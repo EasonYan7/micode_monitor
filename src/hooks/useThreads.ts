@@ -488,6 +488,7 @@ export function useThreads({
       }) => {
         dispatch({ type: "ensureThread", workspaceId, threadId });
         dispatch({ type: "completeAgentMessage", threadId, itemId, text });
+        dispatch({ type: "markProcessing", threadId, isProcessing: false });
         if (threadId !== activeThreadId) {
           dispatch({ type: "markUnread", threadId, hasUnread: true });
         }
@@ -617,6 +618,7 @@ export function useThreads({
 
       const messageText = text.trim();
       dispatch({ type: "addUserMessage", threadId, text: messageText });
+      dispatch({ type: "markProcessing", threadId, isProcessing: true });
       onDebug?.({
         id: `${Date.now()}-client-turn-start`,
         timestamp: Date.now(),

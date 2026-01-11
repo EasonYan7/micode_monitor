@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type { ConversationItem } from "../types";
 
 type MessagesProps = {
@@ -6,6 +7,12 @@ type MessagesProps = {
 };
 
 export function Messages({ items, isThinking }: MessagesProps) {
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [items.length, isThinking]);
+
   return (
     <div className="messages messages-full">
       {items.map((item) => {
@@ -60,6 +67,7 @@ export function Messages({ items, isThinking }: MessagesProps) {
           Start a thread and send a prompt to the agent.
         </div>
       )}
+      <div ref={bottomRef} />
     </div>
   );
 }
