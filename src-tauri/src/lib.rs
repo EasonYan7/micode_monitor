@@ -379,6 +379,8 @@ async fn send_user_message(
     workspace_id: String,
     thread_id: String,
     text: String,
+    model: Option<String>,
+    effort: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
     let sessions = state.sessions.lock().await;
@@ -394,9 +396,24 @@ async fn send_user_message(
             "type": "workspaceWrite",
             "writableRoots": [session.entry.path],
             "networkAccess": true
-        }
+        },
+        "model": model,
+        "effort": effort,
     });
     session.send_request("turn/start", params).await
+}
+
+#[tauri::command]
+async fn model_list(
+    workspace_id: String,
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
+    let sessions = state.sessions.lock().await;
+    let session = sessions
+        .get(&workspace_id)
+        .ok_or("workspace not connected")?;
+    let params = json!({});
+    session.send_request("model/list", params).await
 }
 
 #[tauri::command]
@@ -531,6 +548,7 @@ async fn get_git_status(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .enable_macos_default_menu(false)
         .setup(|app| {
             let state = AppState::load(&app.handle());
             app.manage(state);
@@ -546,7 +564,8 @@ pub fn run() {
             send_user_message,
             respond_to_server_request,
             connect_workspace,
-            get_git_status
+            get_git_status,
+            model_list
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -16,9 +16,12 @@
         "title": "CodexMonitor",
         "width": 1100,
         "height": 720,
+        "minWidth": 800,
+        "minHeight": 600,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "transparent": true,
+        "devtools": false,
         "windowEffects": {
           "effects": ["hudWindow"],
           "state": "active",

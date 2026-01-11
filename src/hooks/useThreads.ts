@@ -19,12 +19,16 @@ type ThreadState = {
   activeThreadIdByWorkspace: Record<string, string | null>;
   messagesByThread: Record<string, Message[]>;
   threadsByWorkspace: Record<string, ThreadSummary[]>;
+  threadStatusById: Record<string, { isProcessing: boolean; hasUnread: boolean }>;
   approvals: ApprovalRequest[];
 };
 
 type ThreadAction =
   | { type: "setActiveThreadId"; workspaceId: string; threadId: string | null }
   | { type: "ensureThread"; workspaceId: string; threadId: string }
+  | { type: "removeThread"; workspaceId: string; threadId: string }
+  | { type: "markProcessing"; threadId: string; isProcessing: boolean }
+  | { type: "markUnread"; threadId: string; hasUnread: boolean }
   | { type: "addUserMessage"; threadId: string; message: Message }
   | { type: "appendAgentDelta"; threadId: string; itemId: string; delta: string }
   | { type: "completeAgentMessage"; threadId: string; itemId: string; text: string }
@@ -35,6 +39,7 @@ const initialState: ThreadState = {
   activeThreadIdByWorkspace: {},
   messagesByThread: emptyMessages,
   threadsByWorkspace: {},
+  threadStatusById: {},
   approvals: [],
 };
 
@@ -47,6 +52,16 @@ function threadReducer(state: ThreadState, action: ThreadAction): ThreadState {
           ...state.activeThreadIdByWorkspace,
           [action.workspaceId]: action.threadId,
         },
+        threadStatusById: action.threadId
+          ? {
+              ...state.threadStatusById,
+              [action.threadId]: {
+                isProcessing:
+                  state.threadStatusById[action.threadId]?.isProcessing ?? false,
+                hasUnread: false,
+              },
+            }
+          : state.threadStatusById,
       };
     case "ensureThread": {
       const list = state.threadsByWorkspace[action.workspaceId] ?? [];
@@ -63,6 +78,10 @@ function threadReducer(state: ThreadState, action: ThreadAction): ThreadState {
           ...state.threadsByWorkspace,
           [action.workspaceId]: [...list, thread],
         },
+        threadStatusById: {
+          ...state.threadStatusById,
+          [action.threadId]: { isProcessing: false, hasUnread: false },
+        },
         activeThreadIdByWorkspace: {
           ...state.activeThreadIdByWorkspace,
           [action.workspaceId]:
@@ -70,6 +89,52 @@ function threadReducer(state: ThreadState, action: ThreadAction): ThreadState {
         },
       };
     }
+    case "removeThread": {
+      const list = state.threadsByWorkspace[action.workspaceId] ?? [];
+      const filtered = list.filter((thread) => thread.id !== action.threadId);
+      const nextActive =
+        state.activeThreadIdByWorkspace[action.workspaceId] === action.threadId
+          ? filtered[0]?.id ?? null
+          : state.activeThreadIdByWorkspace[action.workspaceId] ?? null;
+      const { [action.threadId]: _, ...restMessages } = state.messagesByThread;
+      const { [action.threadId]: __, ...restStatus } = state.threadStatusById;
+      return {
+        ...state,
+        threadsByWorkspace: {
+          ...state.threadsByWorkspace,
+          [action.workspaceId]: filtered,
+        },
+        messagesByThread: restMessages,
+        threadStatusById: restStatus,
+        activeThreadIdByWorkspace: {
+          ...state.activeThreadIdByWorkspace,
+          [action.workspaceId]: nextActive,
+        },
+      };
+    }
+    case "markProcessing":
+      return {
+        ...state,
+        threadStatusById: {
+          ...state.threadStatusById,
+          [action.threadId]: {
+            isProcessing: action.isProcessing,
+            hasUnread: state.threadStatusById[action.threadId]?.hasUnread ?? false,
+          },
+        },
+      };
+    case "markUnread":
+      return {
+        ...state,
+        threadStatusById: {
+          ...state.threadStatusById,
+          [action.threadId]: {
+            isProcessing:
+              state.threadStatusById[action.threadId]?.isProcessing ?? false,
+            hasUnread: action.hasUnread,
+          },
+        },
+      };
     case "addUserMessage": {
       const list = state.messagesByThread[action.threadId] ?? [];
       return {
@@ -124,12 +189,16 @@ type UseThreadsOptions = {
   activeWorkspace: WorkspaceInfo | null;
   onWorkspaceConnected: (id: string) => void;
   onDebug?: (entry: DebugEntry) => void;
+  model?: string | null;
+  effort?: string | null;
 };
 
 export function useThreads({
   activeWorkspace,
   onWorkspaceConnected,
   onDebug,
+  model,
+  effort,
 }: UseThreadsOptions) {
   const [state, dispatch] = useReducer(threadReducer, initialState);
 
@@ -198,9 +267,23 @@ export function useThreads({
       }) => {
         dispatch({ type: "ensureThread", workspaceId, threadId });
         dispatch({ type: "completeAgentMessage", threadId, itemId, text });
+        if (threadId !== activeThreadId) {
+          dispatch({ type: "markUnread", threadId, hasUnread: true });
+        }
+      },
+      onTurnStarted: (workspaceId: string, threadId: string) => {
+        dispatch({
+          type: "ensureThread",
+          workspaceId,
+          threadId,
+        });
+        dispatch({ type: "markProcessing", threadId, isProcessing: true });
+      },
+      onTurnCompleted: (_workspaceId: string, threadId: string) => {
+        dispatch({ type: "markProcessing", threadId, isProcessing: false });
       },
     }),
-    [handleWorkspaceConnected, onDebug],
+    [activeThreadId, activeWorkspaceId, handleWorkspaceConnected, onDebug],
   );
 
   useAppServerEvents(handlers);
@@ -276,13 +359,20 @@ export function useThreads({
         timestamp: Date.now(),
         source: "client",
         label: "turn/start",
-        payload: { workspaceId: activeWorkspace.id, threadId, text: message.text },
+        payload: {
+          workspaceId: activeWorkspace.id,
+          threadId,
+          text: message.text,
+          model,
+          effort,
+        },
       });
       try {
         const response = await sendUserMessageService(
           activeWorkspace.id,
           threadId,
           message.text,
+          { model, effort },
         );
         onDebug?.({
           id: `${Date.now()}-server-turn-start`,
@@ -302,7 +392,7 @@ export function useThreads({
         throw error;
       }
     },
-    [activeWorkspace, activeThreadId, onDebug, startThread],
+    [activeWorkspace, activeThreadId, effort, model, onDebug, startThread],
   );
 
   const handleApprovalDecision = useCallback(
@@ -328,12 +418,18 @@ export function useThreads({
     [activeWorkspaceId],
   );
 
+  const removeThread = useCallback((workspaceId: string, threadId: string) => {
+    dispatch({ type: "removeThread", workspaceId, threadId });
+  }, []);
+
   return {
     activeThreadId,
     setActiveThreadId,
     activeMessages,
     approvals: state.approvals,
     threadsByWorkspace: state.threadsByWorkspace,
+    threadStatusById: state.threadStatusById,
+    removeThread,
     startThread,
     startThreadForWorkspace,
     sendUserMessage,

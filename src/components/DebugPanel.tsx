@@ -5,6 +5,7 @@ type DebugPanelProps = {
   isOpen: boolean;
   onToggle: () => void;
   onClear: () => void;
+  onCopy: () => void;
 };
 
 function formatPayload(payload: unknown) {
@@ -26,6 +27,7 @@ export function DebugPanel({
   isOpen,
   onToggle,
   onClear,
+  onCopy,
 }: DebugPanelProps) {
   if (!isOpen) {
     return null;
@@ -36,6 +38,9 @@ export function DebugPanel({
       <div className="debug-header">
         <div className="debug-title">Debug</div>
         <div className="debug-actions">
+          <button className="ghost" onClick={onCopy}>
+            Copy
+          </button>
           <button className="ghost" onClick={onClear}>
             Clear
           </button>

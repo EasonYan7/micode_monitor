@@ -36,6 +36,16 @@ export type GitFileStatus = {
   deletions: number;
 };
 
+export type ModelOption = {
+  id: string;
+  model: string;
+  displayName: string;
+  description: string;
+  supportedReasoningEfforts: { reasoningEffort: string; description: string }[];
+  defaultReasoningEffort: string;
+  isDefault: boolean;
+};
+
 export type DebugEntry = {
   id: string;
   timestamp: number;

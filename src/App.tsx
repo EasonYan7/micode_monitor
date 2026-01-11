@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import "./styles/base.css";
 import "./styles/buttons.css";
 import "./styles/sidebar.css";
@@ -21,6 +21,7 @@ import { useWorkspaces } from "./hooks/useWorkspaces";
 import { useThreads } from "./hooks/useThreads";
 import { useWindowDrag } from "./hooks/useWindowDrag";
 import { useGitStatus } from "./hooks/useGitStatus";
+import { useModels } from "./hooks/useModels";
 import type { DebugEntry } from "./types";
 
 function App() {
@@ -28,8 +29,28 @@ function App() {
   const [debugOpen, setDebugOpen] = useState(false);
   const [debugEntries, setDebugEntries] = useState<DebugEntry[]>([]);
 
-  const addDebugEntry = (entry: DebugEntry) => {
+  const addDebugEntry = useCallback((entry: DebugEntry) => {
     setDebugEntries((prev) => [...prev, entry].slice(-300));
+  }, []);
+
+  const handleCopyDebug = async () => {
+    const text = debugEntries
+      .map((entry) => {
+        const timestamp = new Date(entry.timestamp).toLocaleTimeString();
+        const payload =
+          entry.payload !== undefined
+            ? typeof entry.payload === "string"
+              ? entry.payload
+              : JSON.stringify(entry.payload, null, 2)
+            : "";
+        return [entry.source.toUpperCase(), timestamp, entry.label, payload]
+          .filter(Boolean)
+          .join("\n");
+      })
+      .join("\n\n");
+    if (text) {
+      await navigator.clipboard.writeText(text);
+    }
   };
 
   const {
@@ -42,12 +63,27 @@ function App() {
     markWorkspaceConnected,
   } = useWorkspaces({ onDebug: addDebugEntry });
 
+  const gitStatus = useGitStatus(activeWorkspace);
+  const {
+    models,
+    selectedModel,
+    selectedModelId,
+    setSelectedModelId,
+    reasoningOptions,
+    selectedEffort,
+    setSelectedEffort,
+  } = useModels({ activeWorkspace, onDebug: addDebugEntry });
+
+  const resolvedModel = selectedModel?.model ?? null;
+
   const {
     setActiveThreadId,
     activeThreadId,
     activeMessages,
     approvals,
     threadsByWorkspace,
+    threadStatusById,
+    removeThread,
     startThread,
     startThreadForWorkspace,
     sendUserMessage,
@@ -56,9 +92,9 @@ function App() {
     activeWorkspace,
     onWorkspaceConnected: markWorkspaceConnected,
     onDebug: addDebugEntry,
+    model: resolvedModel,
+    effort: selectedEffort,
   });
-
-  const gitStatus = useGitStatus(activeWorkspace);
 
   useWindowDrag("titlebar");
 
@@ -100,6 +136,7 @@ function App() {
       <Sidebar
         workspaces={workspaces}
         threadsByWorkspace={threadsByWorkspace}
+        threadStatusById={threadStatusById}
         activeWorkspaceId={activeWorkspaceId}
         activeThreadId={activeThreadId}
         onAddWorkspace={handleAddWorkspace}
@@ -117,6 +154,9 @@ function App() {
         onSelectThread={(workspaceId, threadId) => {
           setActiveWorkspaceId(workspaceId);
           setActiveThreadId(threadId, workspaceId);
+        }}
+        onDeleteThread={(workspaceId, threadId) => {
+          removeThread(workspaceId, threadId);
         }}
       />
 
@@ -164,12 +204,23 @@ function App() {
               <Approvals approvals={approvals} onDecision={handleApprovalDecision} />
             </div>
 
-            <Composer value={input} onChange={setInput} onSend={handleSend} />
+            <Composer
+              value={input}
+              onChange={setInput}
+              onSend={handleSend}
+              models={models}
+              selectedModelId={selectedModelId}
+              onSelectModel={setSelectedModelId}
+              reasoningOptions={reasoningOptions}
+              selectedEffort={selectedEffort}
+              onSelectEffort={setSelectedEffort}
+            />
             <DebugPanel
               entries={debugEntries}
               isOpen={debugOpen}
               onToggle={() => setDebugOpen((prev) => !prev)}
               onClear={() => setDebugEntries([])}
+              onCopy={handleCopyDebug}
             />
           </>
         )}

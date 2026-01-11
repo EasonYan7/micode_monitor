@@ -22,11 +22,14 @@ type AppServerEventHandlers = {
   onAgentMessageDelta?: (event: AgentDelta) => void;
   onAgentMessageCompleted?: (event: AgentCompleted) => void;
   onAppServerEvent?: (event: AppServerEvent) => void;
+  onTurnStarted?: (workspaceId: string, threadId: string) => void;
+  onTurnCompleted?: (workspaceId: string, threadId: string) => void;
 };
 
 export function useAppServerEvents(handlers: AppServerEventHandlers) {
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
+    let unlisten: (() => void) | null = null;
+    let canceled = false;
     listen<AppServerEvent>("app-server-event", (event) => {
       handlers.onAppServerEvent?.(event.payload);
 
@@ -64,6 +67,26 @@ export function useAppServerEvents(handlers: AppServerEventHandlers) {
         return;
       }
 
+      if (method === "turn/started") {
+        const params = message.params as Record<string, unknown>;
+        const turn = params.turn as Record<string, unknown> | undefined;
+        const threadId = String(turn?.threadId ?? turn?.thread_id ?? "");
+        if (threadId) {
+          handlers.onTurnStarted?.(workspace_id, threadId);
+        }
+        return;
+      }
+
+      if (method === "turn/completed") {
+        const params = message.params as Record<string, unknown>;
+        const turn = params.turn as Record<string, unknown> | undefined;
+        const threadId = String(turn?.threadId ?? turn?.thread_id ?? "");
+        if (threadId) {
+          handlers.onTurnCompleted?.(workspace_id, threadId);
+        }
+        return;
+      }
+
       if (method === "item/completed") {
         const params = message.params as Record<string, unknown>;
         const threadId = String(params.threadId ?? params.thread_id ?? "");
@@ -82,10 +105,15 @@ export function useAppServerEvents(handlers: AppServerEventHandlers) {
         }
       }
     }).then((handler) => {
-      unlisten = handler;
+      if (canceled) {
+        handler();
+      } else {
+        unlisten = handler;
+      }
     });
 
     return () => {
+      canceled = true;
       if (unlisten) {
         unlisten();
       }

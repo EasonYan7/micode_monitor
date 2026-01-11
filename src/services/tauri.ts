@@ -34,8 +34,15 @@ export async function sendUserMessage(
   workspaceId: string,
   threadId: string,
   text: string,
+  options?: { model?: string | null; effort?: string | null },
 ) {
-  return invoke("send_user_message", { workspaceId, threadId, text });
+  return invoke("send_user_message", {
+    workspaceId,
+    threadId,
+    text,
+    model: options?.model ?? null,
+    effort: options?.effort ?? null,
+  });
 }
 
 export async function respondToServerRequest(
@@ -57,4 +64,8 @@ export async function getGitStatus(workspace_id: string): Promise<{
   totalDeletions: number;
 }> {
   return invoke("get_git_status", { workspaceId: workspace_id });
+}
+
+export async function getModelList(workspaceId: string) {
+  return invoke<any>("model_list", { workspaceId });
 }

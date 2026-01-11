@@ -127,16 +127,37 @@
 .thread-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
   color: rgba(255, 255, 255, 0.72);
   font-size: 12px;
   cursor: pointer;
-  text-align: left;
   -webkit-app-region: no-drag;
+}
+
+.thread-status {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  display: inline-block;
+  margin-left: 4px;
+}
+
+.thread-status.processing {
+  background: #ff9f43;
+  box-shadow: 0 0 8px rgba(255, 159, 67, 0.8);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.thread-status.unread {
+  background: #4da3ff;
+  box-shadow: 0 0 8px rgba(77, 163, 255, 0.7);
+}
+
+.thread-status.ready {
+  background: #3fe47e;
+  box-shadow: 0 0 8px rgba(63, 228, 126, 0.5);
 }
 
 .thread-row:hover {
@@ -149,13 +170,69 @@
   color: #fff;
 }
 
-.thread-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.4);
+.thread-name {
+  flex: 1;
 }
 
-.thread-row.active .thread-dot {
-  background: rgba(100, 200, 255, 0.8);
+
+.thread-menu {
+  position: relative;
+}
+
+.thread-menu-trigger {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  padding: 2px 4px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.thread-menu-trigger:hover {
+  color: #fff;
+}
+
+.thread-menu-popup {
+  position: absolute;
+  right: 0;
+  top: 22px;
+  background: rgba(20, 24, 34, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 6px;
+  min-width: 120px;
+  z-index: 5;
+}
+
+.thread-menu-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  padding: 6px 8px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.thread-menu-item:hover {
+  background: rgba(255, 90, 90, 0.15);
+  color: #ff7a7a;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
 }
