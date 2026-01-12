@@ -6,7 +6,7 @@ import "./styles/sidebar.css";
 import "./styles/home.css";
 import "./styles/main.css";
 import "./styles/messages.css";
-import "./styles/approvals.css";
+import "./styles/approval-toasts.css";
 import "./styles/composer.css";
 import "./styles/diff.css";
 import "./styles/diff-viewer.css";
@@ -17,7 +17,7 @@ import { Sidebar } from "./components/Sidebar";
 import { Home } from "./components/Home";
 import { MainHeader } from "./components/MainHeader";
 import { Messages } from "./components/Messages";
-import { Approvals } from "./components/Approvals";
+import { ApprovalToasts } from "./components/ApprovalToasts";
 import { Composer } from "./components/Composer";
 import { GitDiffPanel } from "./components/GitDiffPanel";
 import { GitDiffViewer } from "./components/GitDiffViewer";
@@ -430,6 +430,11 @@ function MainApp() {
                 )}
               </div>
             </div>
+            <ApprovalToasts
+              approvals={approvals}
+              workspaces={workspaces}
+              onDecision={handleApprovalDecision}
+            />
 
             <div className="content">
               {centerMode === "diff" ? (
@@ -460,24 +465,23 @@ function MainApp() {
             />
             <div className={`right-panel ${hasActivePlan ? "" : "plan-collapsed"}`}>
               <div className="right-panel-top">
-              <GitDiffPanel
-                mode={gitPanelMode}
-                onModeChange={setGitPanelMode}
-                branchName={gitStatus.branchName || "unknown"}
-                totalAdditions={gitStatus.totalAdditions}
-                totalDeletions={gitStatus.totalDeletions}
-                fileStatus={fileStatus}
-                error={gitStatus.error}
-                logError={gitLogError}
-                logLoading={gitLogLoading}
-                files={gitStatus.files}
-                selectedPath={selectedDiffPath}
-                onSelectFile={handleSelectDiff}
-                logEntries={gitLogEntries}
-                logTotal={gitLogTotal}
-                gitRemoteUrl={gitRemoteUrl}
-              />
-                <Approvals approvals={approvals} onDecision={handleApprovalDecision} />
+                <GitDiffPanel
+                  mode={gitPanelMode}
+                  onModeChange={setGitPanelMode}
+                  branchName={gitStatus.branchName || "unknown"}
+                  totalAdditions={gitStatus.totalAdditions}
+                  totalDeletions={gitStatus.totalDeletions}
+                  fileStatus={fileStatus}
+                  error={gitStatus.error}
+                  logError={gitLogError}
+                  logLoading={gitLogLoading}
+                  files={gitStatus.files}
+                  selectedPath={selectedDiffPath}
+                  onSelectFile={handleSelectDiff}
+                  logEntries={gitLogEntries}
+                  logTotal={gitLogTotal}
+                  gitRemoteUrl={gitRemoteUrl}
+                />
               </div>
               <div
                 className="right-panel-divider"
