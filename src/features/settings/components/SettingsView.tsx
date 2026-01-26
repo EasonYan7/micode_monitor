@@ -24,7 +24,11 @@ import type {
   WorkspaceInfo,
 } from "../../../types";
 import { formatDownloadSize } from "../../../utils/formatting";
-import { buildShortcutValue, formatShortcut } from "../../../utils/shortcuts";
+import {
+  buildShortcutValue,
+  formatShortcut,
+  getDefaultInterruptShortcut,
+} from "../../../utils/shortcuts";
 import { clampUiScale } from "../../../utils/uiScale";
 import { getCodexConfigPath } from "../../../services/tauri";
 import {
@@ -174,6 +178,7 @@ type ShortcutSettingKey =
   | "composerAccessShortcut"
   | "composerReasoningShortcut"
   | "composerCollaborationShortcut"
+  | "interruptShortcut"
   | "newAgentShortcut"
   | "newWorktreeAgentShortcut"
   | "newCloneAgentShortcut"
@@ -190,6 +195,7 @@ type ShortcutDraftKey =
   | "access"
   | "reasoning"
   | "collaboration"
+  | "interrupt"
   | "newAgent"
   | "newWorktreeAgent"
   | "newCloneAgent"
@@ -209,6 +215,7 @@ const shortcutDraftKeyBySetting: Record<ShortcutSettingKey, ShortcutDraftKey> = 
   composerAccessShortcut: "access",
   composerReasoningShortcut: "reasoning",
   composerCollaborationShortcut: "collaboration",
+  interruptShortcut: "interrupt",
   newAgentShortcut: "newAgent",
   newWorktreeAgentShortcut: "newWorktreeAgent",
   newCloneAgentShortcut: "newCloneAgent",
@@ -304,6 +311,7 @@ export function SettingsView({
     access: appSettings.composerAccessShortcut ?? "",
     reasoning: appSettings.composerReasoningShortcut ?? "",
     collaboration: appSettings.composerCollaborationShortcut ?? "",
+    interrupt: appSettings.interruptShortcut ?? "",
     newAgent: appSettings.newAgentShortcut ?? "",
     newWorktreeAgent: appSettings.newWorktreeAgentShortcut ?? "",
     newCloneAgent: appSettings.newCloneAgentShortcut ?? "",
@@ -405,6 +413,7 @@ export function SettingsView({
       access: appSettings.composerAccessShortcut ?? "",
       reasoning: appSettings.composerReasoningShortcut ?? "",
       collaboration: appSettings.composerCollaborationShortcut ?? "",
+      interrupt: appSettings.interruptShortcut ?? "",
       newAgent: appSettings.newAgentShortcut ?? "",
       newWorktreeAgent: appSettings.newWorktreeAgentShortcut ?? "",
       newCloneAgent: appSettings.newCloneAgentShortcut ?? "",
@@ -422,6 +431,7 @@ export function SettingsView({
     appSettings.composerModelShortcut,
     appSettings.composerReasoningShortcut,
     appSettings.composerCollaborationShortcut,
+    appSettings.interruptShortcut,
     appSettings.newAgentShortcut,
     appSettings.newWorktreeAgentShortcut,
     appSettings.newCloneAgentShortcut,
@@ -2020,6 +2030,30 @@ export function SettingsView({
                   </div>
                   <div className="settings-help">
                     Default: {formatShortcut("shift+tab")}
+                  </div>
+                </div>
+                <div className="settings-field">
+                  <div className="settings-field-label">Stop active run</div>
+                  <div className="settings-field-row">
+                    <input
+                      className="settings-input settings-input--shortcut"
+                      value={formatShortcut(shortcutDrafts.interrupt)}
+                      onKeyDown={(event) =>
+                        handleShortcutKeyDown(event, "interruptShortcut")
+                      }
+                      placeholder="Type shortcut"
+                      readOnly
+                    />
+                    <button
+                      type="button"
+                      className="ghost settings-button-compact"
+                      onClick={() => void updateShortcut("interruptShortcut", null)}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="settings-help">
+                    Default: {formatShortcut(getDefaultInterruptShortcut())}
                   </div>
                 </div>
                 <div className="settings-divider" />

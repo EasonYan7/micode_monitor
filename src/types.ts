@@ -117,6 +117,7 @@ export type AppSettings = {
   composerAccessShortcut: string | null;
   composerReasoningShortcut: string | null;
   composerCollaborationShortcut: string | null;
+  interruptShortcut: string | null;
   newAgentShortcut: string | null;
   newWorktreeAgentShortcut: string | null;
   newCloneAgentShortcut: string | null;
