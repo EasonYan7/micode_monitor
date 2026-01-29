@@ -1,82 +1,221 @@
 # CodexMonitor Agent Guide
 
 ## Project Summary
-CodexMonitor is a macOS Tauri app that orchestrates Codex agents across local workspaces. The frontend is React + Vite; the backend is a Tauri Rust process that spawns `codex app-server` per workspace and streams JSON-RPC events.
+CodexMonitor is a Tauri app that orchestrates Codex agents across local workspaces.
+
+- Frontend: React + Vite
+- Backend (app): Tauri Rust process
+- Backend (daemon): `src-tauri/src/bin/codex_monitor_daemon.rs`
+- Core idea: shared backend domain logic lives under `src-tauri/src/shared/`
+
+## State-of-the-Art Backend Architecture
+
+The backend now has a clear separation between shared domain logic and environment wiring.
+
+- Shared domain/core logic: `src-tauri/src/shared/*`
+- App wiring and platform concerns: `src-tauri/src/*.rs` and `src-tauri/src/workspaces/*`
+- Daemon wiring and transport concerns: `src-tauri/src/bin/codex_monitor_daemon.rs`
+
+### Shared Core Modules (Source of Truth)
+
+These modules are the primary place for backend logic that must work in both the app and the daemon.
+
+- `src-tauri/src/shared/codex_core.rs`
+  - Threads, approvals, login/cancel, account, skills, config model
+- `src-tauri/src/shared/workspaces_core.rs`
+  - Workspace/worktree operations, persistence, sorting, and git command helpers
+- `src-tauri/src/shared/settings_core.rs`
+  - App settings load/update, Codex config path
+- `src-tauri/src/shared/files_core.rs`
+  - File read/write logic
+- `src-tauri/src/shared/git_core.rs`
+  - Git command helpers and remote/branch logic
+- `src-tauri/src/shared/worktree_core.rs`
+  - Worktree naming/path helpers and clone destination helpers
+- `src-tauri/src/shared/account.rs`
+  - Account helper utilities and tests
+
+### App/Daemon Pattern
+
+Use this mental model when changing backend code:
+
+1. Put shared logic in a shared core module.
+2. Keep app and daemon code as thin adapters.
+3. Pass environment-specific behavior via closures or small adapter helpers.
+
+The app and daemon should not re-implement domain logic.
 
 ## Key Paths
 
-- `src/App.tsx`: composition root
-- `src/features/`: feature-sliced UI, hooks, and local helpers
-- `src/features/settings/components/SettingsView.tsx`: settings UI (projects, display, Codex)
-- `src/features/update/components/UpdateToast.tsx`: in-app updater UI
-- `src/features/home/components/Home.tsx`: home dashboard + latest agent runs
-- `src/features/settings/hooks/useAppSettings.ts`: app settings load/save + doctor
-- `src/features/update/hooks/useUpdater.ts`: update checks + install flow
-- `src/features/layout/hooks/useResizablePanels.ts`: panel resize + persistence
-- `src/features/composer/hooks/useComposerImages.ts`: image attachment state
-- `src/features/composer/hooks/useComposerImageDrop.ts`: drag/drop + paste images
-- `src/features/git/hooks/useGitHubIssues.ts`: GitHub issues tab data
-- `src/utils/threadItems.ts`: thread item normalization + conversion
-- `src/services/tauri.ts`: Tauri IPC wrapper
-- `src/styles/`: split CSS by area
-- `src/types.ts`: shared types
-- `src-tauri/src/lib.rs`: backend app-server client
-- `src-tauri/src/git.rs`: git status/log/diff + GitHub issues via `gh`
-- `src-tauri/src/settings.rs`: app settings persistence
-- `src-tauri/src/codex_config.rs`: read/write Codex `config.toml` feature flags
-- `src-tauri/src/prompts.rs`: custom prompt discovery/parsing
-- `src-tauri/tauri.conf.json`: window config + effects
+### Frontend
+
+- Composition root: `src/App.tsx`
+- Feature slices: `src/features/`
+- Tauri IPC wrapper: `src/services/tauri.ts`
+- Tauri event hub: `src/services/events.ts`
+- Shared UI types: `src/types.ts`
+- Thread item normalization: `src/utils/threadItems.ts`
+- Styles: `src/styles/`
+
+### Backend (App)
+
+- Tauri command registry: `src-tauri/src/lib.rs`
+- Codex commands adapter: `src-tauri/src/codex.rs`
+- Settings adapter: `src-tauri/src/settings.rs`
+- Files adapter: `src-tauri/src/files.rs`
+- Workspaces adapters: `src-tauri/src/workspaces/*`
+- Top-level git features: `src-tauri/src/git.rs`
+
+### Backend (Daemon)
+
+- Daemon entrypoint: `src-tauri/src/bin/codex_monitor_daemon.rs`
+- Daemon uses shared cores via `#[path = "../shared/mod.rs"] mod shared;`
 
 ## Architecture Guidelines
 
-- **Composition root**: keep orchestration in `src/App.tsx`; avoid logic in components.
-- **Components**: presentational only; props in, UI out; no Tauri IPC calls.
-- **Hooks**: own state, side-effects, and event wiring (e.g., app-server events).
-- **Utils**: pure helpers live in `src/utils/` (no React hooks here).
-- **Services**: all Tauri IPC goes through `src/services/` (prefer `src/services/tauri.ts`; event subscriptions can live in `src/services/events.ts`).
-- **Types**: shared UI data types live in `src/types.ts`.
-- **Styles**: one CSS file per UI area in `src/styles/` (no global refactors in components).
-- **Backend IPC**: add new commands in `src-tauri/src/lib.rs` and mirror them in the service.
-- **App-server protocol**: do not send any requests before `initialize/initialized`.
-- **Keep `src/App.tsx` lean**:
-  - Keep it to wiring: hook composition, top-level layout, and route/section assembly.
-  - Move stateful logic/effects into hooks under `src/features/app/hooks/`.
-  - Keep Tauri IPC, menu listeners, and subscriptions out of `src/App.tsx` (use hooks/services).
-  - If a block grows beyond ~60 lines or needs its own state/effects, extract it.
+### Frontend Guidelines
+
+- Composition root: keep orchestration in `src/App.tsx`.
+- Components: presentational only. Props in, UI out. No Tauri IPC.
+- Hooks: own state, side effects, and event wiring.
+- Utils: pure helpers only in `src/utils/`.
+- Services: all Tauri IPC goes through `src/services/`.
+- Types: shared UI types live in `src/types.ts`.
+- Styles: one CSS file per UI area under `src/styles/`.
+
+Keep `src/App.tsx` lean:
+
+- Keep it to wiring: hook composition, layout, and assembly.
+- Move stateful logic/effects into hooks under `src/features/app/hooks/`.
+- Keep Tauri IPC, menu listeners, and subscriptions out of `src/App.tsx`.
+
+### Backend Guidelines
+
+- Shared logic goes in `src-tauri/src/shared/` first.
+- App and daemon should be thin adapters around shared cores.
+- Avoid duplicating git/worktree/codex/settings/files logic in adapters.
+- Prefer explicit, readable adapter helpers over clever abstractions.
+
+## Daemon: How and When to Add Code (No Duplication)
+
+The daemon exists to run backend logic outside the Tauri app. It must not become a second implementation.
+
+### When to Update the Daemon
+
+Update the daemon when one of these is true:
+
+- A Tauri command is also used in remote mode.
+- The daemon needs to expose the same behavior over its JSON-RPC transport.
+- Shared core behavior changes and the daemon wiring must pass new inputs.
+
+### Where Code Should Go
+
+Use this decision rule:
+
+1. Shared behavior or domain logic:
+   - Add or update code in `src-tauri/src/shared/*.rs`.
+2. App-only behavior:
+   - Update the app adapters or Tauri commands.
+3. Daemon-only transport/wiring behavior:
+   - Update `src-tauri/src/bin/codex_monitor_daemon.rs`.
+
+### How to Add a New Backend Command (Correctly)
+
+Follow this order to avoid duplication:
+
+1. Implement the core logic in a shared module.
+   - Usually `codex_core.rs`, `workspaces_core.rs`, `settings_core.rs`, or `files_core.rs`.
+2. Wire it in the app.
+   - Add a Tauri command in `src-tauri/src/lib.rs`.
+   - Call the shared core from the appropriate adapter.
+   - Mirror it in `src/services/tauri.ts`.
+3. Wire it in the daemon.
+   - Add a daemon method that calls the same shared core.
+   - Add the JSON-RPC handler branch in `codex_monitor_daemon.rs`.
+
+### Adapter Patterns to Reuse
+
+Prefer these existing patterns:
+
+- Shared git unit wrapper:
+  - `workspaces_core::run_git_command_unit(...)`
+- App spawn adapter:
+  - `spawn_with_app(...)` in `src-tauri/src/workspaces/commands.rs`
+- Daemon spawn adapter:
+  - `spawn_with_client(...)` in `src-tauri/src/bin/codex_monitor_daemon.rs`
+
+If you find yourself copying logic between app and daemon, stop and extract it into `src-tauri/src/shared/`.
 
 ## App-Server Flow
 
 - Backend spawns `codex app-server` using the `codex` binary.
-- Initializes with `initialize` request and `initialized` notification.
-- Streams JSON-RPC notifications over stdout; request/response pairs use `id`.
-- Approval requests arrive as server-initiated JSON-RPC requests.
-- Threads are fetched via `thread/list`, filtered by `cwd`, and resumed via `thread/resume` when selected.
-- Archiving uses `thread/archive` and removes the thread from the UI list.
+- Initialize with `initialize` and then `initialized`.
+- Do not send requests before initialization.
+- JSON-RPC notifications stream over stdout.
+- Threads are listed via `thread/list` and resumed via `thread/resume`.
+- Archiving uses `thread/archive`.
 
 ## Event Stack (Tauri → React)
 
-The app uses a shared event hub for Tauri events so each event has exactly one native `listen` and fan-outs to React subscribers.
+The app uses a shared event hub so each native event has one `listen` and many subscribers.
 
-- **Backend emits**: `src-tauri/src/lib.rs` uses `emit_menu_event` (or `app.emit`) to send events to the `"main"` window.
-- **Frontend hub**: `src/services/events.ts` defines `createEventHub` and module-level hubs (one per event). These hubs call `listen` once and dispatch to subscribers. Each listener call is wrapped in `try/catch` so one handler cannot block others.
-- **React subscription**: components/hooks call `useTauriEvent` with a `subscribeX` function from `src/services/events.ts`. Avoid calling `listen` directly from React.
+- Backend emits: `src-tauri/src/lib.rs` emits events to the main window.
+- Frontend hub: `src/services/events.ts` defines `createEventHub` and module-level hubs.
+- React subscription: use `useTauriEvent(subscribeX, handler)`.
 
-### Adding a new Tauri event
+### Adding a New Tauri Event
 
-1) **Backend emit**: add a new menu item or command in `src-tauri/src/lib.rs` that calls `app.emit("event-name", payload)` or `emit_menu_event(...)`.
-2) **Frontend hub**: add a hub and subscription in `src/services/events.ts`:
-   - Define the payload type (or reuse an existing one).
-   - Create `const myEventHub = createEventHub<MyPayload>("event-name");`
-   - Export `subscribeMyEvent(onEvent, options)` that delegates to the hub.
-3) **React usage**: wire it up with `useTauriEvent(subscribeMyEvent, handler)` in a hook/component (usually `src/App.tsx` or a feature hook).
-4) **Tests**: update `src/services/events.test.ts` if you add new subscription helpers.
+1. Emit the event in `src-tauri/src/lib.rs`.
+2. Add a hub and `subscribeX` helper in `src/services/events.ts`.
+3. Subscribe via `useTauriEvent` in a hook or component.
+4. Update `src/services/events.test.ts` if you add new subscription helpers.
 
 ## Workspace Persistence
 
-- Workspaces are stored in `workspaces.json` under the app data directory.
-- `list_workspaces` returns saved items; `add_workspace` persists and spawns a session.
+- Workspaces live in `workspaces.json` under the app data directory.
+- Settings live in `settings.json` under the app data directory.
 - On launch, the app connects each workspace once and loads its thread list.
-  - `src/App.tsx` guards this with a `Set` to avoid connect/list loops.
+
+## Common Changes (Where to Look First)
+
+- UI layout or styling:
+  - `src/features/*/components/*` and `src/styles/*`
+- App-server events:
+  - `src/features/app/hooks/useAppServerEvents.ts`
+- Tauri IPC shape:
+  - `src/services/tauri.ts` and `src-tauri/src/lib.rs`
+- Shared backend behavior:
+  - `src-tauri/src/shared/*`
+- Workspaces/worktrees:
+  - Shared core: `src-tauri/src/shared/workspaces_core.rs`
+  - App adapters: `src-tauri/src/workspaces/*`
+  - Daemon wiring: `src-tauri/src/bin/codex_monitor_daemon.rs`
+- Settings and Codex config:
+  - Shared core: `src-tauri/src/shared/settings_core.rs`
+  - App adapter: `src-tauri/src/settings.rs`
+  - Daemon wiring: `src-tauri/src/bin/codex_monitor_daemon.rs`
+- Files:
+  - Shared core: `src-tauri/src/shared/files_core.rs`
+  - App adapter: `src-tauri/src/files.rs`
+- Codex threads/approvals/login:
+  - Shared core: `src-tauri/src/shared/codex_core.rs`
+  - App adapter: `src-tauri/src/codex.rs`
+  - Daemon wiring: `src-tauri/src/bin/codex_monitor_daemon.rs`
+
+## Threads Feature Split (Frontend)
+
+`useThreads` is a composition layer that wires focused hooks and shared utilities.
+
+- Orchestration: `src/features/threads/hooks/useThreads.ts`
+- Actions: `src/features/threads/hooks/useThreadActions.ts`
+- Approvals: `src/features/threads/hooks/useThreadApprovals.ts`
+- Event handlers: `src/features/threads/hooks/useThreadEventHandlers.ts`
+- Messaging: `src/features/threads/hooks/useThreadMessaging.ts`
+- Storage: `src/features/threads/hooks/useThreadStorage.ts`
+- Status helpers: `src/features/threads/hooks/useThreadStatus.ts`
+- Selectors: `src/features/threads/hooks/useThreadSelectors.ts`
+- Rate limits: `src/features/threads/hooks/useThreadRateLimits.ts`
+- Collab links: `src/features/threads/hooks/useThreadLinking.ts`
 
 ## Running Locally
 
@@ -109,71 +248,26 @@ npm run test:watch
 
 ## Validation
 
-- At the end of a task, run `npm run lint` first.
-- Run `npm run test` when you touched thread handling, settings, updater, or any shared utils.
-- Finish with `npm run typecheck`.
+At the end of a task:
 
-## Common Changes
-
-- UI layout or styling: update `src/features/*/components/*` and `src/styles/*`.
-- App-server event handling: edit `src/features/app/hooks/useAppServerEvents.ts`.
-- Tauri IPC: add wrappers in `src/services/tauri.ts` and implement in `src-tauri/src/lib.rs`.
-- App settings or updater behavior: `src/features/settings/hooks/useAppSettings.ts`, `src/features/update/hooks/useUpdater.ts`, and `src/features/settings/components/SettingsView.tsx`.
-- Experimental feature toggles: UI state in `src/features/settings/components/SettingsView.tsx`, shared types in `src/types.ts`, and sync to Codex `config.toml` via `src-tauri/src/codex_config.rs` + `src-tauri/src/settings.rs` (daemon mirror in `src-tauri/src/bin/codex_monitor_daemon.rs`).
-- Git diff behavior: `src/features/git/hooks/useGitStatus.ts` (polling + activity refresh) and `src-tauri/src/lib.rs` (libgit2 status).
-- GitHub issues panel: `src/features/git/hooks/useGitHubIssues.ts` + `src-tauri/src/git.rs`.
-- Thread history rendering: `src/features/threads/hooks/useThreads.ts` merges `thread/resume` turns into UI items.
-  - Thread names can come from the resume preview (when no custom name) or from the first user/assistant message when the name is auto-generated.
-- Thread item parsing/normalization: `src/utils/threadItems.ts`.
-- Thread state reducer: `src/features/threads/hooks/useThreadsReducer.ts`.
-
-## Threads Feature Split
-
-The `useThreads` hook is a composition layer that wires together focused hooks and shared utilities. This keeps side effects isolated and makes the flow easier to test.
-
-- Orchestration: `src/features/threads/hooks/useThreads.ts`
-  - Composes the hooks below and provides the public API to the UI.
-- Actions (RPC + list/paging): `src/features/threads/hooks/useThreadActions.ts`
-  - `thread/start`, `thread/resume`, `thread/list`, pagination, archive.
-  - Updates activity timestamps and thread names/previews.
-- Approvals (allowlist + decisions): `src/features/threads/hooks/useThreadApprovals.ts`
-  - Tracks remembered commands and resolves approval requests.
-- Event handlers (server → reducer): `src/features/threads/hooks/useThreadEventHandlers.ts`
-  - Composes:
-    - `useThreadApprovalEvents.ts` (approval requests + allowlist auto-accept)
-    - `useThreadItemEvents.ts` (item-level updates, deltas, tool/reasoning/agent items)
-    - `useThreadTurnEvents.ts` (turn start/complete/interrupt, plan/token/rate limit updates)
-- Messaging: `src/features/threads/hooks/useThreadMessaging.ts`
-  - Sends user messages and handles local echo/queueing.
-- Thread state/storage: `src/features/threads/hooks/useThreadStorage.ts`
-  - LocalStorage-backed custom names, pinned threads, activity map.
-- Status updates (shared): `src/features/threads/hooks/useThreadStatus.ts`
-  - Centralized helpers for processing/reviewing/active turn updates.
-- Selectors: `src/features/threads/hooks/useThreadSelectors.ts`
-  - Active thread ID/items for the active workspace.
-- Rate limits: `src/features/threads/hooks/useThreadRateLimits.ts`
-  - Fetches and normalizes account rate limits.
-- Collab links: `src/features/threads/hooks/useThreadLinking.ts`
-  - Applies parent/child links to thread state.
-- Utilities:
-  - `src/features/threads/utils/threadNormalize.ts` (shape normalization)
-  - `src/features/threads/utils/threadStorage.ts` (persistence helpers)
-  - `src/utils/threadItems.ts` (thread item conversion + merge)
+1. Run `npm run lint`.
+2. Run `npm run test` when you touched threads, settings, updater, shared utils, or backend cores.
+3. Run `npm run typecheck`.
+4. If you changed Rust backend code, run `cargo check` in `src-tauri`.
 
 ## Notes
 
 - The window uses `titleBarStyle: "Overlay"` and macOS private APIs for transparency.
-- Avoid breaking the JSON-RPC format; app-server rejects requests before initialization.
-- The debug panel is UI-only; it logs client/server/app-server events from `useAppServerEvents`.
-- App settings live in `settings.json` under the app data directory (Codex path, default access mode, UI scale).
-- Experimental toggles that map to Codex features (`collab`, `steer`, `unified_exec`) are synced to `CODEX_HOME/config.toml` (or `~/.codex/config.toml`) on load/save and are best-effort (settings still persist if the file is missing/unwritable).
-- UI preferences (panel sizes, reduced transparency toggle, recent thread activity) live in `localStorage`.
+- Avoid breaking JSON-RPC format; the app-server is strict.
+- App settings and Codex feature toggles are best-effort synced to `CODEX_HOME/config.toml`.
+- UI preferences live in `localStorage`.
 - GitHub issues require `gh` to be installed and authenticated.
-- Custom prompts are loaded from `$CODEX_HOME/prompts` (or `~/.codex/prompts`) and support optional frontmatter metadata.
+- Custom prompts are loaded from `$CODEX_HOME/prompts` (or `~/.codex/prompts`).
 
 ## Error Toasts
 
-- Use `pushErrorToast` from `src/services/toasts.ts` to surface user-facing errors.
-- Example: `pushErrorToast({ title: "Couldn’t open workspace", message: errorMessage });`
-- The toast UI is wired at the app level via `useErrorToasts` in `src/features/notifications/hooks/useErrorToasts.ts` and rendered by `src/features/notifications/components/ErrorToasts.tsx`.
-- Styles live in `src/styles/error-toasts.css` and are imported by `src/App.tsx`.
+- Use `pushErrorToast` from `src/services/toasts.ts` for user-facing errors.
+- Toast wiring:
+  - Hook: `src/features/notifications/hooks/useErrorToasts.ts`
+  - UI: `src/features/notifications/components/ErrorToasts.tsx`
+  - Styles: `src/styles/error-toasts.css`
