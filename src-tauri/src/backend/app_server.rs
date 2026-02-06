@@ -295,8 +295,8 @@ impl WorkspaceSession {
 
     async fn create_session_for_cwd(&self, cwd: String) -> Result<String, String> {
         let response = self
-            // Do not force an empty MCP server list; let micode use its configured servers.
-            .send_acp_request("session/new", json!({ "cwd": cwd }))
+            // ACP requires mcpServers in session/new. Start with an empty override list.
+            .send_acp_request("session/new", json!({ "cwd": cwd, "mcpServers": [] }))
             .await?;
         let result = response.get("result").cloned().ok_or_else(|| {
             acp_error_message(&response).unwrap_or_else(|| "missing ACP result".to_string())
@@ -714,10 +714,16 @@ fn session_id_from_notification(value: &Value) -> Option<String> {
 
 fn translate_acp_update(
     thread_id: &str,
+    turn_index: i64,
     update: &Value,
     workspace_id: &str,
 ) -> Vec<AppServerEvent> {
     let mut events = Vec::new();
+    let turn_seq = if turn_index < 0 {
+        0
+    } else {
+        turn_index as u64 + 1
+    };
     let kind = update
         .get("sessionUpdate")
         .and_then(Value::as_str)
@@ -738,7 +744,7 @@ fn translate_acp_update(
                         "method": "item/agentMessage/delta",
                         "params": {
                             "threadId": thread_id,
-                            "itemId": format!("agent-{}", Uuid::new_v4()),
+                            "itemId": format!("agent-{thread_id}-{turn_seq}"),
                             "delta": delta
                         }
                     }),
@@ -759,7 +765,7 @@ fn translate_acp_update(
                         "method": "item/reasoning/textDelta",
                         "params": {
                             "threadId": thread_id,
-                            "itemId": format!("reasoning-{}", Uuid::new_v4()),
+                            "itemId": format!("reasoning-{thread_id}-{turn_seq}"),
                             "delta": delta
                         }
                     }),
@@ -782,7 +788,11 @@ fn translate_acp_update(
             });
         }
         "tool_call" => {
-            let item_id = format!("tool-{}", Uuid::new_v4());
+            let item_id = update
+                .get("toolCallId")
+                .and_then(Value::as_str)
+                .map(|value| format!("tool-{value}"))
+                .unwrap_or_else(|| format!("tool-{}-{turn_seq}", Uuid::new_v4()));
             let title = update
                 .get("title")
                 .and_then(Value::as_str)
@@ -804,6 +814,11 @@ fn translate_acp_update(
             });
         }
         "tool_call_update" => {
+            let item_id = update
+                .get("toolCallId")
+                .and_then(Value::as_str)
+                .map(|value| format!("tool-{value}"))
+                .unwrap_or_else(|| format!("tool-{}-{turn_seq}", Uuid::new_v4()));
             let title = update
                 .get("title")
                 .and_then(Value::as_str)
@@ -815,7 +830,7 @@ fn translate_acp_update(
                     "params": {
                         "threadId": thread_id,
                         "item": {
-                            "id": format!("tool-{}", Uuid::new_v4()),
+                            "id": item_id,
                             "type": "mcpToolCall",
                             "title": title,
                             "status": "completed"
@@ -921,9 +936,12 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                     };
                     if let Some(thread) = thread {
                         if let Some(update) = value.get("params").and_then(|v| v.get("update")) {
-                            for event in
-                                translate_acp_update(&thread.thread_id, update, &workspace_id)
-                            {
+                            for event in translate_acp_update(
+                                &thread.thread_id,
+                                thread.message_index,
+                                update,
+                                &workspace_id,
+                            ) {
                                 let _ = event_tx.send(event);
                             }
                         }
@@ -1073,7 +1091,7 @@ mod tests {
             "sessionUpdate": "agent_message_chunk",
             "content": { "type": "text", "text": "hello" }
         });
-        let events = translate_acp_update("thread-1", &update, "ws-1");
+        let events = translate_acp_update("thread-1", 0, &update, "ws-1");
         assert_eq!(events.len(), 1);
         let method = events[0]
             .message
@@ -1090,7 +1108,7 @@ mod tests {
                 { "content": "step1", "status": "pending", "priority": "high" }
             ]
         });
-        let events = translate_acp_update("thread-2", &update, "ws-2");
+        let events = translate_acp_update("thread-2", 1, &update, "ws-2");
         assert_eq!(events.len(), 1);
         let method = events[0]
             .message
