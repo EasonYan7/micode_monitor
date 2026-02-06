@@ -13,6 +13,8 @@
 - [x] Sync slash autocomplete with MiCode ACP `available_commands_update`
 - [x] Stabilize turn completion when ACP stream ends but prompt response stalls
 - [x] Hide internal MiCode JSON routing preamble from assistant messages
+- [x] Keep Debug/Log button always visible in sidebar corner actions
+- [x] Harden internal JSON preamble stripping for mixed-content code blocks
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -35,3 +37,5 @@
 - Slash UX parity: wire ACP `available_commands_update` into composer so `/` suggestions now come from MiCode runtime commands.
 - Turn reliability: if ACP streamed chunks but `session/prompt` final response times out, synthesize `turn/completed` to prevent stuck "Working...".
 - UX polish: strip internal fenced JSON routing payloads (e.g. title/worktreeName blocks) from assistant message display.
+- UX tweak: keep Debug log entrypoint always visible (not only on warnings) for faster troubleshooting.
+- JSON filtering refinement: strip internal routing code blocks when they include `title` + `worktree*` markers even if not strict JSON.

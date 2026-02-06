@@ -218,6 +218,16 @@ function stripInternalJsonPreamble(text: string) {
       continue;
     }
     let parsed: unknown = null;
+    const lowerRaw = rawJson.toLowerCase();
+    const looksLikeInternalRoutingBlock =
+      lowerRaw.includes("\"title\"") &&
+      (lowerRaw.includes("\"worktreename\"") ||
+        lowerRaw.includes("\"worktree\"") ||
+        lowerRaw.includes("\"workspace\""));
+    if (looksLikeInternalRoutingBlock) {
+      remaining = remaining.slice(match[0].length);
+      continue;
+    }
     try {
       parsed = JSON.parse(rawJson);
     } catch {

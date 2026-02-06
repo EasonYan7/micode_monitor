@@ -85,7 +85,7 @@ export function useDebugLog() {
     [],
   );
 
-  const showDebugButton = hasDebugAlerts || debugOpen || debugPinned;
+  const showDebugButton = hasDebugAlerts || debugOpen || debugPinned || true;
 
   return {
     debugOpen,
