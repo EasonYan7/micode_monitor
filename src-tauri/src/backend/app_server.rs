@@ -880,7 +880,9 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
     command.current_dir(&entry.path);
     command.arg("--experimental-acp");
     if let Some(agent_home) = agent_home {
-        command.env("CODEX_HOME", agent_home);
+        // For MiCode ACP, avoid forcing CODEX_HOME which can stall prompt execution.
+        // Keep an explicit MiCode-specific override hook instead.
+        command.env("MICODE_HOME", agent_home);
     }
     command.stdin(std::process::Stdio::piped());
     command.stdout(std::process::Stdio::piped());

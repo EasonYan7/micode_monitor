@@ -22,3 +22,4 @@
 - Build fix: align ACP update adapter turn index type with `message_index: u64` to restore successful Rust compile.
 - UX parity fix: normalize ACP `turn/start` response to always include `result.turn.id` so frontend no longer shows false "Turn failed to start."
 - Copy cleanup: replace user-facing "agent" prompts with "MiCode" in messaging/workspace entry points.
+- Runtime fix: stop injecting `CODEX_HOME` into MiCode ACP process (use `MICODE_HOME` env key) to prevent prompt hangs in GUI.
