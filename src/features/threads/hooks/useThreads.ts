@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useReducer, useRef } from "react";
+import { useCallback, useMemo, useReducer, useRef, useState } from "react";
 import type { CustomPromptOption, DebugEntry, WorkspaceInfo } from "../../../types";
 import { useAppServerEvents } from "../../app/hooks/useAppServerEvents";
 import { initialState, threadReducer } from "./useThreadsReducer";
@@ -44,6 +44,9 @@ export function useThreads({
   onMessageActivity,
 }: UseThreadsOptions) {
   const [state, dispatch] = useReducer(threadReducer, initialState);
+  const [slashCommandsByThread, setSlashCommandsByThread] = useState<
+    Record<string, { name: string; description?: string }[]>
+  >({});
   const loadedThreadsRef = useRef<Record<string, boolean>>({});
   const replaceOnResumeRef = useRef<Record<string, boolean>>({});
   const pendingInterruptsRef = useRef<Set<string>>(new Set());
@@ -218,13 +221,69 @@ export function useThreads({
     [handleAccountUpdated],
   );
 
+  const handleAvailableCommandsUpdated = useCallback(
+    (_workspaceId: string, threadId: string, commands: { name: string; description?: string }[]) => {
+      if (!threadId) {
+        return;
+      }
+      const normalized = commands.reduce<{ name: string; description?: string }[]>(
+        (acc, command) => {
+          const withoutSlash = command.name.replace(/^\/+/, "").trim();
+          if (!withoutSlash) {
+            return acc;
+          }
+          acc.push({
+            name: withoutSlash,
+            description: command.description,
+          });
+          return acc;
+        },
+        [],
+      );
+      const deduped: { name: string; description?: string }[] = [];
+      const seen = new Set<string>();
+      normalized.forEach((command) => {
+        const key = command.name.toLowerCase();
+        if (seen.has(key)) {
+          return;
+        }
+        seen.add(key);
+        deduped.push(command);
+      });
+      setSlashCommandsByThread((prev) => {
+        const current = prev[threadId] ?? [];
+        if (
+          current.length === deduped.length &&
+          current.every(
+            (entry, index) =>
+              entry.name === deduped[index]?.name &&
+              entry.description === deduped[index]?.description,
+          )
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          [threadId]: deduped,
+        };
+      });
+    },
+    [],
+  );
+
   const handlers = useMemo(
     () => ({
       ...threadHandlers,
       onAccountUpdated: handleAccountUpdated,
       onAccountLoginCompleted: handleAccountLoginCompleted,
+      onAvailableCommandsUpdated: handleAvailableCommandsUpdated,
     }),
-    [threadHandlers, handleAccountUpdated, handleAccountLoginCompleted],
+    [
+      threadHandlers,
+      handleAccountUpdated,
+      handleAccountLoginCompleted,
+      handleAvailableCommandsUpdated,
+    ],
   );
 
   useAppServerEvents(handlers);
@@ -430,6 +489,7 @@ export function useThreads({
     accountByWorkspace: state.accountByWorkspace,
     planByThread: state.planByThread,
     lastAgentMessageByThread: state.lastAgentMessageByThread,
+    activeSlashCommands: activeThreadId ? slashCommandsByThread[activeThreadId] ?? [] : [],
     refreshAccountRateLimits,
     refreshAccountInfo,
     interruptTurn,

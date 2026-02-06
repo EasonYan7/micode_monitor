@@ -865,6 +865,22 @@ fn translate_acp_update(
                 }),
             });
         }
+        "available_commands_update" => {
+            let commands = update
+                .get("availableCommands")
+                .cloned()
+                .unwrap_or_else(|| json!([]));
+            events.push(AppServerEvent {
+                workspace_id: workspace_id.to_string(),
+                message: json!({
+                    "method": "micode/availableCommands/updated",
+                    "params": {
+                        "threadId": thread_id,
+                        "availableCommands": commands
+                    }
+                }),
+            });
+        }
         "tool_call" => {
             let item_id = update
                 .get("toolCallId")
@@ -1194,5 +1210,22 @@ mod tests {
             .get("method")
             .and_then(|value| value.as_str());
         assert_eq!(method, Some("turn/plan/updated"));
+    }
+
+    #[test]
+    fn translate_available_commands_update_event() {
+        let update = json!({
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": [
+                { "name": "status", "description": "Show status" }
+            ]
+        });
+        let events = translate_acp_update("thread-3", 2, &update, "ws-3");
+        assert_eq!(events.len(), 1);
+        let method = events[0]
+            .message
+            .get("method")
+            .and_then(|value| value.as_str());
+        assert_eq!(method, Some("micode/availableCommands/updated"));
     }
 }

@@ -406,6 +406,7 @@ type LayoutNodesOptions = {
   appsEnabled: boolean;
   apps: AppOption[];
   prompts: CustomPromptOption[];
+  slashCommands: { name: string; description?: string }[];
   files: string[];
   onInsertComposerText: (text: string) => void;
   canInsertComposerText: boolean;
@@ -593,6 +594,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       appsEnabled={options.appsEnabled}
       apps={options.apps}
       prompts={options.prompts}
+      slashCommands={options.slashCommands}
       files={options.files}
       textareaRef={options.textareaRef}
       historyKey={options.activeWorkspace?.id ?? null}

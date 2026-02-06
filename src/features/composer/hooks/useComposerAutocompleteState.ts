@@ -17,6 +17,7 @@ type UseComposerAutocompleteStateArgs = {
   skills: Skill[];
   apps: AppOption[];
   prompts: CustomPromptOption[];
+  slashCommands?: { name: string; description?: string }[];
   files: string[];
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   setText: (next: string) => void;
@@ -71,6 +72,7 @@ export function useComposerAutocompleteState({
   skills,
   apps,
   prompts: _prompts,
+  slashCommands = [],
   files,
   textareaRef,
   setText,
@@ -119,12 +121,25 @@ export function useComposerAutocompleteState({
     [fileTriggerActive, files, selectionStart, text],
   );
 
+  const slashItems = useMemo<AutocompleteItem[]>(
+    () =>
+      slashCommands.map((command) => ({
+        id: `slash:${command.name}`,
+        label: command.name,
+        description: command.description,
+        insertText: command.name,
+        group: "Slash" as const,
+      })),
+    [slashCommands],
+  );
+
   const triggers = useMemo(
     () => [
+      { trigger: "/", items: slashItems },
       { trigger: "$", items: skillItems },
       { trigger: "@", items: fileItems },
     ],
-    [fileItems, skillItems],
+    [fileItems, skillItems, slashItems],
   );
 
   const {

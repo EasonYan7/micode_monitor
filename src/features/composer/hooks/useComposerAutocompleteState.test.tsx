@@ -71,7 +71,7 @@ describe("useComposerAutocompleteState file mentions", () => {
 });
 
 describe("useComposerAutocompleteState slash commands", () => {
-  it("includes built-in slash commands in alphabetical order when apps are enabled", () => {
+  it("uses slash commands provided by MiCode", () => {
     const text = "/";
     const selectionStart = text.length;
     const textareaRef = createRef<HTMLTextAreaElement>();
@@ -89,6 +89,10 @@ describe("useComposerAutocompleteState slash commands", () => {
         skills: [],
         apps: [],
         prompts: [],
+        slashCommands: [
+          { name: "status", description: "Show workspace status" },
+          { name: "review", description: "Start review flow" },
+        ],
         files: [],
         textareaRef,
         setText: vi.fn(),
@@ -97,31 +101,10 @@ describe("useComposerAutocompleteState slash commands", () => {
     );
 
     const labels = result.current.autocompleteMatches.map((item) => item.label);
-    expect(labels).toEqual(
-      expect.arrayContaining([
-        "apps",
-        "compact",
-        "fork",
-        "mcp",
-        "new",
-        "resume",
-        "review",
-        "status",
-      ]),
-    );
-    expect(labels.slice(0, 8)).toEqual([
-      "apps",
-      "compact",
-      "fork",
-      "mcp",
-      "new",
-      "resume",
-      "review",
-      "status",
-    ]);
+    expect(labels).toEqual(["status", "review"]);
   });
 
-  it("hides /apps when apps are disabled", () => {
+  it("shows no slash suggestions when MiCode has not provided commands", () => {
     const text = "/";
     const selectionStart = text.length;
     const textareaRef = createRef<HTMLTextAreaElement>();
@@ -139,6 +122,7 @@ describe("useComposerAutocompleteState slash commands", () => {
         skills: [],
         apps: [],
         prompts: [],
+        slashCommands: [],
         files: [],
         textareaRef,
         setText: vi.fn(),
@@ -146,9 +130,7 @@ describe("useComposerAutocompleteState slash commands", () => {
       }),
     );
 
-    const labels = result.current.autocompleteMatches.map((item) => item.label);
-    expect(labels).not.toContain("apps");
-    expect(labels).toEqual(["compact", "fork", "mcp", "new", "resume", "review", "status"]);
+    expect(result.current.autocompleteMatches).toEqual([]);
   });
 });
 

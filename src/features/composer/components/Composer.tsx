@@ -60,6 +60,7 @@ type ComposerProps = {
   skills: { name: string; description?: string }[];
   apps: AppOption[];
   prompts: CustomPromptOption[];
+  slashCommands?: { name: string; description?: string }[];
   files: string[];
   contextUsage?: ThreadTokenUsage | null;
   queuedMessages?: QueuedMessage[];
@@ -156,6 +157,7 @@ export function Composer({
   skills,
   apps,
   prompts,
+  slashCommands = [],
   files,
   contextUsage = null,
   queuedMessages = [],
@@ -260,6 +262,7 @@ export function Composer({
     skills,
     apps,
     prompts,
+    slashCommands,
     files,
     textareaRef,
     setText: setComposerText,

@@ -28,6 +28,11 @@ type AgentCompleted = {
   text: string;
 };
 
+type AvailableCommand = {
+  name: string;
+  description?: string;
+};
+
 type AppServerEventHandlers = {
   onWorkspaceConnected?: (workspaceId: string) => void;
   onThreadStarted?: (workspaceId: string, thread: Record<string, unknown>) => void;
@@ -39,6 +44,11 @@ type AppServerEventHandlers = {
     workspaceId: string,
     threadId: string,
     action: string,
+  ) => void;
+  onAvailableCommandsUpdated?: (
+    workspaceId: string,
+    threadId: string,
+    commands: AvailableCommand[],
   ) => void;
   onApprovalRequest?: (request: ApprovalRequest) => void;
   onRequestUserInput?: (request: RequestUserInputRequest) => void;
@@ -95,6 +105,7 @@ export const METHODS_ROUTED_IN_USE_APP_SERVER_EVENTS = [
   "account/rateLimits/updated",
   "account/updated",
   "micode/backgroundThread",
+  "micode/availableCommands/updated",
   "micode/connected",
   "error",
   "item/agentMessage/delta",
@@ -245,6 +256,41 @@ export function useAppServerEvents(handlers: AppServerEventHandlers) {
         if (threadId) {
           handlers.onBackgroundThreadAction?.(workspace_id, threadId, action);
         }
+        return;
+      }
+
+      if (method === "micode/availableCommands/updated") {
+        const threadId = String(params.threadId ?? params.thread_id ?? "").trim();
+        if (!threadId) {
+          return;
+        }
+        const commandsRaw = Array.isArray(params.availableCommands)
+          ? params.availableCommands
+          : [];
+        const commands = commandsRaw
+          .map((entry) => {
+            if (typeof entry === "string") {
+              const name = entry.trim();
+              return name ? { name } : null;
+            }
+            if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+              return null;
+            }
+            const record = entry as Record<string, unknown>;
+            const nameRaw = record.name ?? record.command ?? record.id ?? "";
+            const name = String(nameRaw).trim();
+            if (!name) {
+              return null;
+            }
+            const descriptionRaw = record.description ?? record.title ?? "";
+            const description = String(descriptionRaw).trim();
+            return {
+              name,
+              description: description.length ? description : undefined,
+            };
+          })
+          .filter((command): command is AvailableCommand => Boolean(command));
+        handlers.onAvailableCommandsUpdated?.(workspace_id, threadId, commands);
         return;
       }
 

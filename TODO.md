@@ -10,6 +10,7 @@
 - [x] Update frontend types/settings labels to MiCode/Agent naming
 - [x] Add tests for ACP mapping and settings migration
 - [x] Run available checks and fix regressions (`npm run typecheck`, targeted vitest)
+- [x] Sync slash autocomplete with MiCode ACP `available_commands_update`
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -29,3 +30,4 @@
 - Stability tweak: increase ACP prompt timeout from 30s to 90s to reduce false timeout during long streaming turns.
 - Data integrity fix: enforce unique sessionId per workspace thread and auto-repair duplicate session mappings in sessions.json.
 - Slash passthrough mode: disable app-level slash interception/autocomplete; forward `/...` directly to MiCode.
+- Slash UX parity: wire ACP `available_commands_update` into composer so `/` suggestions now come from MiCode runtime commands.

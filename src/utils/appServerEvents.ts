@@ -5,6 +5,7 @@ export const SUPPORTED_APP_SERVER_METHODS = [
   "account/rateLimits/updated",
   "account/updated",
   "micode/backgroundThread",
+  "micode/availableCommands/updated",
   "micode/connected",
   "micode/event/skills_update_available",
   "error",

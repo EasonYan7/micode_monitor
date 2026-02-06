@@ -50,6 +50,7 @@ describe("useAppServerEvents", () => {
       onThreadStarted: vi.fn(),
       onThreadNameUpdated: vi.fn(),
       onBackgroundThreadAction: vi.fn(),
+      onAvailableCommandsUpdated: vi.fn(),
       onAgentMessageDelta: vi.fn(),
       onReasoningSummaryBoundary: vi.fn(),
       onPlanDelta: vi.fn(),
@@ -157,6 +158,30 @@ describe("useAppServerEvents", () => {
       "ws-1",
       "thread-2",
       "hide",
+    );
+
+    act(() => {
+      listener?.({
+        workspace_id: "ws-1",
+        message: {
+          method: "micode/availableCommands/updated",
+          params: {
+            threadId: "thread-2",
+            availableCommands: [
+              { name: "/status", description: "Show status" },
+              { command: "review" },
+            ],
+          },
+        },
+      });
+    });
+    expect(handlers.onAvailableCommandsUpdated).toHaveBeenCalledWith(
+      "ws-1",
+      "thread-2",
+      [
+        { name: "/status", description: "Show status" },
+        { name: "review", description: undefined },
+      ],
     );
 
     act(() => {

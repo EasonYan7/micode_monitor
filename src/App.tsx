@@ -655,6 +655,7 @@ function MainApp() {
     accountByWorkspace,
     planByThread,
     lastAgentMessageByThread,
+    activeSlashCommands,
     interruptTurn,
     removeThread,
     pinThread,
@@ -2098,6 +2099,7 @@ function MainApp() {
     appsEnabled: appSettings.experimentalAppsEnabled,
     apps,
     prompts,
+    slashCommands: activeSlashCommands,
     files,
     onInsertComposerText: handleInsertComposerText,
     canInsertComposerText,
@@ -2181,6 +2183,7 @@ function MainApp() {
       appsEnabled={appSettings.experimentalAppsEnabled}
       apps={apps}
       prompts={prompts}
+      slashCommands={activeSlashCommands}
       files={files}
       onFileAutocompleteActiveChange={setFileAutocompleteActive}
       dictationEnabled={appSettings.dictationEnabled && dictationReady}

@@ -75,6 +75,7 @@ type WorkspaceHomeProps = {
   appsEnabled: boolean;
   apps: AppOption[];
   prompts: CustomPromptOption[];
+  slashCommands?: { name: string; description?: string }[];
   files: string[];
   dictationEnabled: boolean;
   dictationState: DictationSessionState;
@@ -154,6 +155,7 @@ export function WorkspaceHome({
   appsEnabled,
   apps,
   prompts,
+  slashCommands = [],
   files,
   dictationEnabled,
   dictationState,
@@ -221,6 +223,7 @@ export function WorkspaceHome({
     skills,
     apps,
     prompts,
+    slashCommands,
     files,
     textareaRef,
     setText: onPromptChange,
