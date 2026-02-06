@@ -39,7 +39,7 @@ describe("useWorktreePrompt", () => {
       result.current.updateName("My New Feature!");
     });
 
-    expect(result.current.worktreePrompt?.branch).toBe("codex/my-new-feature");
+    expect(result.current.worktreePrompt?.branch).toBe("micode/my-new-feature");
 
     act(() => {
       result.current.updateBranch("custom/branch-name");
@@ -92,7 +92,7 @@ describe("useWorktreePrompt", () => {
       connected: true,
       kind: "worktree",
       parentId: parentWorkspace.id,
-      worktree: { branch: "codex/example" },
+      worktree: { branch: "micode/example" },
       settings: { sidebarCollapsed: false },
     };
     const addWorktreeAgent = vi.fn().mockResolvedValue(worktreeWorkspace);

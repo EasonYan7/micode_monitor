@@ -26,7 +26,7 @@ import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
 import { getUsageLabels } from "../utils/usageLabels";
 import { formatRelativeTimeShort } from "../../../utils/time";
 
-const COLLAPSED_GROUPS_STORAGE_KEY = "codexmonitor.collapsedGroups";
+const COLLAPSED_GROUPS_STORAGE_KEY = "micodemonitor.collapsedGroups";
 const UNGROUPED_COLLAPSE_ID = "__ungrouped__";
 const ADD_MENU_WIDTH = 200;
 

@@ -1,4 +1,4 @@
-const FILE_LINK_PROTOCOL = "codex-file:";
+const FILE_LINK_PROTOCOL = "micode-file:";
 const FILE_LINE_SUFFIX_PATTERN = "(?::\\d+(?::\\d+)?)?";
 
 const FILE_PATH_PATTERN =

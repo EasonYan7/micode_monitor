@@ -4,9 +4,9 @@ export const SUPPORTED_APP_SERVER_METHODS = [
   "account/login/completed",
   "account/rateLimits/updated",
   "account/updated",
-  "codex/backgroundThread",
-  "codex/connected",
-  "codex/event/skills_update_available",
+  "micode/backgroundThread",
+  "micode/connected",
+  "micode/event/skills_update_available",
   "error",
   "item/agentMessage/delta",
   "item/commandExecution/outputDelta",
@@ -31,7 +31,7 @@ export const SUPPORTED_APP_SERVER_METHODS = [
 export type SupportedAppServerMethod = (typeof SUPPORTED_APP_SERVER_METHODS)[number];
 
 export const METHODS_HANDLED_OUTSIDE_USE_APP_SERVER_EVENTS = [
-  "codex/event/skills_update_available",
+  "micode/event/skills_update_available",
 ] as const satisfies readonly SupportedAppServerMethod[];
 
 const SUPPORTED_METHOD_SET = new Set<string>(SUPPORTED_APP_SERVER_METHODS);
@@ -97,5 +97,5 @@ export function isApprovalRequestMethod(method: string): boolean {
 }
 
 export function isSkillsUpdateAvailableEvent(event: AppServerEvent): boolean {
-  return getAppServerRawMethod(event) === "codex/event/skills_update_available";
+  return getAppServerRawMethod(event) === "micode/event/skills_update_available";
 }

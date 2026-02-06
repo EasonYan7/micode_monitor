@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::State;
 
-use crate::codex::home::{resolve_default_codex_home, resolve_workspace_codex_home};
+use crate::micode::home::{resolve_default_micode_home, resolve_workspace_micode_home};
 use crate::state::AppState;
 use crate::types::{
     LocalUsageDay, LocalUsageModel, LocalUsageSnapshot, LocalUsageTotals, WorkspaceEntry,
@@ -521,9 +521,9 @@ fn make_day_keys(days: u32) -> Vec<String> {
         .collect()
 }
 
-fn resolve_codex_sessions_root(codex_home_override: Option<PathBuf>) -> Option<PathBuf> {
-    codex_home_override
-        .or_else(resolve_default_codex_home)
+fn resolve_micode_sessions_root(micode_home_override: Option<PathBuf>) -> Option<PathBuf> {
+    micode_home_override
+        .or_else(resolve_default_micode_home)
         .map(|home| home.join("sessions"))
 }
 
@@ -532,9 +532,9 @@ fn resolve_sessions_roots(
     workspace_path: Option<&Path>,
 ) -> Vec<PathBuf> {
     if let Some(workspace_path) = workspace_path {
-        let codex_home_override =
-            resolve_workspace_codex_home_for_path(workspaces, Some(workspace_path));
-        return resolve_codex_sessions_root(codex_home_override)
+        let micode_home_override =
+            resolve_workspace_micode_home_for_path(workspaces, Some(workspace_path));
+        return resolve_micode_sessions_root(micode_home_override)
             .into_iter()
             .collect();
     }
@@ -542,7 +542,7 @@ fn resolve_sessions_roots(
     let mut roots = Vec::new();
     let mut seen = HashSet::new();
 
-    if let Some(root) = resolve_codex_sessions_root(None) {
+    if let Some(root) = resolve_micode_sessions_root(None) {
         if seen.insert(root.clone()) {
             roots.push(root);
         }
@@ -553,10 +553,10 @@ fn resolve_sessions_roots(
             .parent_id
             .as_ref()
             .and_then(|parent_id| workspaces.get(parent_id));
-        let Some(agent_home) = resolve_workspace_codex_home(entry, parent_entry) else {
+        let Some(agent_home) = resolve_workspace_micode_home(entry, parent_entry) else {
             continue;
         };
-        if let Some(root) = resolve_codex_sessions_root(Some(agent_home)) {
+        if let Some(root) = resolve_micode_sessions_root(Some(agent_home)) {
             if seen.insert(root.clone()) {
                 roots.push(root);
             }
@@ -566,7 +566,7 @@ fn resolve_sessions_roots(
     roots
 }
 
-fn resolve_workspace_codex_home_for_path(
+fn resolve_workspace_micode_home_for_path(
     workspaces: &HashMap<String, crate::types::WorkspaceEntry>,
     workspace_path: Option<&Path>,
 ) -> Option<PathBuf> {
@@ -584,7 +584,7 @@ fn resolve_workspace_codex_home_for_path(
         .as_ref()
         .and_then(|parent_id| workspaces.get(parent_id));
 
-    resolve_workspace_codex_home(entry, parent_entry)
+    resolve_workspace_micode_home(entry, parent_entry)
 }
 
 fn day_dir_for_key(root: &Path, day_key: &str) -> PathBuf {
@@ -608,7 +608,7 @@ mod tests {
     fn write_temp_jsonl(lines: &[&str]) -> PathBuf {
         let mut path = std::env::temp_dir();
         path.push(format!(
-            "codexmonitor-local-usage-test-{}.jsonl",
+            "micodemonitor-local-usage-test-{}.jsonl",
             Uuid::new_v4()
         ));
         let mut file = File::create(&path).expect("create temp jsonl");
@@ -620,7 +620,7 @@ mod tests {
 
     fn make_temp_sessions_root() -> PathBuf {
         let mut root = std::env::temp_dir();
-        root.push(format!("codexmonitor-local-usage-root-{}", Uuid::new_v4()));
+        root.push(format!("micodemonitor-local-usage-root-{}", Uuid::new_v4()));
         fs::create_dir_all(&root).expect("create temp root");
         root
     }
@@ -815,7 +815,7 @@ mod tests {
         let mut settings_a = WorkspaceSettings::default();
         settings_a.agent_home = Some(
             std::env::temp_dir()
-                .join(format!("codex-home-a-{}", Uuid::new_v4()))
+                .join(format!("micode-home-a-{}", Uuid::new_v4()))
                 .to_string_lossy()
                 .to_string(),
         );
@@ -832,7 +832,7 @@ mod tests {
         let mut settings_b = WorkspaceSettings::default();
         settings_b.agent_home = Some(
             std::env::temp_dir()
-                .join(format!("codex-home-b-{}", Uuid::new_v4()))
+                .join(format!("micode-home-b-{}", Uuid::new_v4()))
                 .to_string_lossy()
                 .to_string(),
         );

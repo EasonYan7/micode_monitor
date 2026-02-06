@@ -3,7 +3,7 @@ import GitBranch from "lucide-react/dist/esm/icons/git-branch";
 import MessagesSquare from "lucide-react/dist/esm/icons/messages-square";
 import TerminalSquare from "lucide-react/dist/esm/icons/terminal-square";
 
-type TabletNavTab = "codex" | "git" | "log";
+type TabletNavTab = "micode" | "git" | "log";
 
 type TabletNavProps = {
   activeTab: TabletNavTab;
@@ -11,7 +11,7 @@ type TabletNavProps = {
 };
 
 const tabs: { id: TabletNavTab; label: string; icon: ReactNode }[] = [
-  { id: "codex", label: "Agent", icon: <MessagesSquare className="tablet-nav-icon" /> },
+  { id: "micode", label: "Agent", icon: <MessagesSquare className="tablet-nav-icon" /> },
   { id: "git", label: "Git", icon: <GitBranch className="tablet-nav-icon" /> },
   { id: "log", label: "Log", icon: <TerminalSquare className="tablet-nav-icon" /> },
 ];

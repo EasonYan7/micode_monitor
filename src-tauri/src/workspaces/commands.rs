@@ -22,9 +22,9 @@ use super::worktree::{
 };
 
 use crate::backend::app_server::WorkspaceSession;
-use crate::codex::args::resolve_workspace_codex_args;
-use crate::codex::home::resolve_workspace_codex_home;
-use crate::codex::spawn_workspace_session;
+use crate::micode::args::resolve_workspace_micode_args;
+use crate::micode::home::resolve_workspace_micode_home;
+use crate::micode::spawn_workspace_session;
 use crate::git_utils::resolve_git_root;
 use crate::remote_backend;
 use crate::shared::process_core::tokio_command;
@@ -109,18 +109,18 @@ pub(crate) async fn is_workspace_path_dir(
 #[tauri::command]
 pub(crate) async fn add_workspace(
     path: String,
-    codex_bin: Option<String>,
+    micode_bin: Option<String>,
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<WorkspaceInfo, String> {
     if remote_backend::is_remote_mode(&*state).await {
         let path = remote_backend::normalize_path_for_remote(path);
-        let codex_bin = codex_bin.map(remote_backend::normalize_path_for_remote);
+        let micode_bin = micode_bin.map(remote_backend::normalize_path_for_remote);
         let response = remote_backend::call_remote(
             &*state,
             app,
             "add_workspace",
-            json!({ "path": path, "codex_bin": codex_bin }),
+            json!({ "path": path, "micode_bin": micode_bin }),
         )
         .await?;
         return serde_json::from_value(response).map_err(|err| err.to_string());
@@ -128,7 +128,7 @@ pub(crate) async fn add_workspace(
 
     workspaces_core::add_workspace_core(
         path,
-        codex_bin,
+        micode_bin,
         &state.workspaces,
         &state.sessions,
         &state.app_settings,
@@ -221,10 +221,10 @@ pub(crate) async fn add_clone(
         let settings = state.app_settings.lock().await;
         (
             settings.agent_bin.clone(),
-            resolve_workspace_codex_args(&entry, None, Some(&settings)),
+            resolve_workspace_micode_args(&entry, None, Some(&settings)),
         )
     };
-    let agent_home = resolve_workspace_codex_home(&entry, None);
+    let agent_home = resolve_workspace_micode_home(&entry, None);
     let session = match spawn_workspace_session(
         entry.clone(),
         default_bin,
@@ -720,27 +720,27 @@ pub(crate) async fn update_workspace_settings(
 }
 
 #[tauri::command]
-pub(crate) async fn update_workspace_codex_bin(
+pub(crate) async fn update_workspace_micode_bin(
     id: String,
-    codex_bin: Option<String>,
+    micode_bin: Option<String>,
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<WorkspaceInfo, String> {
     if remote_backend::is_remote_mode(&*state).await {
-        let codex_bin = codex_bin.map(remote_backend::normalize_path_for_remote);
+        let micode_bin = micode_bin.map(remote_backend::normalize_path_for_remote);
         let response = remote_backend::call_remote(
             &*state,
             app,
-            "update_workspace_codex_bin",
-            json!({ "id": id, "codex_bin": codex_bin }),
+            "update_workspace_micode_bin",
+            json!({ "id": id, "micode_bin": micode_bin }),
         )
         .await?;
         return serde_json::from_value(response).map_err(|err| err.to_string());
     }
 
-    workspaces_core::update_workspace_codex_bin_core(
+    workspaces_core::update_workspace_micode_bin_core(
         id,
-        codex_bin,
+        micode_bin,
         &state.workspaces,
         &state.sessions,
         &state.storage_path,

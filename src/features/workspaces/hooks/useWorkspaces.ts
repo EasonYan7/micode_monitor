@@ -19,7 +19,7 @@ import {
   removeWorktree as removeWorktreeService,
   renameWorktree as renameWorktreeService,
   renameWorktreeUpstream as renameWorktreeUpstreamService,
-  updateWorkspaceCodexBin as updateWorkspaceCodexBinService,
+  updateWorkspaceMiCodeBin as updateWorkspaceMiCodeBinService,
   updateWorkspaceSettings as updateWorkspaceSettingsService,
 } from "../../../services/tauri";
 
@@ -30,7 +30,7 @@ const SORT_ORDER_FALLBACK = Number.MAX_SAFE_INTEGER;
 
 type UseWorkspacesOptions = {
   onDebug?: (entry: DebugEntry) => void;
-  defaultCodexBin?: string | null;
+  defaultMiCodeBin?: string | null;
   appSettings?: AppSettings;
   onUpdateAppSettings?: (next: AppSettings) => Promise<AppSettings>;
 };
@@ -81,7 +81,7 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
     () => new Set(),
   );
   const workspaceSettingsRef = useRef<Map<string, WorkspaceSettings>>(new Map());
-  const { onDebug, defaultCodexBin, appSettings, onUpdateAppSettings } = options;
+  const { onDebug, defaultMiCodeBin, appSettings, onUpdateAppSettings } = options;
 
   const refreshWorkspaces = useCallback(async () => {
     try {
@@ -232,7 +232,7 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
         payload: { path: selection },
       });
       try {
-        const workspace = await addWorkspaceService(selection, defaultCodexBin ?? null);
+        const workspace = await addWorkspaceService(selection, defaultMiCodeBin ?? null);
         setWorkspaces((prev) => [...prev, workspace]);
         setActiveWorkspaceId(workspace.id);
         return workspace;
@@ -247,7 +247,7 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
         throw error;
       }
     },
-    [defaultCodexBin, onDebug],
+    [defaultMiCodeBin, onDebug],
   );
 
   const addWorkspace = useCallback(async () => {
@@ -447,24 +447,24 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
     [onDebug, workspaces],
   );
 
-  async function updateWorkspaceCodexBin(workspaceId: string, codexBin: string | null) {
+  async function updateWorkspaceMiCodeBin(workspaceId: string, micodeBin: string | null) {
     onDebug?.({
-      id: `${Date.now()}-client-update-workspace-codex-bin`,
+      id: `${Date.now()}-client-update-workspace-micode-bin`,
       timestamp: Date.now(),
       source: "client",
-      label: "workspace/codexBin",
-      payload: { workspaceId, codexBin },
+      label: "workspace/micodeBin",
+      payload: { workspaceId, micodeBin },
     });
     const previous = workspaces.find((entry) => entry.id === workspaceId) ?? null;
     if (previous) {
       setWorkspaces((prev) =>
         prev.map((entry) =>
-          entry.id === workspaceId ? { ...entry, codex_bin: codexBin } : entry,
+          entry.id === workspaceId ? { ...entry, micode_bin: micodeBin } : entry,
         ),
       );
     }
     try {
-      const updated = await updateWorkspaceCodexBinService(workspaceId, codexBin);
+      const updated = await updateWorkspaceMiCodeBinService(workspaceId, micodeBin);
       setWorkspaces((prev) =>
         prev.map((entry) => (entry.id === workspaceId ? updated : entry)),
       );
@@ -476,10 +476,10 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
         );
       }
       onDebug?.({
-        id: `${Date.now()}-client-update-workspace-codex-bin-error`,
+        id: `${Date.now()}-client-update-workspace-micode-bin-error`,
         timestamp: Date.now(),
         source: "error",
-        label: "workspace/codexBin error",
+        label: "workspace/micodeBin error",
         payload: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -854,7 +854,7 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
     connectWorkspace,
     markWorkspaceConnected,
     updateWorkspaceSettings,
-    updateWorkspaceCodexBin,
+    updateWorkspaceMiCodeBin,
     createWorkspaceGroup,
     renameWorkspaceGroup,
     moveWorkspaceGroup,

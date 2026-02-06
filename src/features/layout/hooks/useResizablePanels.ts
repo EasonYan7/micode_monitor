@@ -1,11 +1,11 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const STORAGE_KEY_SIDEBAR = "codexmonitor.sidebarWidth";
-const STORAGE_KEY_RIGHT_PANEL = "codexmonitor.rightPanelWidth";
-const STORAGE_KEY_PLAN_PANEL = "codexmonitor.planPanelHeight";
-const STORAGE_KEY_TERMINAL_PANEL = "codexmonitor.terminalPanelHeight";
-const STORAGE_KEY_DEBUG_PANEL = "codexmonitor.debugPanelHeight";
+const STORAGE_KEY_SIDEBAR = "micodemonitor.sidebarWidth";
+const STORAGE_KEY_RIGHT_PANEL = "micodemonitor.rightPanelWidth";
+const STORAGE_KEY_PLAN_PANEL = "micodemonitor.planPanelHeight";
+const STORAGE_KEY_TERMINAL_PANEL = "micodemonitor.terminalPanelHeight";
+const STORAGE_KEY_DEBUG_PANEL = "micodemonitor.debugPanelHeight";
 const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 420;
 const MIN_RIGHT_PANEL_WIDTH = 270;

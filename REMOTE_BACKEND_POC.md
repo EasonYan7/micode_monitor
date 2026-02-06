@@ -1,6 +1,6 @@
 # Remote Backend POC (daemon)
 
-This fork includes a **proof-of-concept** daemon that runs CodexMonitor's backend logic in a separate process (intended for WSL2/Linux), exposing a simple **line-delimited JSON-RPC** protocol over TCP.
+This fork includes a **proof-of-concept** daemon that runs MiCodeMonitor's backend logic in a separate process (intended for WSL2/Linux), exposing a simple **line-delimited JSON-RPC** protocol over TCP.
 
 This is **not** wired into the desktop app yet (no UI toggle / remote proxy), but it is useful to validate the architecture and iterate on the protocol.
 
@@ -14,9 +14,9 @@ cd src-tauri
 # pick a strong token (or export CODEX_MONITOR_DAEMON_TOKEN)
 TOKEN="change-me"
 
-cargo run --bin codex_monitor_daemon -- \
+cargo run --bin micode_monitor_daemon -- \
   --listen 127.0.0.1:4732 \
-  --data-dir "$HOME/.local/share/codex-monitor-daemon" \
+  --data-dir "$HOME/.local/share/micode-monitor-daemon" \
   --token "$TOKEN"
 ```
 
@@ -51,13 +51,13 @@ printf '{\"id\":3,\"method\":\"list_workspaces\",\"params\":{}}\\n' | nc -w 1 12
 
 - `ping`
 - `list_workspaces`
-- `add_workspace` (`{ path, codex_bin? }`)
+- `add_workspace` (`{ path, micode_bin? }`)
 - `add_worktree` (`{ parentId, branch }`)
 - `connect_workspace` (`{ id }`)
 - `remove_workspace` (`{ id }`)
 - `remove_worktree` (`{ id }`)
 - `update_workspace_settings` (`{ id, settings }`)
-- `update_workspace_codex_bin` (`{ id, codex_bin? }`)
+- `update_workspace_micode_bin` (`{ id, micode_bin? }`)
 - `list_workspace_files` (`{ workspaceId }`)
 - `get_app_settings`
 - `update_app_settings` (`{ settings }`)

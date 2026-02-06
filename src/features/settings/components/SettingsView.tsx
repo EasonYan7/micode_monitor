@@ -18,7 +18,7 @@ import ExternalLink from "lucide-react/dist/esm/icons/external-link";
 import Layers from "lucide-react/dist/esm/icons/layers";
 import type {
   AppSettings,
-  CodexDoctorResult,
+  MiCodeDoctorResult,
   DictationModelStatus,
   WorkspaceSettings,
   OpenAppTarget,
@@ -32,7 +32,7 @@ import {
   getDefaultInterruptShortcut,
 } from "../../../utils/shortcuts";
 import { clampUiScale } from "../../../utils/uiScale";
-import { getCodexConfigPath } from "../../../services/tauri";
+import { getMiCodeConfigPath } from "../../../services/tauri";
 import { pushErrorToast } from "../../../services/toasts";
 import {
   DEFAULT_CODE_FONT_FAMILY,
@@ -46,7 +46,7 @@ import {
 import { DEFAULT_OPEN_APP_ID, OPEN_APP_STORAGE_KEY } from "../../app/constants";
 import { GENERIC_APP_ICON, getKnownOpenAppIcon } from "../../app/utils/openAppIcons";
 import { useGlobalAgentsMd } from "../hooks/useGlobalAgentsMd";
-import { useGlobalCodexConfigToml } from "../hooks/useGlobalCodexConfigToml";
+import { useGlobalMiCodeConfigToml } from "../hooks/useGlobalMiCodeConfigToml";
 import { FileEditorCard } from "../../shared/components/FileEditorCard";
 
 const DICTATION_MODELS = [
@@ -160,10 +160,10 @@ export type SettingsViewProps = {
   openAppIconById: Record<string, string>;
   onUpdateAppSettings: (next: AppSettings) => Promise<void>;
   onRunDoctor: (
-    codexBin: string | null,
-    codexArgs: string | null,
-  ) => Promise<CodexDoctorResult>;
-  onUpdateWorkspaceCodexBin: (id: string, codexBin: string | null) => Promise<void>;
+    micodeBin: string | null,
+    micodeArgs: string | null,
+  ) => Promise<MiCodeDoctorResult>;
+  onUpdateWorkspaceMiCodeBin: (id: string, micodeBin: string | null) => Promise<void>;
   onUpdateWorkspaceSettings: (
     id: string,
     settings: Partial<WorkspaceSettings>,
@@ -176,7 +176,7 @@ export type SettingsViewProps = {
   onDownloadDictationModel?: () => void;
   onCancelDictationDownload?: () => void;
   onRemoveDictationModel?: () => void;
-  initialSection?: CodexSection;
+  initialSection?: MiCodeSection;
 };
 
 type SettingsSection =
@@ -188,7 +188,7 @@ type SettingsSection =
   | "shortcuts"
   | "open-apps"
   | "git";
-type CodexSection = SettingsSection | "codex" | "features";
+type MiCodeSection = SettingsSection | "micode" | "features";
 type ShortcutSettingKey =
   | "composerModelShortcut"
   | "composerAccessShortcut"
@@ -310,7 +310,7 @@ export function SettingsView({
   openAppIconById,
   onUpdateAppSettings,
   onRunDoctor,
-  onUpdateWorkspaceCodexBin,
+  onUpdateWorkspaceMiCodeBin,
   onUpdateWorkspaceSettings,
   scaleShortcutTitle,
   scaleShortcutText,
@@ -322,7 +322,7 @@ export function SettingsView({
   onRemoveDictationModel,
   initialSection,
 }: SettingsViewProps) {
-  const [activeSection, setActiveSection] = useState<CodexSection>("projects");
+  const [activeSection, setActiveSection] = useState<MiCodeSection>("projects");
   const [environmentWorkspaceId, setEnvironmentWorkspaceId] = useState<string | null>(
     null,
   );
@@ -335,11 +335,11 @@ export function SettingsView({
   >(null);
   const [environmentError, setEnvironmentError] = useState<string | null>(null);
   const [environmentSaving, setEnvironmentSaving] = useState(false);
-  const [codexPathDraft, setCodexPathDraft] = useState(
-    appSettings.agentBin ?? appSettings.codexBin ?? "",
+  const [micodePathDraft, setMiCodePathDraft] = useState(
+    appSettings.agentBin ?? appSettings.micodeBin ?? "",
   );
-  const [codexArgsDraft, setCodexArgsDraft] = useState(
-    appSettings.agentArgs ?? appSettings.codexArgs ?? "",
+  const [micodeArgsDraft, setMiCodeArgsDraft] = useState(
+    appSettings.agentArgs ?? appSettings.micodeArgs ?? "",
   );
   const [remoteHostDraft, setRemoteHostDraft] = useState(appSettings.remoteBackendHost);
   const [remoteTokenDraft, setRemoteTokenDraft] = useState(appSettings.remoteBackendToken ?? "");
@@ -349,13 +349,13 @@ export function SettingsView({
   const [uiFontDraft, setUiFontDraft] = useState(appSettings.uiFontFamily);
   const [codeFontDraft, setCodeFontDraft] = useState(appSettings.codeFontFamily);
   const [codeFontSizeDraft, setCodeFontSizeDraft] = useState(appSettings.codeFontSize);
-  const [codexBinOverrideDrafts, setCodexBinOverrideDrafts] = useState<
+  const [micodeBinOverrideDrafts, setMiCodeBinOverrideDrafts] = useState<
     Record<string, string>
   >({});
-  const [codexHomeOverrideDrafts, setCodexHomeOverrideDrafts] = useState<
+  const [micodeHomeOverrideDrafts, setMiCodeHomeOverrideDrafts] = useState<
     Record<string, string>
   >({});
-  const [codexArgsOverrideDrafts, setCodexArgsOverrideDrafts] = useState<
+  const [micodeArgsOverrideDrafts, setMiCodeArgsOverrideDrafts] = useState<
     Record<string, string>
   >({});
   const [groupDrafts, setGroupDrafts] = useState<Record<string, string>>({});
@@ -369,7 +369,7 @@ export function SettingsView({
   );
   const [doctorState, setDoctorState] = useState<{
     status: "idle" | "running" | "done";
-    result: CodexDoctorResult | null;
+    result: MiCodeDoctorResult | null;
   }>({ status: "idle", result: null });
   const {
     content: globalAgentsContent,
@@ -394,7 +394,7 @@ export function SettingsView({
     setContent: setGlobalConfigContent,
     refresh: refreshGlobalConfig,
     save: saveGlobalConfig,
-  } = useGlobalCodexConfigToml();
+  } = useGlobalMiCodeConfigToml();
   const [openConfigError, setOpenConfigError] = useState<string | null>(null);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [shortcutDrafts, setShortcutDrafts] = useState({
@@ -490,11 +490,11 @@ export function SettingsView({
     return normalizeWorktreeSetupScript(environmentDraftScript);
   }, [environmentDraftScript]);
   const environmentDirty = environmentDraftNormalized !== environmentSavedScript;
-  const hasCodexHomeOverrides = useMemo(
+  const hasMiCodeHomeOverrides = useMemo(
     () =>
       projects.some(
         (workspace) =>
-          workspace.settings.agentHome != null || workspace.settings.codexHome != null,
+          workspace.settings.agentHome != null || workspace.settings.micodeHome != null,
       ),
     [projects],
   );
@@ -527,12 +527,12 @@ export function SettingsView({
   }, [onClose]);
 
   useEffect(() => {
-    setCodexPathDraft(appSettings.agentBin ?? appSettings.codexBin ?? "");
-  }, [appSettings.agentBin, appSettings.codexBin]);
+    setMiCodePathDraft(appSettings.agentBin ?? appSettings.micodeBin ?? "");
+  }, [appSettings.agentBin, appSettings.micodeBin]);
 
   useEffect(() => {
-    setCodexArgsDraft(appSettings.agentArgs ?? appSettings.codexArgs ?? "");
-  }, [appSettings.agentArgs, appSettings.codexArgs]);
+    setMiCodeArgsDraft(appSettings.agentArgs ?? appSettings.micodeArgs ?? "");
+  }, [appSettings.agentArgs, appSettings.micodeArgs]);
 
   useEffect(() => {
     setRemoteHostDraft(appSettings.remoteBackendHost);
@@ -608,7 +608,7 @@ export function SettingsView({
   const handleOpenConfig = useCallback(async () => {
     setOpenConfigError(null);
     try {
-      const configPath = await getCodexConfigPath();
+      const configPath = await getMiCodeConfigPath();
       await revealItemInDir(configPath);
     } catch (error) {
       setOpenConfigError(
@@ -618,25 +618,25 @@ export function SettingsView({
   }, []);
 
   useEffect(() => {
-    setCodexBinOverrideDrafts((prev) =>
+    setMiCodeBinOverrideDrafts((prev) =>
       buildWorkspaceOverrideDrafts(
         projects,
         prev,
-        (workspace) => workspace.agent_bin ?? workspace.codex_bin ?? null,
+        (workspace) => workspace.agent_bin ?? workspace.micode_bin ?? null,
       ),
     );
-    setCodexHomeOverrideDrafts((prev) =>
+    setMiCodeHomeOverrideDrafts((prev) =>
       buildWorkspaceOverrideDrafts(
         projects,
         prev,
-        (workspace) => workspace.settings.agentHome ?? workspace.settings.codexHome ?? null,
+        (workspace) => workspace.settings.agentHome ?? workspace.settings.micodeHome ?? null,
       ),
     );
-    setCodexArgsOverrideDrafts((prev) =>
+    setMiCodeArgsOverrideDrafts((prev) =>
       buildWorkspaceOverrideDrafts(
         projects,
         prev,
-        (workspace) => workspace.settings.agentArgs ?? workspace.settings.codexArgs ?? null,
+        (workspace) => workspace.settings.agentArgs ?? workspace.settings.micodeArgs ?? null,
       ),
     );
   }, [projects]);
@@ -699,11 +699,11 @@ export function SettingsView({
     environmentWorkspace,
   ]);
 
-  const nextCodexBin = codexPathDraft.trim() ? codexPathDraft.trim() : null;
-  const nextCodexArgs = codexArgsDraft.trim() ? codexArgsDraft.trim() : null;
-  const codexDirty =
-    nextCodexBin !== (appSettings.agentBin ?? appSettings.codexBin ?? null) ||
-    nextCodexArgs !== (appSettings.agentArgs ?? appSettings.codexArgs ?? null);
+  const nextMiCodeBin = micodePathDraft.trim() ? micodePathDraft.trim() : null;
+  const nextMiCodeArgs = micodeArgsDraft.trim() ? micodeArgsDraft.trim() : null;
+  const micodeDirty =
+    nextMiCodeBin !== (appSettings.agentBin ?? appSettings.micodeBin ?? null) ||
+    nextMiCodeArgs !== (appSettings.agentArgs ?? appSettings.micodeArgs ?? null);
 
   const trimmedScale = scaleDraft.trim();
   const parsedPercent = trimmedScale
@@ -711,15 +711,15 @@ export function SettingsView({
     : Number.NaN;
   const parsedScale = Number.isFinite(parsedPercent) ? parsedPercent / 100 : null;
 
-  const handleSaveCodexSettings = async () => {
+  const handleSaveMiCodeSettings = async () => {
     setIsSavingSettings(true);
     try {
       await onUpdateAppSettings({
         ...appSettings,
-        agentBin: nextCodexBin,
-        agentArgs: nextCodexArgs,
-        codexBin: nextCodexBin,
-        codexArgs: nextCodexArgs,
+        agentBin: nextMiCodeBin,
+        agentArgs: nextMiCodeArgs,
+        micodeBin: nextMiCodeBin,
+        micodeArgs: nextMiCodeArgs,
       });
     } finally {
       setIsSavingSettings(false);
@@ -954,25 +954,25 @@ export function SettingsView({
     });
   };
 
-  const handleBrowseCodex = async () => {
+  const handleBrowseMiCode = async () => {
     const selection = await open({ multiple: false, directory: false });
     if (!selection || Array.isArray(selection)) {
       return;
     }
-    setCodexPathDraft(selection);
+    setMiCodePathDraft(selection);
   };
 
   const handleRunDoctor = async () => {
     setDoctorState({ status: "running", result: null });
     try {
-      const result = await onRunDoctor(nextCodexBin, nextCodexArgs);
+      const result = await onRunDoctor(nextMiCodeBin, nextMiCodeArgs);
       setDoctorState({ status: "done", result });
     } catch (error) {
       setDoctorState({
         status: "done",
         result: {
           ok: false,
-          codexBin: nextCodexBin,
+          micodeBin: nextMiCodeBin,
           version: null,
           appServerOk: false,
           details: error instanceof Error ? error.message : String(error),
@@ -1218,8 +1218,8 @@ export function SettingsView({
             </button>
             <button
               type="button"
-              className={`settings-nav ${activeSection === "codex" ? "active" : ""}`}
-              onClick={() => setActiveSection("codex")}
+              className={`settings-nav ${activeSection === "micode" ? "active" : ""}`}
+              onClick={() => setActiveSection("micode")}
             >
               <TerminalSquare aria-hidden />
               MiCode
@@ -2972,31 +2972,31 @@ export function SettingsView({
                 </div>
               </section>
             )}
-            {activeSection === "codex" && (
+            {activeSection === "micode" && (
               <section className="settings-section">
                 <div className="settings-section-title">MiCode</div>
                 <div className="settings-section-subtitle">
                   Configure the MiCode CLI used by this app and validate the install.
                 </div>
                 <div className="settings-field">
-                  <label className="settings-field-label" htmlFor="codex-path">
+                  <label className="settings-field-label" htmlFor="micode-path">
                     Default agent path
                   </label>
                   <div className="settings-field-row">
                     <input
-                      id="codex-path"
+                      id="micode-path"
                       className="settings-input"
-                      value={codexPathDraft}
+                      value={micodePathDraft}
                       placeholder="micode"
-                      onChange={(event) => setCodexPathDraft(event.target.value)}
+                      onChange={(event) => setMiCodePathDraft(event.target.value)}
                     />
-                    <button type="button" className="ghost" onClick={handleBrowseCodex}>
+                    <button type="button" className="ghost" onClick={handleBrowseMiCode}>
                       Browse
                     </button>
                     <button
                       type="button"
                       className="ghost"
-                      onClick={() => setCodexPathDraft("")}
+                      onClick={() => setMiCodePathDraft("")}
                     >
                       Use PATH
                     </button>
@@ -3004,21 +3004,21 @@ export function SettingsView({
                   <div className="settings-help">
                     Leave empty to use the system PATH resolution.
                   </div>
-                  <label className="settings-field-label" htmlFor="codex-args">
+                  <label className="settings-field-label" htmlFor="micode-args">
                     Default agent args
                   </label>
                   <div className="settings-field-row">
                     <input
-                      id="codex-args"
+                      id="micode-args"
                       className="settings-input"
-                      value={codexArgsDraft}
+                      value={micodeArgsDraft}
                       placeholder="--profile personal"
-                      onChange={(event) => setCodexArgsDraft(event.target.value)}
+                      onChange={(event) => setMiCodeArgsDraft(event.target.value)}
                     />
                     <button
                       type="button"
                       className="ghost"
-                      onClick={() => setCodexArgsDraft("")}
+                      onClick={() => setMiCodeArgsDraft("")}
                     >
                       Clear
                     </button>
@@ -3028,11 +3028,11 @@ export function SettingsView({
                     <code>--experimental-acp</code>. Use quotes for values with spaces.
                   </div>
                 <div className="settings-field-actions">
-                  {codexDirty && (
+                  {micodeDirty && (
                     <button
                       type="button"
                       className="primary"
-                      onClick={handleSaveCodexSettings}
+                      onClick={handleSaveMiCodeSettings}
                       disabled={isSavingSettings}
                     >
                       {isSavingSettings ? "Saving..." : "Save"}
@@ -3216,7 +3216,7 @@ export function SettingsView({
                   }}
                   helpText={
                     <>
-                      Stored at <code>~/.codex/AGENTS.md</code>.
+                      Stored at <code>~/.micode/AGENTS.md</code>.
                     </>
                   }
                   classNames={{
@@ -3251,7 +3251,7 @@ export function SettingsView({
                   }}
                   helpText={
                     <>
-                      Stored at <code>~/.codex/config.toml</code>.
+                      Stored at <code>~/.micode/config.toml</code>.
                     </>
                   }
                   classNames={{
@@ -3280,24 +3280,24 @@ export function SettingsView({
                           <div className="settings-override-field">
                             <input
                               className="settings-input settings-input--compact"
-                              value={codexBinOverrideDrafts[workspace.id] ?? ""}
+                              value={micodeBinOverrideDrafts[workspace.id] ?? ""}
                               placeholder="MiCode binary override"
                               onChange={(event) =>
-                                setCodexBinOverrideDrafts((prev) => ({
+                                setMiCodeBinOverrideDrafts((prev) => ({
                                   ...prev,
                                   [workspace.id]: event.target.value,
                                 }))
                               }
                               onBlur={async () => {
-                                const draft = codexBinOverrideDrafts[workspace.id] ?? "";
+                                const draft = micodeBinOverrideDrafts[workspace.id] ?? "";
                                 const nextValue = normalizeOverrideValue(draft);
                                 if (
                                   nextValue ===
-                                  (workspace.agent_bin ?? workspace.codex_bin ?? null)
+                                  (workspace.agent_bin ?? workspace.micode_bin ?? null)
                                 ) {
                                   return;
                                 }
-                                await onUpdateWorkspaceCodexBin(workspace.id, nextValue);
+                                await onUpdateWorkspaceMiCodeBin(workspace.id, nextValue);
                               }}
                               aria-label={`MiCode binary override for ${workspace.name}`}
                             />
@@ -3305,11 +3305,11 @@ export function SettingsView({
                               type="button"
                               className="ghost"
                               onClick={async () => {
-                                setCodexBinOverrideDrafts((prev) => ({
+                                setMiCodeBinOverrideDrafts((prev) => ({
                                   ...prev,
                                   [workspace.id]: "",
                                 }));
-                                await onUpdateWorkspaceCodexBin(workspace.id, null);
+                                await onUpdateWorkspaceMiCodeBin(workspace.id, null);
                               }}
                             >
                               Clear
@@ -3318,28 +3318,28 @@ export function SettingsView({
                           <div className="settings-override-field">
                             <input
                               className="settings-input settings-input--compact"
-                              value={codexHomeOverrideDrafts[workspace.id] ?? ""}
+                              value={micodeHomeOverrideDrafts[workspace.id] ?? ""}
                               placeholder="CODEX_HOME override"
                               onChange={(event) =>
-                                setCodexHomeOverrideDrafts((prev) => ({
+                                setMiCodeHomeOverrideDrafts((prev) => ({
                                   ...prev,
                                   [workspace.id]: event.target.value,
                                 }))
                               }
                               onBlur={async () => {
-                                const draft = codexHomeOverrideDrafts[workspace.id] ?? "";
+                                const draft = micodeHomeOverrideDrafts[workspace.id] ?? "";
                                 const nextValue = normalizeOverrideValue(draft);
                                 if (
                                   nextValue ===
                                   (workspace.settings.agentHome ??
-                                    workspace.settings.codexHome ??
+                                    workspace.settings.micodeHome ??
                                     null)
                                 ) {
                                   return;
                                 }
                                 await onUpdateWorkspaceSettings(workspace.id, {
                                   agentHome: nextValue,
-                                  codexHome: nextValue,
+                                  micodeHome: nextValue,
                                 });
                               }}
                               aria-label={`CODEX_HOME override for ${workspace.name}`}
@@ -3348,13 +3348,13 @@ export function SettingsView({
                               type="button"
                               className="ghost"
                               onClick={async () => {
-                                setCodexHomeOverrideDrafts((prev) => ({
+                                setMiCodeHomeOverrideDrafts((prev) => ({
                                   ...prev,
                                   [workspace.id]: "",
                                 }));
                                 await onUpdateWorkspaceSettings(workspace.id, {
                                   agentHome: null,
-                                  codexHome: null,
+                                  micodeHome: null,
                                 });
                               }}
                             >
@@ -3364,28 +3364,28 @@ export function SettingsView({
                           <div className="settings-override-field">
                             <input
                               className="settings-input settings-input--compact"
-                              value={codexArgsOverrideDrafts[workspace.id] ?? ""}
+                              value={micodeArgsOverrideDrafts[workspace.id] ?? ""}
                               placeholder="MiCode args override"
                               onChange={(event) =>
-                                setCodexArgsOverrideDrafts((prev) => ({
+                                setMiCodeArgsOverrideDrafts((prev) => ({
                                   ...prev,
                                   [workspace.id]: event.target.value,
                                 }))
                               }
                               onBlur={async () => {
-                                const draft = codexArgsOverrideDrafts[workspace.id] ?? "";
+                                const draft = micodeArgsOverrideDrafts[workspace.id] ?? "";
                                 const nextValue = normalizeOverrideValue(draft);
                                 if (
                                   nextValue ===
                                   (workspace.settings.agentArgs ??
-                                    workspace.settings.codexArgs ??
+                                    workspace.settings.micodeArgs ??
                                     null)
                                 ) {
                                   return;
                                 }
                                 await onUpdateWorkspaceSettings(workspace.id, {
                                   agentArgs: nextValue,
-                                  codexArgs: nextValue,
+                                  micodeArgs: nextValue,
                                 });
                               }}
                               aria-label={`MiCode args override for ${workspace.name}`}
@@ -3394,13 +3394,13 @@ export function SettingsView({
                               type="button"
                               className="ghost"
                               onClick={async () => {
-                                setCodexArgsOverrideDrafts((prev) => ({
+                                setMiCodeArgsOverrideDrafts((prev) => ({
                                   ...prev,
                                   [workspace.id]: "",
                                 }));
                                 await onUpdateWorkspaceSettings(workspace.id, {
                                   agentArgs: null,
-                                  codexArgs: null,
+                                  micodeArgs: null,
                                 });
                               }}
                             >
@@ -3424,7 +3424,7 @@ export function SettingsView({
                 <div className="settings-section-subtitle">
                   Manage stable and experimental agent features.
                 </div>
-                {hasCodexHomeOverrides && (
+                {hasMiCodeHomeOverrides && (
                   <div className="settings-help">
                     Feature settings are stored in the default CODEX_HOME config.toml.
                     <br />

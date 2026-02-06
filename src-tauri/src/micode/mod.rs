@@ -14,20 +14,20 @@ pub(crate) mod home;
 
 pub(crate) use crate::backend::app_server::WorkspaceSession;
 use crate::backend::app_server::{
-    build_codex_path_env, check_acp_handshake, check_codex_installation,
+    build_micode_path_env, check_acp_handshake, check_micode_installation,
     spawn_workspace_session as spawn_workspace_session_inner,
 };
 use crate::backend::events::AppServerEvent;
 use crate::event_sink::TauriEventSink;
 use crate::remote_backend;
-use crate::shared::codex_core;
+use crate::shared::micode_core;
 use crate::shared::process_core::tokio_command;
 use crate::state::AppState;
 use crate::types::WorkspaceEntry;
 
 pub(crate) async fn spawn_workspace_session(
     entry: WorkspaceEntry,
-    default_codex_bin: Option<String>,
+    default_micode_bin: Option<String>,
     agent_args: Option<String>,
     app_handle: AppHandle,
     agent_home: Option<PathBuf>,
@@ -36,7 +36,7 @@ pub(crate) async fn spawn_workspace_session(
     let event_sink = TauriEventSink::new(app_handle);
     spawn_workspace_session_inner(
         entry,
-        default_codex_bin,
+        default_micode_bin,
         agent_args,
         agent_home,
         client_version,
@@ -46,25 +46,25 @@ pub(crate) async fn spawn_workspace_session(
 }
 
 #[tauri::command]
-pub(crate) async fn codex_doctor(
-    codex_bin: Option<String>,
-    codex_args: Option<String>,
+pub(crate) async fn micode_doctor(
+    micode_bin: Option<String>,
+    micode_args: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
     let (default_bin, default_args) = {
         let settings = state.app_settings.lock().await;
         (settings.agent_bin.clone(), settings.agent_args.clone())
     };
-    let resolved = codex_bin
+    let resolved = micode_bin
         .clone()
         .filter(|value| !value.trim().is_empty())
         .or(default_bin);
-    let resolved_args = codex_args
+    let resolved_args = micode_args
         .clone()
         .filter(|value| !value.trim().is_empty())
         .or(default_args);
-    let path_env = build_codex_path_env(resolved.as_deref());
-    let version = check_codex_installation(resolved.clone()).await?;
+    let path_env = build_micode_path_env(resolved.as_deref());
+    let version = check_micode_installation(resolved.clone()).await?;
     let app_server_ok = check_acp_handshake(resolved.clone(), resolved_args.clone()).await?;
     let (node_ok, node_version, node_details) = {
         let mut node_command = tokio_command("node");
@@ -130,7 +130,7 @@ pub(crate) async fn codex_doctor(
     Ok(json!({
         "ok": version.is_some() && app_server_ok,
         "agentBin": resolved,
-        "codexBin": resolved,
+        "micodeBin": resolved,
         "version": version,
         "appServerOk": app_server_ok,
         "details": details,
@@ -157,7 +157,7 @@ pub(crate) async fn start_thread(
         .await;
     }
 
-    codex_core::start_thread_core(&state.sessions, workspace_id).await
+    micode_core::start_thread_core(&state.sessions, workspace_id).await
 }
 
 #[tauri::command]
@@ -177,7 +177,7 @@ pub(crate) async fn resume_thread(
         .await;
     }
 
-    codex_core::resume_thread_core(&state.sessions, workspace_id, thread_id).await
+    micode_core::resume_thread_core(&state.sessions, workspace_id, thread_id).await
 }
 
 #[tauri::command]
@@ -197,7 +197,7 @@ pub(crate) async fn fork_thread(
         .await;
     }
 
-    codex_core::fork_thread_core(&state.sessions, workspace_id, thread_id).await
+    micode_core::fork_thread_core(&state.sessions, workspace_id, thread_id).await
 }
 
 #[tauri::command]
@@ -218,7 +218,7 @@ pub(crate) async fn list_threads(
         .await;
     }
 
-    codex_core::list_threads_core(&state.sessions, workspace_id, cursor, limit).await
+    micode_core::list_threads_core(&state.sessions, workspace_id, cursor, limit).await
 }
 
 #[tauri::command]
@@ -239,7 +239,7 @@ pub(crate) async fn list_mcp_server_status(
         .await;
     }
 
-    codex_core::list_mcp_server_status_core(&state.sessions, workspace_id, cursor, limit).await
+    micode_core::list_mcp_server_status_core(&state.sessions, workspace_id, cursor, limit).await
 }
 
 #[tauri::command]
@@ -259,7 +259,7 @@ pub(crate) async fn archive_thread(
         .await;
     }
 
-    codex_core::archive_thread_core(&state.sessions, workspace_id, thread_id).await
+    micode_core::archive_thread_core(&state.sessions, workspace_id, thread_id).await
 }
 
 #[tauri::command]
@@ -279,7 +279,7 @@ pub(crate) async fn compact_thread(
         .await;
     }
 
-    codex_core::compact_thread_core(&state.sessions, workspace_id, thread_id).await
+    micode_core::compact_thread_core(&state.sessions, workspace_id, thread_id).await
 }
 
 #[tauri::command]
@@ -300,7 +300,7 @@ pub(crate) async fn set_thread_name(
         .await;
     }
 
-    codex_core::set_thread_name_core(&state.sessions, workspace_id, thread_id, name).await
+    micode_core::set_thread_name_core(&state.sessions, workspace_id, thread_id, name).await
 }
 
 #[tauri::command]
@@ -345,7 +345,7 @@ pub(crate) async fn send_user_message(
         .await;
     }
 
-    codex_core::send_user_message_core(
+    micode_core::send_user_message_core(
         &state.sessions,
         workspace_id,
         thread_id,
@@ -375,7 +375,7 @@ pub(crate) async fn collaboration_mode_list(
         .await;
     }
 
-    codex_core::collaboration_mode_list_core(&state.sessions, workspace_id).await
+    micode_core::collaboration_mode_list_core(&state.sessions, workspace_id).await
 }
 
 #[tauri::command]
@@ -396,7 +396,7 @@ pub(crate) async fn turn_interrupt(
         .await;
     }
 
-    codex_core::turn_interrupt_core(&state.sessions, workspace_id, thread_id, turn_id).await
+    micode_core::turn_interrupt_core(&state.sessions, workspace_id, thread_id, turn_id).await
 }
 
 #[tauri::command]
@@ -423,7 +423,7 @@ pub(crate) async fn start_review(
         .await;
     }
 
-    codex_core::start_review_core(&state.sessions, workspace_id, thread_id, target, delivery).await
+    micode_core::start_review_core(&state.sessions, workspace_id, thread_id, target, delivery).await
 }
 
 #[tauri::command]
@@ -442,7 +442,7 @@ pub(crate) async fn model_list(
         .await;
     }
 
-    codex_core::model_list_core(&state.sessions, workspace_id).await
+    micode_core::model_list_core(&state.sessions, workspace_id).await
 }
 
 #[tauri::command]
@@ -461,7 +461,7 @@ pub(crate) async fn account_rate_limits(
         .await;
     }
 
-    codex_core::account_rate_limits_core(&state.sessions, workspace_id).await
+    micode_core::account_rate_limits_core(&state.sessions, workspace_id).await
 }
 
 #[tauri::command]
@@ -480,11 +480,11 @@ pub(crate) async fn account_read(
         .await;
     }
 
-    codex_core::account_read_core(&state.sessions, &state.workspaces, workspace_id).await
+    micode_core::account_read_core(&state.sessions, &state.workspaces, workspace_id).await
 }
 
 #[tauri::command]
-pub(crate) async fn codex_login(
+pub(crate) async fn micode_login(
     workspace_id: String,
     state: State<'_, AppState>,
     app: AppHandle,
@@ -493,17 +493,17 @@ pub(crate) async fn codex_login(
         return remote_backend::call_remote(
             &*state,
             app,
-            "codex_login",
+            "micode_login",
             json!({ "workspaceId": workspace_id }),
         )
         .await;
     }
 
-    codex_core::codex_login_core(&state.sessions, &state.codex_login_cancels, workspace_id).await
+    micode_core::micode_login_core(&state.sessions, &state.micode_login_cancels, workspace_id).await
 }
 
 #[tauri::command]
-pub(crate) async fn codex_login_cancel(
+pub(crate) async fn micode_login_cancel(
     workspace_id: String,
     state: State<'_, AppState>,
     app: AppHandle,
@@ -512,13 +512,13 @@ pub(crate) async fn codex_login_cancel(
         return remote_backend::call_remote(
             &*state,
             app,
-            "codex_login_cancel",
+            "micode_login_cancel",
             json!({ "workspaceId": workspace_id }),
         )
         .await;
     }
 
-    codex_core::codex_login_cancel_core(&state.sessions, &state.codex_login_cancels, workspace_id)
+    micode_core::micode_login_cancel_core(&state.sessions, &state.micode_login_cancels, workspace_id)
         .await
 }
 
@@ -538,7 +538,7 @@ pub(crate) async fn skills_list(
         .await;
     }
 
-    codex_core::skills_list_core(&state.sessions, workspace_id).await
+    micode_core::skills_list_core(&state.sessions, workspace_id).await
 }
 
 #[tauri::command]
@@ -559,7 +559,7 @@ pub(crate) async fn apps_list(
         .await;
     }
 
-    codex_core::apps_list_core(&state.sessions, workspace_id, cursor, limit).await
+    micode_core::apps_list_core(&state.sessions, workspace_id, cursor, limit).await
 }
 
 #[tauri::command]
@@ -581,7 +581,7 @@ pub(crate) async fn respond_to_server_request(
         return Ok(());
     }
 
-    codex_core::respond_to_server_request_core(&state.sessions, workspace_id, request_id, result)
+    micode_core::respond_to_server_request_core(&state.sessions, workspace_id, request_id, result)
         .await
 }
 
@@ -619,7 +619,7 @@ pub(crate) async fn remember_approval_rule(
     command: Vec<String>,
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
-    codex_core::remember_approval_rule_core(&state.workspaces, workspace_id, command).await
+    micode_core::remember_approval_rule_core(&state.workspaces, workspace_id, command).await
 }
 
 #[tauri::command]
@@ -638,7 +638,7 @@ pub(crate) async fn get_config_model(
         .await;
     }
 
-    codex_core::get_config_model_core(&state.workspaces, workspace_id).await
+    micode_core::get_config_model_core(&state.workspaces, workspace_id).await
 }
 
 /// Generates a commit message in the background without showing in the main chat
@@ -709,7 +709,7 @@ pub(crate) async fn generate_commit_message(
         AppServerEvent {
             workspace_id: workspace_id.clone(),
             message: json!({
-                "method": "codex/backgroundThread",
+                "method": "micode/backgroundThread",
                 "params": {
                     "threadId": thread_id,
                     "action": "hide"
@@ -917,7 +917,7 @@ Task:\n{cleaned_prompt}"
         AppServerEvent {
             workspace_id: workspace_id.clone(),
             message: json!({
-                "method": "codex/backgroundThread",
+                "method": "micode/backgroundThread",
                 "params": {
                     "threadId": thread_id,
                     "action": "hide"

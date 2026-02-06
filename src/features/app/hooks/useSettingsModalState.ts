@@ -7,7 +7,7 @@ export type SettingsSection =
   | "shortcuts"
   | "open-apps"
   | "git"
-  | "codex"
+  | "micode"
   | "features";
 
 export function useSettingsModalState() {

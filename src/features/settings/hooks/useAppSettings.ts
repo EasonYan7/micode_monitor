@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AppSettings } from "../../../types";
-import { getAppSettings, runCodexDoctor, updateAppSettings } from "../../../services/tauri";
+import { getAppSettings, runMiCodeDoctor, updateAppSettings } from "../../../services/tauri";
 import { clampUiScale, UI_SCALE_DEFAULT } from "../../../utils/uiScale";
 import {
   DEFAULT_CODE_FONT_FAMILY,
@@ -24,8 +24,8 @@ const defaultSettings: AppSettings = {
   agentProvider: "micode-acp",
   agentBin: null,
   agentArgs: null,
-  codexBin: null,
-  codexArgs: null,
+  micodeBin: null,
+  micodeArgs: null,
   backendMode: "local",
   remoteBackendHost: "127.0.0.1:4732",
   remoteBackendToken: null,
@@ -111,15 +111,15 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
     agentProvider: "micode-acp",
     agentBin: settings.agentBin?.trim()
       ? settings.agentBin.trim()
-      : (settings.codexBin?.trim() ? settings.codexBin.trim() : null),
+      : (settings.micodeBin?.trim() ? settings.micodeBin.trim() : null),
     agentArgs: settings.agentArgs?.trim()
       ? settings.agentArgs.trim()
-      : (settings.codexArgs?.trim() ? settings.codexArgs.trim() : null),
-    codexBin: settings.codexBin?.trim()
-      ? settings.codexBin.trim()
+      : (settings.micodeArgs?.trim() ? settings.micodeArgs.trim() : null),
+    micodeBin: settings.micodeBin?.trim()
+      ? settings.micodeBin.trim()
       : (settings.agentBin?.trim() ? settings.agentBin.trim() : null),
-    codexArgs: settings.codexArgs?.trim()
-      ? settings.codexArgs.trim()
+    micodeArgs: settings.micodeArgs?.trim()
+      ? settings.micodeArgs.trim()
       : (settings.agentArgs?.trim() ? settings.agentArgs.trim() : null),
     uiScale: clampUiScale(settings.uiScale),
     theme: allowedThemes.has(settings.theme) ? settings.theme : "system",
@@ -185,8 +185,8 @@ export function useAppSettings() {
   }, []);
 
   const doctor = useCallback(
-    async (codexBin: string | null, codexArgs: string | null) => {
-      return runCodexDoctor(codexBin, codexArgs);
+    async (micodeBin: string | null, micodeArgs: string | null) => {
+      return runMiCodeDoctor(micodeBin, micodeArgs);
     },
     [],
   );

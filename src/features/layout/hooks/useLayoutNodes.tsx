@@ -223,9 +223,9 @@ type LayoutNodesOptions = {
   mainHeaderActionsNode?: ReactNode;
   centerMode: "chat" | "diff";
   onExitDiff: () => void;
-  activeTab: "projects" | "codex" | "git" | "log";
-  onSelectTab: (tab: "projects" | "codex" | "git" | "log") => void;
-  tabletNavTab: "codex" | "git" | "log";
+  activeTab: "projects" | "micode" | "git" | "log";
+  onSelectTab: (tab: "projects" | "micode" | "git" | "log") => void;
+  tabletNavTab: "micode" | "git" | "log";
   gitPanelMode: "diff" | "log" | "issues" | "prs";
   onGitPanelModeChange: (mode: "diff" | "log" | "issues" | "prs") => void;
   gitDiffViewStyle: "split" | "unified";
@@ -461,7 +461,7 @@ type LayoutNodesResult = {
   debugPanelNode: ReactNode;
   debugPanelFullNode: ReactNode;
   terminalDockNode: ReactNode;
-  compactEmptyCodexNode: ReactNode;
+  compactEmptyMiCodeNode: ReactNode;
   compactEmptyGitNode: ReactNode;
   compactGitBackNode: ReactNode;
 };
@@ -928,7 +928,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
     />
   );
 
-  const compactEmptyCodexNode = (
+  const compactEmptyMiCodeNode = (
     <div className="compact-empty">
       <h3>No workspace selected</h3>
       <p>Choose a project to start chatting.</p>
@@ -973,7 +973,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
     debugPanelNode,
     debugPanelFullNode,
     terminalDockNode,
-    compactEmptyCodexNode,
+    compactEmptyMiCodeNode,
     compactEmptyGitNode,
     compactGitBackNode,
   };

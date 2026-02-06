@@ -11,15 +11,15 @@ use tokio::time::timeout;
 use tokio::time::Instant;
 
 use crate::backend::app_server::WorkspaceSession;
-use crate::codex::config as codex_config;
-use crate::codex::home::{resolve_default_codex_home, resolve_workspace_codex_home};
+use crate::micode::config as micode_config;
+use crate::micode::home::{resolve_default_micode_home, resolve_workspace_micode_home};
 use crate::rules;
 use crate::shared::account::{build_account_response, read_auth_account};
 use crate::types::WorkspaceEntry;
 
 const LOGIN_START_TIMEOUT: Duration = Duration::from_secs(30);
 
-pub(crate) enum CodexLoginCancelState {
+pub(crate) enum MiCodeLoginCancelState {
     PendingStart(oneshot::Sender<()>),
     LoginId(String),
 }
@@ -52,13 +52,13 @@ async fn resolve_workspace_and_parent(
     Ok((entry, parent_entry))
 }
 
-async fn resolve_codex_home_for_workspace_core(
+async fn resolve_micode_home_for_workspace_core(
     workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
     workspace_id: &str,
 ) -> Result<PathBuf, String> {
     let (entry, parent_entry) = resolve_workspace_and_parent(workspaces, workspace_id).await?;
-    resolve_workspace_codex_home(&entry, parent_entry.as_ref())
-        .or_else(resolve_default_codex_home)
+    resolve_workspace_micode_home(&entry, parent_entry.as_ref())
+        .or_else(resolve_default_micode_home)
         .ok_or_else(|| "Unable to resolve CODEX_HOME".to_string())
 }
 
@@ -293,33 +293,33 @@ pub(crate) async fn account_read_core(
     };
 
     let (entry, parent_entry) = resolve_workspace_and_parent(workspaces, &workspace_id).await?;
-    let agent_home = resolve_workspace_codex_home(&entry, parent_entry.as_ref())
-        .or_else(resolve_default_codex_home);
+    let agent_home = resolve_workspace_micode_home(&entry, parent_entry.as_ref())
+        .or_else(resolve_default_micode_home);
     let fallback = read_auth_account(agent_home);
 
     Ok(build_account_response(response, fallback))
 }
 
-pub(crate) async fn codex_login_core(
+pub(crate) async fn micode_login_core(
     sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
-    codex_login_cancels: &Mutex<HashMap<String, CodexLoginCancelState>>,
+    micode_login_cancels: &Mutex<HashMap<String, MiCodeLoginCancelState>>,
     workspace_id: String,
 ) -> Result<Value, String> {
     let session = get_session_clone(sessions, &workspace_id).await?;
     let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
     {
-        let mut cancels = codex_login_cancels.lock().await;
+        let mut cancels = micode_login_cancels.lock().await;
         if let Some(existing) = cancels.remove(&workspace_id) {
             match existing {
-                CodexLoginCancelState::PendingStart(tx) => {
+                MiCodeLoginCancelState::PendingStart(tx) => {
                     let _ = tx.send(());
                 }
-                CodexLoginCancelState::LoginId(_) => {}
+                MiCodeLoginCancelState::LoginId(_) => {}
             }
         }
         cancels.insert(
             workspace_id.clone(),
-            CodexLoginCancelState::PendingStart(cancel_tx),
+            MiCodeLoginCancelState::PendingStart(cancel_tx),
         );
     }
 
@@ -331,23 +331,23 @@ pub(crate) async fn codex_login_core(
     let response = loop {
         match cancel_rx.try_recv() {
             Ok(_) => {
-                let mut cancels = codex_login_cancels.lock().await;
+                let mut cancels = micode_login_cancels.lock().await;
                 cancels.remove(&workspace_id);
-                return Err("Codex login canceled.".to_string());
+                return Err("MiCode login canceled.".to_string());
             }
             Err(TryRecvError::Closed) => {
-                let mut cancels = codex_login_cancels.lock().await;
+                let mut cancels = micode_login_cancels.lock().await;
                 cancels.remove(&workspace_id);
-                return Err("Codex login canceled.".to_string());
+                return Err("MiCode login canceled.".to_string());
             }
             Err(TryRecvError::Empty) => {}
         }
 
         let elapsed = start.elapsed();
         if elapsed >= LOGIN_START_TIMEOUT {
-            let mut cancels = codex_login_cancels.lock().await;
+            let mut cancels = micode_login_cancels.lock().await;
             cancels.remove(&workspace_id);
-            return Err("Codex login start timed out.".to_string());
+            return Err("MiCode login start timed out.".to_string());
         }
 
         let tick = Duration::from_millis(150);
@@ -375,10 +375,10 @@ pub(crate) async fn codex_login_core(
         .ok_or_else(|| "missing auth url in account/login/start response".to_string())?;
 
     {
-        let mut cancels = codex_login_cancels.lock().await;
+        let mut cancels = micode_login_cancels.lock().await;
         cancels.insert(
             workspace_id,
-            CodexLoginCancelState::LoginId(login_id.clone()),
+            MiCodeLoginCancelState::LoginId(login_id.clone()),
         );
     }
 
@@ -389,13 +389,13 @@ pub(crate) async fn codex_login_core(
     }))
 }
 
-pub(crate) async fn codex_login_cancel_core(
+pub(crate) async fn micode_login_cancel_core(
     sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
-    codex_login_cancels: &Mutex<HashMap<String, CodexLoginCancelState>>,
+    micode_login_cancels: &Mutex<HashMap<String, MiCodeLoginCancelState>>,
     workspace_id: String,
 ) -> Result<Value, String> {
     let cancel_state = {
-        let mut cancels = codex_login_cancels.lock().await;
+        let mut cancels = micode_login_cancels.lock().await;
         cancels.remove(&workspace_id)
     };
 
@@ -404,14 +404,14 @@ pub(crate) async fn codex_login_cancel_core(
     };
 
     match cancel_state {
-        CodexLoginCancelState::PendingStart(cancel_tx) => {
+        MiCodeLoginCancelState::PendingStart(cancel_tx) => {
             let _ = cancel_tx.send(());
             return Ok(json!({
                 "canceled": true,
                 "status": "canceled",
             }));
         }
-        CodexLoginCancelState::LoginId(login_id) => {
+        MiCodeLoginCancelState::LoginId(login_id) => {
             let session = get_session_clone(sessions, &workspace_id).await?;
             let response = session
                 .send_request(
@@ -482,7 +482,7 @@ pub(crate) async fn remember_approval_rule_core(
         return Err("empty command".to_string());
     }
 
-    let agent_home = resolve_codex_home_for_workspace_core(workspaces, &workspace_id).await?;
+    let agent_home = resolve_micode_home_for_workspace_core(workspaces, &workspace_id).await?;
     let rules_path = rules::default_rules_path(&agent_home);
     rules::append_prefix_rule(&rules_path, &command)?;
 
@@ -496,7 +496,7 @@ pub(crate) async fn get_config_model_core(
     workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
     workspace_id: String,
 ) -> Result<Value, String> {
-    let agent_home = resolve_codex_home_for_workspace_core(workspaces, &workspace_id).await?;
-    let model = codex_config::read_config_model(Some(agent_home))?;
+    let agent_home = resolve_micode_home_for_workspace_core(workspaces, &workspace_id).await?;
+    let model = micode_config::read_config_model(Some(agent_home))?;
     Ok(json!({ "model": model }))
 }

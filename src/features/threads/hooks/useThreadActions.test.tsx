@@ -42,8 +42,8 @@ vi.mock("../utils/threadStorage", () => ({
 describe("useThreadActions", () => {
   const workspace: WorkspaceInfo = {
     id: "ws-1",
-    name: "CodexMonitor",
-    path: "/tmp/codex",
+    name: "MiCodeMonitor",
+    path: "/tmp/micode",
     connected: true,
     settings: { sidebarCollapsed: false },
   };
@@ -333,7 +333,7 @@ describe("useThreadActions", () => {
         data: [
           {
             id: "thread-1",
-            cwd: "/tmp/codex",
+            cwd: "/tmp/micode",
             preview: "Remote preview",
             updated_at: 5000,
           },
@@ -421,7 +421,7 @@ describe("useThreadActions", () => {
         data: [
           {
             id: "thread-2",
-            cwd: "/tmp/codex",
+            cwd: "/tmp/micode",
             preview: "Older preview",
             updated_at: 4000,
           },

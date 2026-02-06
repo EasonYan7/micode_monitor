@@ -1,5 +1,5 @@
 {
-  description = "CodexMonitor Tauri app for orchestrating Codex agents";
+  description = "MiCodeMonitor Tauri app for orchestrating MiCode agents";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -21,7 +21,7 @@
         ];
 
         frontend = pkgs.buildNpmPackage {
-          pname = "codex-monitor-frontend";
+          pname = "micode-monitor-frontend";
           version = packageJson.version;
           src = ./.;
           nodejs = pkgs.nodejs_20;
@@ -41,7 +41,7 @@
         };
 
         appPackage = pkgs.rustPlatform.buildRustPackage {
-          pname = "codex-monitor";
+          pname = "micode-monitor";
           version = packageJson.version;
           src = ./src-tauri;
 
@@ -77,7 +77,7 @@
           installPhase = ''
             mkdir -p $out/bin
             target_dir="target/${pkgs.stdenv.hostPlatform.rust.rustcTarget}"
-            cp "$target_dir/release/codex-monitor" $out/bin/
+            cp "$target_dir/release/micode-monitor" $out/bin/
           '';
         };
       in

@@ -53,7 +53,7 @@ describe("useSystemNotificationThreadLinks", () => {
 
     expect(setCenterMode).toHaveBeenCalledWith("chat");
     expect(setSelectedDiffPath).toHaveBeenCalledWith(null);
-    expect(setActiveTab).toHaveBeenCalledWith("codex");
+    expect(setActiveTab).toHaveBeenCalledWith("micode");
     expect(setActiveWorkspaceId).toHaveBeenCalledWith("ws-1");
     expect(setActiveThreadId).toHaveBeenCalledWith("t-1", "ws-1");
     expect(connectWorkspace).not.toHaveBeenCalled();

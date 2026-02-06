@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use tauri::State;
 use tokio::task;
 
-use crate::codex::home::{resolve_default_codex_home, resolve_workspace_codex_home};
+use crate::micode::home::{resolve_default_micode_home, resolve_workspace_micode_home};
 use crate::state::AppState;
 use crate::types::WorkspaceEntry;
 
@@ -21,7 +21,7 @@ pub(crate) struct CustomPromptEntry {
     pub(crate) scope: Option<String>,
 }
 
-fn resolve_codex_home_for_workspace(
+fn resolve_micode_home_for_workspace(
     workspaces: &HashMap<String, WorkspaceEntry>,
     entry: &WorkspaceEntry,
 ) -> Option<PathBuf> {
@@ -29,14 +29,14 @@ fn resolve_codex_home_for_workspace(
         .parent_id
         .as_ref()
         .and_then(|parent_id| workspaces.get(parent_id));
-    resolve_workspace_codex_home(entry, parent_entry).or_else(resolve_default_codex_home)
+    resolve_workspace_micode_home(entry, parent_entry).or_else(resolve_default_micode_home)
 }
 
 fn default_prompts_dir_for_workspace(
     workspaces: &HashMap<String, WorkspaceEntry>,
     entry: &WorkspaceEntry,
 ) -> Option<PathBuf> {
-    resolve_codex_home_for_workspace(workspaces, entry).map(|home| home.join("prompts"))
+    resolve_micode_home_for_workspace(workspaces, entry).map(|home| home.join("prompts"))
 }
 
 fn require_workspace_entry(

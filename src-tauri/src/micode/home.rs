@@ -3,13 +3,13 @@ use std::path::PathBuf;
 
 use crate::types::WorkspaceEntry;
 
-pub(crate) fn resolve_workspace_codex_home(
+pub(crate) fn resolve_workspace_micode_home(
     entry: &WorkspaceEntry,
     parent_entry: Option<&WorkspaceEntry>,
 ) -> Option<PathBuf> {
     if let Some(value) = entry.settings.agent_home.as_ref() {
         let base = PathBuf::from(&entry.path);
-        if let Some(path) = normalize_codex_home_with_base(value, &base) {
+        if let Some(path) = normalize_micode_home_with_base(value, &base) {
             return Some(path);
         }
     }
@@ -17,33 +17,33 @@ pub(crate) fn resolve_workspace_codex_home(
         if let Some(parent) = parent_entry {
             if let Some(value) = parent.settings.agent_home.as_ref() {
                 let base = PathBuf::from(&parent.path);
-                if let Some(path) = normalize_codex_home_with_base(value, &base) {
+                if let Some(path) = normalize_micode_home_with_base(value, &base) {
                     return Some(path);
                 }
             }
-            let legacy_home = PathBuf::from(&parent.path).join(".codexmonitor");
+            let legacy_home = PathBuf::from(&parent.path).join(".micodemonitor");
             if legacy_home.is_dir() {
                 return Some(legacy_home);
             }
         }
     }
-    let legacy_home = PathBuf::from(&entry.path).join(".codexmonitor");
+    let legacy_home = PathBuf::from(&entry.path).join(".micodemonitor");
     if legacy_home.is_dir() {
         return Some(legacy_home);
     }
-    resolve_default_codex_home()
+    resolve_default_micode_home()
 }
 
-pub(crate) fn resolve_default_codex_home() -> Option<PathBuf> {
+pub(crate) fn resolve_default_micode_home() -> Option<PathBuf> {
     if let Ok(value) = env::var("CODEX_HOME") {
-        if let Some(path) = normalize_codex_home(&value) {
+        if let Some(path) = normalize_micode_home(&value) {
             return Some(path);
         }
     }
-    resolve_home_dir().map(|home| home.join(".codex"))
+    resolve_home_dir().map(|home| home.join(".micode"))
 }
 
-fn normalize_codex_home(value: &str) -> Option<PathBuf> {
+fn normalize_micode_home(value: &str) -> Option<PathBuf> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return None;
@@ -61,8 +61,8 @@ fn normalize_codex_home(value: &str) -> Option<PathBuf> {
     Some(PathBuf::from(trimmed))
 }
 
-fn normalize_codex_home_with_base(value: &str, base: &PathBuf) -> Option<PathBuf> {
-    let path = normalize_codex_home(value)?;
+fn normalize_micode_home_with_base(value: &str, base: &PathBuf) -> Option<PathBuf> {
+    let path = normalize_micode_home(value)?;
     if path.is_absolute() {
         Some(path)
     } else {
@@ -220,38 +220,38 @@ mod tests {
     }
 
     #[test]
-    fn worktree_inherits_parent_codex_home_override() {
-        let parent = workspace_entry(WorkspaceKind::Main, "/repo", Some("/tmp/codex-parent"));
+    fn worktree_inherits_parent_micode_home_override() {
+        let parent = workspace_entry(WorkspaceKind::Main, "/repo", Some("/tmp/micode-parent"));
         let child = workspace_entry(WorkspaceKind::Worktree, "/repo/worktree", None);
 
-        let resolved = resolve_workspace_codex_home(&child, Some(&parent));
+        let resolved = resolve_workspace_micode_home(&child, Some(&parent));
 
-        assert_eq!(resolved, Some(PathBuf::from("/tmp/codex-parent")));
+        assert_eq!(resolved, Some(PathBuf::from("/tmp/micode-parent")));
     }
 
     #[test]
-    fn workspace_codex_home_relative_resolves_against_workspace_path() {
-        let entry = workspace_entry(WorkspaceKind::Main, "/repo", Some(".codex"));
+    fn workspace_micode_home_relative_resolves_against_workspace_path() {
+        let entry = workspace_entry(WorkspaceKind::Main, "/repo", Some(".micode"));
 
-        let resolved = resolve_workspace_codex_home(&entry, None);
+        let resolved = resolve_workspace_micode_home(&entry, None);
 
-        assert_eq!(resolved, Some(PathBuf::from("/repo/.codex")));
+        assert_eq!(resolved, Some(PathBuf::from("/repo/.micode")));
     }
 
     #[test]
     fn worktree_relative_override_uses_parent_path() {
-        let parent = workspace_entry(WorkspaceKind::Main, "/repo", Some(".codex"));
+        let parent = workspace_entry(WorkspaceKind::Main, "/repo", Some(".micode"));
         let child = workspace_entry(WorkspaceKind::Worktree, "/repo/worktree", None);
 
-        let resolved = resolve_workspace_codex_home(&child, Some(&parent));
+        let resolved = resolve_workspace_micode_home(&child, Some(&parent));
 
-        assert_eq!(resolved, Some(PathBuf::from("/repo/.codex")));
+        assert_eq!(resolved, Some(PathBuf::from("/repo/.micode")));
     }
 
     #[test]
-    fn codex_home_expands_tilde_and_env_vars() {
+    fn micode_home_expands_tilde_and_env_vars() {
         let _guard = ENV_LOCK.lock().expect("lock env");
-        let home_dir = std::env::temp_dir().join("codex-home-test");
+        let home_dir = std::env::temp_dir().join("micode-home-test");
         let home_str = home_dir.to_string_lossy().to_string();
 
         let prev_home = std::env::var("HOME").ok();
@@ -260,22 +260,22 @@ mod tests {
         let prev_appdata = std::env::var("APPDATA").ok();
         std::env::set_var("APPDATA", "/tmp/appdata-root");
 
-        let tilde = normalize_codex_home("~/.codex-api");
-        assert_eq!(tilde, Some(home_dir.join(".codex-api")));
+        let tilde = normalize_micode_home("~/.micode-api");
+        assert_eq!(tilde, Some(home_dir.join(".micode-api")));
 
-        let dollar = normalize_codex_home("$HOME/.codex-api");
-        assert_eq!(dollar, Some(home_dir.join(".codex-api")));
+        let dollar = normalize_micode_home("$HOME/.micode-api");
+        assert_eq!(dollar, Some(home_dir.join(".micode-api")));
 
-        let braces = normalize_codex_home("${HOME}/.codex-api");
-        assert_eq!(braces, Some(home_dir.join(".codex-api")));
+        let braces = normalize_micode_home("${HOME}/.micode-api");
+        assert_eq!(braces, Some(home_dir.join(".micode-api")));
 
-        let appdata = normalize_codex_home("%APPDATA%/Codex");
-        assert_eq!(appdata, Some(PathBuf::from("/tmp/appdata-root/Codex")));
+        let appdata = normalize_micode_home("%APPDATA%/MiCode");
+        assert_eq!(appdata, Some(PathBuf::from("/tmp/appdata-root/MiCode")));
 
-        let appdata_lower = normalize_codex_home("$appdata/Codex");
+        let appdata_lower = normalize_micode_home("$appdata/MiCode");
         assert_eq!(
             appdata_lower,
-            Some(PathBuf::from("/tmp/appdata-root/Codex"))
+            Some(PathBuf::from("/tmp/appdata-root/MiCode"))
         );
 
         match prev_home {

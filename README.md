@@ -1,18 +1,18 @@
-# CodexMonitor
+# MiCodeMonitor
 
-![CodexMonitor](screenshot.png)
+![MiCodeMonitor](screenshot.png)
 
-CodexMonitor is a macOS Tauri app for orchestrating multiple Codex agents across local workspaces. It provides a sidebar to manage projects, a home screen for quick actions, and a conversation view backed by the Codex app-server protocol.
+MiCodeMonitor is a macOS Tauri app for orchestrating multiple MiCode agents across local workspaces. It provides a sidebar to manage projects, a home screen for quick actions, and a conversation view backed by the MiCode app-server protocol.
 
 ## Features
 
 ### Workspaces & Threads
 
 - Add and persist workspaces, group/sort them, and jump into recent agent activity from the home dashboard.
-- Spawn one `codex app-server` per workspace, resume threads, and track unread/running state.
-- Worktree and clone agents for isolated work; worktrees live under the app data directory (legacy `.codex-worktrees` supported).
+- Spawn one `micode app-server` per workspace, resume threads, and track unread/running state.
+- Worktree and clone agents for isolated work; worktrees live under the app data directory (legacy `.micode-worktrees` supported).
 - Thread management: pin/rename/archive/copy, per-thread drafts, and stop/interrupt in-flight turns.
-- Optional remote backend (daemon) mode for running Codex on another machine.
+- Optional remote backend (daemon) mode for running MiCode on another machine.
 
 ### Composer & Agent Controls
 
@@ -47,11 +47,11 @@ CodexMonitor is a macOS Tauri app for orchestrating multiple Codex agents across
 - Node.js + npm
 - Rust toolchain (stable)
 - CMake (required for native dependencies; Whisper/dictation uses it on non-Windows)
-- Codex installed on your system and available as `codex` in `PATH`
+- MiCode installed on your system and available as `micode` in `PATH`
 - Git CLI (used for worktree operations)
 - GitHub CLI (`gh`) for the Issues panel (optional)
 
-If the `codex` binary is not in `PATH`, update the backend to pass a custom path per workspace.
+If the `micode` binary is not in `PATH`, update the backend to pass a custom path per workspace.
 If you hit native build errors, run:
 
 ```bash
@@ -116,24 +116,24 @@ src/
   styles/           split CSS by area
   types.ts          shared types
 src-tauri/
-  src/lib.rs        Tauri backend + codex app-server client
+  src/lib.rs        Tauri backend + micode app-server client
   tauri.conf.json   window configuration
 ```
 
 ## Notes
 
 - Workspaces persist to `workspaces.json` under the app data directory.
-- App settings persist to `settings.json` under the app data directory (Codex path, default access mode, UI scale).
-- Feature settings are supported in the UI and synced to `$CODEX_HOME/config.toml` (or `~/.codex/config.toml`) on load/save. Stable: Collaboration modes (`features.collaboration_modes`), personality (`personality`), Steer mode (`features.steer`), and Background terminal (`features.unified_exec`). Experimental: Collab mode (`features.collab`) and Apps (`features.apps`).
+- App settings persist to `settings.json` under the app data directory (MiCode path, default access mode, UI scale).
+- Feature settings are supported in the UI and synced to `$CODEX_HOME/config.toml` (or `~/.micode/config.toml`) on load/save. Stable: Collaboration modes (`features.collaboration_modes`), personality (`personality`), Steer mode (`features.steer`), and Background terminal (`features.unified_exec`). Experimental: Collab mode (`features.collab`) and Apps (`features.apps`).
 - On launch and on window focus, the app reconnects and refreshes thread lists for each workspace.
 - Threads are restored by filtering `thread/list` results using the workspace `cwd`.
 - Selecting a thread always calls `thread/resume` to refresh messages from disk.
 - CLI sessions appear if their `cwd` matches the workspace path; they are not live-streamed unless resumed.
-- The app uses `codex app-server` over stdio; see `src-tauri/src/lib.rs`.
-- Codex sessions use the default Codex home (usually `~/.codex`); if a legacy `.codexmonitor/` exists in a workspace, it is used for that workspace.
-- Worktree agents live under the app data directory (`worktrees/<workspace-id>`); legacy `.codex-worktrees/` paths remain supported, and the app no longer edits repo `.gitignore` files.
+- The app uses `micode app-server` over stdio; see `src-tauri/src/lib.rs`.
+- MiCode sessions use the default MiCode home (usually `~/.micode`); if a legacy `.micodemonitor/` exists in a workspace, it is used for that workspace.
+- Worktree agents live under the app data directory (`worktrees/<workspace-id>`); legacy `.micode-worktrees/` paths remain supported, and the app no longer edits repo `.gitignore` files.
 - UI state (panel sizes, reduced transparency toggle, recent thread activity) is stored in `localStorage`.
-- Custom prompts load from `$CODEX_HOME/prompts` (or `~/.codex/prompts`) with optional frontmatter description/argument hints.
+- Custom prompts load from `$CODEX_HOME/prompts` (or `~/.micode/prompts`) with optional frontmatter description/argument hints.
 
 ## Tauri IPC Surface
 

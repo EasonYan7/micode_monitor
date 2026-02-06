@@ -29,7 +29,7 @@ pub(crate) fn read_apps_enabled() -> Result<Option<bool>, String> {
 }
 
 pub(crate) fn read_personality() -> Result<Option<String>, String> {
-    let Some(root) = resolve_default_codex_home() else {
+    let Some(root) = resolve_default_micode_home() else {
         return Ok(None);
     };
     let contents = read_config_contents_from_root(&root)?;
@@ -60,7 +60,7 @@ pub(crate) fn write_apps_enabled(enabled: bool) -> Result<(), String> {
 }
 
 pub(crate) fn write_personality(personality: &str) -> Result<(), String> {
-    let Some(root) = resolve_default_codex_home() else {
+    let Some(root) = resolve_default_micode_home() else {
         return Ok(());
     };
     let policy = config_policy()?;
@@ -86,7 +86,7 @@ pub(crate) fn write_personality(personality: &str) -> Result<(), String> {
 }
 
 fn read_feature_flag(key: &str) -> Result<Option<bool>, String> {
-    let Some(root) = resolve_default_codex_home() else {
+    let Some(root) = resolve_default_micode_home() else {
         return Ok(None);
     };
     let contents = read_config_contents_from_root(&root)?;
@@ -96,7 +96,7 @@ fn read_feature_flag(key: &str) -> Result<Option<bool>, String> {
 }
 
 fn write_feature_flag(key: &str, enabled: bool) -> Result<(), String> {
-    let Some(root) = resolve_default_codex_home() else {
+    let Some(root) = resolve_default_micode_home() else {
         return Ok(());
     };
     let policy = config_policy()?;
@@ -118,19 +118,19 @@ fn write_feature_flag(key: &str, enabled: bool) -> Result<(), String> {
 }
 
 pub(crate) fn config_toml_path() -> Option<PathBuf> {
-    resolve_default_codex_home().map(|home| home.join("config.toml"))
+    resolve_default_micode_home().map(|home| home.join("config.toml"))
 }
 
 pub(crate) fn read_config_model(agent_home: Option<PathBuf>) -> Result<Option<String>, String> {
-    let root = agent_home.or_else(resolve_default_codex_home);
+    let root = agent_home.or_else(resolve_default_micode_home);
     let Some(root) = root else {
         return Err("Unable to resolve CODEX_HOME".to_string());
     };
     read_config_model_from_root(&root)
 }
 
-fn resolve_default_codex_home() -> Option<PathBuf> {
-    crate::codex::home::resolve_default_codex_home()
+fn resolve_default_micode_home() -> Option<PathBuf> {
+    crate::micode::home::resolve_default_micode_home()
 }
 
 fn config_policy() -> Result<crate::files::policy::FilePolicy, String> {

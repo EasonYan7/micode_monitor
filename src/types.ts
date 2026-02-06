@@ -5,8 +5,8 @@ export type WorkspaceSettings = {
   gitRoot?: string | null;
   agentHome?: string | null;
   agentArgs?: string | null;
-  codexHome?: string | null;
-  codexArgs?: string | null;
+  micodeHome?: string | null;
+  micodeArgs?: string | null;
   launchScript?: string | null;
   launchScripts?: LaunchScriptEntry[] | null;
   worktreeSetupScript?: string | null;
@@ -55,7 +55,7 @@ export type WorkspaceInfo = {
   path: string;
   connected: boolean;
   agent_bin?: string | null;
-  codex_bin?: string | null;
+  micode_bin?: string | null;
   kind?: WorkspaceKind;
   parentId?: string | null;
   worktree?: WorktreeInfo | null;
@@ -146,8 +146,8 @@ export type AppSettings = {
   agentProvider: "micode-acp";
   agentBin: string | null;
   agentArgs: string | null;
-  codexBin: string | null;
-  codexArgs: string | null;
+  micodeBin: string | null;
+  micodeArgs: string | null;
   backendMode: BackendMode;
   remoteBackendHost: string;
   remoteBackendToken: string | null;
@@ -207,9 +207,9 @@ export type AppSettings = {
   selectedOpenAppId: string;
 };
 
-export type CodexDoctorResult = {
+export type MiCodeDoctorResult = {
   ok: boolean;
-  codexBin: string | null;
+  micodeBin: string | null;
   version: string | null;
   appServerOk: boolean;
   details: string | null;

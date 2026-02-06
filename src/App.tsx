@@ -172,9 +172,9 @@ function MainApp() {
   useLiquidGlassEffect({ reduceTransparency, onDebug: addDebugEntry });
   const [accessMode, setAccessMode] = useState<AccessMode>("current");
   const [activeTab, setActiveTab] = useState<
-    "projects" | "codex" | "git" | "log"
-  >("codex");
-  const tabletTab = activeTab === "projects" ? "codex" : activeTab;
+    "projects" | "micode" | "git" | "log"
+  >("micode");
+  const tabletTab = activeTab === "projects" ? "micode" : activeTab;
   const {
     workspaces,
     workspaceGroups,
@@ -191,7 +191,7 @@ function MainApp() {
     connectWorkspace,
     markWorkspaceConnected,
     updateWorkspaceSettings,
-    updateWorkspaceCodexBin,
+    updateWorkspaceMiCodeBin,
     createWorkspaceGroup,
     renameWorkspaceGroup,
     moveWorkspaceGroup,
@@ -925,7 +925,7 @@ function MainApp() {
     connectWorkspace,
     onSelectWorkspace: selectWorkspace,
     onWorktreeCreated: handleWorktreeCreated,
-    onCompactActivate: isCompact ? () => setActiveTab("codex") : undefined,
+    onCompactActivate: isCompact ? () => setActiveTab("micode") : undefined,
     onError: (message) => {
       addDebugEntry({
         id: `${Date.now()}-client-add-worktree-error`,
@@ -1000,7 +1000,7 @@ function MainApp() {
     onSelectWorkspace: selectWorkspace,
     resolveProjectContext: resolveCloneProjectContext,
     persistProjectCopiesFolder,
-    onCompactActivate: isCompact ? () => setActiveTab("codex") : undefined,
+    onCompactActivate: isCompact ? () => setActiveTab("micode") : undefined,
     onError: (message) => {
       addDebugEntry({
         id: `${Date.now()}-client-add-clone-error`,
@@ -1073,7 +1073,7 @@ function MainApp() {
   const showWorkspaceHome = Boolean(activeWorkspace && !activeThreadId && !isNewAgentDraftMode);
   const showComposer = (!isCompact
     ? centerMode === "chat" || centerMode === "diff"
-    : (isTablet ? tabletTab : activeTab) === "codex") && !showWorkspaceHome;
+    : (isTablet ? tabletTab : activeTab) === "micode") && !showWorkspaceHome;
   const { files, isLoading: isFilesLoading, setFileAutocompleteActive } =
     useWorkspaceFileListing({
       activeWorkspace,
@@ -1439,7 +1439,7 @@ function MainApp() {
       return;
     }
     if (activeTab === "projects") {
-      setActiveTab("codex");
+      setActiveTab("micode");
     }
   }, [activeTab, isTablet]);
 
@@ -1579,7 +1579,7 @@ function MainApp() {
       selectWorkspace(workspaceId);
       setActiveThreadId(threadId, workspaceId);
       if (isCompact) {
-        setActiveTab("codex");
+        setActiveTab("micode");
       }
     },
     [
@@ -1740,7 +1740,7 @@ function MainApp() {
     debugPanelNode,
     debugPanelFullNode,
     terminalDockNode,
-    compactEmptyCodexNode,
+    compactEmptyMiCodeNode,
     compactEmptyGitNode,
     compactGitBackNode,
   } = useLayoutNodes({
@@ -1796,7 +1796,7 @@ function MainApp() {
     onConnectWorkspace: async (workspace) => {
       await connectWorkspace(workspace);
       if (isCompact) {
-        setActiveTab("codex");
+        setActiveTab("micode");
       }
     },
     onAddAgent: handleAddAgent,
@@ -1878,7 +1878,7 @@ function MainApp() {
       selectWorkspace(workspaceId);
       setActiveThreadId(threadId, workspaceId);
       if (isCompact) {
-        setActiveTab("codex");
+        setActiveTab("micode");
       }
     },
     activeWorkspace,
@@ -2288,7 +2288,7 @@ function MainApp() {
         debugPanelNode={debugPanelNode}
         debugPanelFullNode={debugPanelFullNode}
         terminalDockNode={terminalDockNode}
-        compactEmptyCodexNode={compactEmptyCodexNode}
+        compactEmptyMiCodeNode={compactEmptyMiCodeNode}
         compactEmptyGitNode={compactEmptyGitNode}
         compactGitBackNode={compactGitBackNode}
         onSidebarResizeStart={onSidebarResizeStart}
@@ -2346,8 +2346,8 @@ function MainApp() {
             await queueSaveSettings(next);
           },
           onRunDoctor: doctor,
-          onUpdateWorkspaceCodexBin: async (id, codexBin) => {
-            await updateWorkspaceCodexBin(id, codexBin);
+          onUpdateWorkspaceMiCodeBin: async (id, micodeBin) => {
+            await updateWorkspaceMiCodeBin(id, micodeBin);
           },
           onUpdateWorkspaceSettings: async (id, settings) => {
             await updateWorkspaceSettings(id, settings);

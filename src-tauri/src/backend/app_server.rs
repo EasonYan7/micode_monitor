@@ -15,7 +15,7 @@ use tokio::time::timeout;
 use uuid::Uuid;
 
 use crate::backend::events::{AppServerEvent, EventSink};
-use crate::codex::args::apply_codex_args;
+use crate::micode::args::apply_micode_args;
 use crate::shared::process_core::tokio_command;
 use crate::types::WorkspaceEntry;
 
@@ -44,7 +44,7 @@ struct LocalThreadStore {
 impl LocalThreadStore {
     fn load(workspace_path: &str) -> Self {
         let path = PathBuf::from(workspace_path)
-            .join(".codexmonitor")
+            .join(".micodemonitor")
             .join("sessions.json");
         if let Ok(raw) = std::fs::read_to_string(&path) {
             if let Ok(records) = serde_json::from_str::<Vec<LocalThreadRecord>>(&raw) {
@@ -581,7 +581,7 @@ impl WorkspaceSession {
     }
 }
 
-pub(crate) fn build_codex_path_env(agent_bin: Option<&str>) -> Option<String> {
+pub(crate) fn build_micode_path_env(agent_bin: Option<&str>) -> Option<String> {
     let mut paths: Vec<String> = env::var("PATH")
         .unwrap_or_default()
         .split(':')
@@ -622,22 +622,22 @@ pub(crate) fn build_codex_path_env(agent_bin: Option<&str>) -> Option<String> {
     }
 }
 
-pub(crate) fn build_codex_command_with_bin(agent_bin: Option<String>) -> Command {
+pub(crate) fn build_micode_command_with_bin(agent_bin: Option<String>) -> Command {
     let bin = agent_bin
         .clone()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| "micode".into());
     let mut command = tokio_command(bin);
-    if let Some(path_env) = build_codex_path_env(agent_bin.as_deref()) {
+    if let Some(path_env) = build_micode_path_env(agent_bin.as_deref()) {
         command.env("PATH", path_env);
     }
     command
 }
 
-pub(crate) async fn check_codex_installation(
+pub(crate) async fn check_micode_installation(
     agent_bin: Option<String>,
 ) -> Result<Option<String>, String> {
-    let mut command = build_codex_command_with_bin(agent_bin);
+    let mut command = build_micode_command_with_bin(agent_bin);
     command.arg("--version");
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::piped());
@@ -686,8 +686,8 @@ pub(crate) async fn check_acp_handshake(
     agent_bin: Option<String>,
     agent_args: Option<String>,
 ) -> Result<bool, String> {
-    let mut command = build_codex_command_with_bin(agent_bin);
-    apply_codex_args(&mut command, agent_args.as_deref())?;
+    let mut command = build_micode_command_with_bin(agent_bin);
+    apply_micode_args(&mut command, agent_args.as_deref())?;
     command.arg("--experimental-acp");
     command.stdin(std::process::Stdio::piped());
     command.stdout(std::process::Stdio::piped());
@@ -862,7 +862,7 @@ fn translate_acp_update(
 
 pub(crate) async fn spawn_workspace_session<E: EventSink>(
     entry: WorkspaceEntry,
-    default_codex_bin: Option<String>,
+    default_micode_bin: Option<String>,
     agent_args: Option<String>,
     agent_home: Option<PathBuf>,
     client_version: String,
@@ -872,11 +872,11 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
         .agent_bin
         .clone()
         .filter(|value| !value.trim().is_empty())
-        .or(default_codex_bin);
-    let _ = check_codex_installation(agent_bin.clone()).await?;
+        .or(default_micode_bin);
+    let _ = check_micode_installation(agent_bin.clone()).await?;
 
-    let mut command = build_codex_command_with_bin(agent_bin);
-    apply_codex_args(&mut command, agent_args.as_deref())?;
+    let mut command = build_micode_command_with_bin(agent_bin);
+    apply_micode_args(&mut command, agent_args.as_deref())?;
     command.current_dir(&entry.path);
     command.arg("--experimental-acp");
     // Do not inject CODEX_HOME/MICODE_HOME by default for MiCode ACP.
@@ -926,7 +926,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                     let _ = event_tx.send(AppServerEvent {
                         workspace_id: workspace_id.clone(),
                         message: json!({
-                            "method": "codex/parseError",
+                            "method": "micode/parseError",
                             "params": { "error": err.to_string(), "raw": line },
                         }),
                     });
@@ -1027,7 +1027,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
             event_sink_clone.emit_app_server_event(AppServerEvent {
                 workspace_id: workspace_id.clone(),
                 message: json!({
-                    "method": "codex/stderr",
+                    "method": "micode/stderr",
                     "params": { "message": line },
                 }),
             });
@@ -1059,7 +1059,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
     event_sink.emit_app_server_event(AppServerEvent {
         workspace_id: entry.id.clone(),
         message: json!({
-            "method": "codex/connected",
+            "method": "micode/connected",
             "params": { "workspaceId": entry.id.clone() }
         }),
     });

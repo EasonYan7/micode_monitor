@@ -198,7 +198,7 @@ pub(crate) struct WorkspaceEntry {
     pub(crate) id: String,
     pub(crate) name: String,
     pub(crate) path: String,
-    #[serde(default, rename = "agentBin", alias = "codexBin")]
+    #[serde(default, rename = "agentBin", alias = "micodeBin")]
     pub(crate) agent_bin: Option<String>,
     #[serde(default)]
     pub(crate) kind: WorkspaceKind,
@@ -216,7 +216,7 @@ pub(crate) struct WorkspaceInfo {
     pub(crate) name: String,
     pub(crate) path: String,
     pub(crate) connected: bool,
-    #[serde(default, rename = "agentBin", alias = "codexBin")]
+    #[serde(default, rename = "agentBin", alias = "micodeBin")]
     pub(crate) agent_bin: Option<String>,
     #[serde(default)]
     pub(crate) kind: WorkspaceKind,
@@ -272,9 +272,9 @@ pub(crate) struct WorkspaceSettings {
     pub(crate) group_id: Option<String>,
     #[serde(default, rename = "gitRoot")]
     pub(crate) git_root: Option<String>,
-    #[serde(default, rename = "agentHome", alias = "codexHome")]
+    #[serde(default, rename = "agentHome", alias = "micodeHome")]
     pub(crate) agent_home: Option<String>,
-    #[serde(default, rename = "agentArgs", alias = "codexArgs")]
+    #[serde(default, rename = "agentArgs", alias = "micodeArgs")]
     pub(crate) agent_args: Option<String>,
     #[serde(default, rename = "launchScript")]
     pub(crate) launch_script: Option<String>,
@@ -318,12 +318,12 @@ pub(crate) struct AppSettings {
     #[serde(
         default = "default_agent_provider",
         rename = "agentProvider",
-        alias = "codexProvider"
+        alias = "micodeProvider"
     )]
     pub(crate) agent_provider: String,
-    #[serde(default, rename = "agentBin", alias = "codexBin")]
+    #[serde(default, rename = "agentBin", alias = "micodeBin")]
     pub(crate) agent_bin: Option<String>,
-    #[serde(default, rename = "agentArgs", alias = "codexArgs")]
+    #[serde(default, rename = "agentArgs", alias = "micodeArgs")]
     pub(crate) agent_args: Option<String>,
     #[serde(default, rename = "backendMode")]
     pub(crate) backend_mode: BackendMode,
@@ -1020,7 +1020,7 @@ mod tests {
     #[test]
     fn workspace_entry_defaults_from_minimal_json() {
         let entry: WorkspaceEntry =
-            serde_json::from_str(r#"{"id":"1","name":"Test","path":"/tmp","codexBin":null}"#)
+            serde_json::from_str(r#"{"id":"1","name":"Test","path":"/tmp","micodeBin":null}"#)
                 .expect("workspace deserialize");
         assert!(matches!(entry.kind, WorkspaceKind::Main));
         assert!(entry.parent_id.is_none());

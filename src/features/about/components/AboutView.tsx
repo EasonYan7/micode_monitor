@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
-const GITHUB_URL = "https://github.com/Dimillian/CodexMonitor";
+const GITHUB_URL = "https://github.com/Dimillian/MiCodeMonitor";
 const TWITTER_URL = "https://x.com/dimillian";
 
 export function AboutView() {
@@ -44,15 +44,15 @@ export function AboutView() {
           <img
             className="about-icon"
             src="/app-icon.png"
-            alt="Codex Monitor icon"
+            alt="MiCode Monitor icon"
           />
-          <div className="about-title">Codex Monitor</div>
+          <div className="about-title">MiCode Monitor</div>
         </div>
         <div className="about-version">
           {version ? `Version ${version}` : "Version —"}
         </div>
         <div className="about-tagline">
-          Monitor the situation of your Codex agents
+          Monitor the situation of your MiCode agents
         </div>
         <div className="about-divider" />
         <div className="about-links">
@@ -72,7 +72,7 @@ export function AboutView() {
             Twitter
           </button>
         </div>
-        <div className="about-footer">Made with ♥ by Codex & Dimillian</div>
+        <div className="about-footer">Made with ♥ by MiCode & Dimillian</div>
       </div>
     </div>
   );

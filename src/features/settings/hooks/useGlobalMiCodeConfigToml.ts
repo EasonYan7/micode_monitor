@@ -1,11 +1,11 @@
-import { readGlobalCodexConfigToml, writeGlobalCodexConfigToml } from "../../../services/tauri";
+import { readGlobalMiCodeConfigToml, writeGlobalMiCodeConfigToml } from "../../../services/tauri";
 import { useFileEditor } from "../../shared/hooks/useFileEditor";
 
-export function useGlobalCodexConfigToml() {
+export function useGlobalMiCodeConfigToml() {
   return useFileEditor({
     key: "global-config",
-    read: readGlobalCodexConfigToml,
-    write: writeGlobalCodexConfigToml,
+    read: readGlobalMiCodeConfigToml,
+    write: writeGlobalMiCodeConfigToml,
     readErrorTitle: "Couldn’t load global config.toml",
     writeErrorTitle: "Couldn’t save global config.toml",
   });

@@ -41,7 +41,7 @@ describe("appServerEvents", () => {
 
   it("matches canonical skills update event method only", () => {
     const canonicalEvent = makeEvent({
-      method: "codex/event/skills_update_available",
+      method: "micode/event/skills_update_available",
       params: {},
     });
     const nonCanonicalMethod = makeEvent({

@@ -3,7 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { Options as NotificationOptions } from "@tauri-apps/plugin-notification";
 import type {
   AppSettings,
-  CodexDoctorResult,
+  MiCodeDoctorResult,
   DictationModelStatus,
   DictationSessionState,
   LocalUsageSnapshot,
@@ -68,8 +68,8 @@ export async function listWorkspaces(): Promise<WorkspaceInfo[]> {
   }
 }
 
-export async function getCodexConfigPath(): Promise<string> {
-  return invoke<string>("get_codex_config_path");
+export async function getMiCodeConfigPath(): Promise<string> {
+  return invoke<string>("get_micode_config_path");
 }
 
 export type TextFileResponse = {
@@ -79,7 +79,7 @@ export type TextFileResponse = {
 };
 
 export type GlobalAgentsResponse = TextFileResponse;
-export type GlobalCodexConfigResponse = TextFileResponse;
+export type GlobalMiCodeConfigResponse = TextFileResponse;
 export type AgentMdResponse = TextFileResponse;
 
 type FileScope = "workspace" | "global";
@@ -110,11 +110,11 @@ export async function writeGlobalAgentsMd(content: string): Promise<void> {
   return fileWrite("global", "agents", content);
 }
 
-export async function readGlobalCodexConfigToml(): Promise<GlobalCodexConfigResponse> {
+export async function readGlobalMiCodeConfigToml(): Promise<GlobalMiCodeConfigResponse> {
   return fileRead("global", "config");
 }
 
-export async function writeGlobalCodexConfigToml(content: string): Promise<void> {
+export async function writeGlobalMiCodeConfigToml(content: string): Promise<void> {
   return fileWrite("global", "config", content);
 }
 
@@ -132,9 +132,9 @@ export async function getConfigModel(workspaceId: string): Promise<string | null
 
 export async function addWorkspace(
   path: string,
-  codex_bin: string | null,
+  micode_bin: string | null,
 ): Promise<WorkspaceInfo> {
-  return invoke<WorkspaceInfo>("add_workspace", { path, codex_bin });
+  return invoke<WorkspaceInfo>("add_workspace", { path, micode_bin });
 }
 
 export async function isWorkspacePathDir(path: string): Promise<boolean> {
@@ -184,11 +184,11 @@ export async function updateWorkspaceSettings(
   return invoke<WorkspaceInfo>("update_workspace_settings", { id, settings });
 }
 
-export async function updateWorkspaceCodexBin(
+export async function updateWorkspaceMiCodeBin(
   id: string,
-  codex_bin: string | null,
+  micode_bin: string | null,
 ): Promise<WorkspaceInfo> {
-  return invoke<WorkspaceInfo>("update_workspace_codex_bin", { id, codex_bin });
+  return invoke<WorkspaceInfo>("update_workspace_micode_bin", { id, micode_bin });
 }
 
 export async function removeWorkspace(id: string): Promise<void> {
@@ -484,15 +484,15 @@ export async function getAccountInfo(workspaceId: string) {
   return invoke<any>("account_read", { workspaceId });
 }
 
-export async function runCodexLogin(workspaceId: string) {
-  return invoke<{ loginId: string; authUrl: string; raw?: unknown }>("codex_login", {
+export async function runMiCodeLogin(workspaceId: string) {
+  return invoke<{ loginId: string; authUrl: string; raw?: unknown }>("micode_login", {
     workspaceId,
   });
 }
 
-export async function cancelCodexLogin(workspaceId: string) {
+export async function cancelMiCodeLogin(workspaceId: string) {
   return invoke<{ canceled: boolean; status?: string; raw?: unknown }>(
-    "codex_login_cancel",
+    "micode_login_cancel",
     { workspaceId },
   );
 }
@@ -595,11 +595,11 @@ export async function setMenuAccelerators(
   return invoke("menu_set_accelerators", { updates });
 }
 
-export async function runCodexDoctor(
-  codexBin: string | null,
-  codexArgs: string | null,
-): Promise<CodexDoctorResult> {
-  return invoke<CodexDoctorResult>("codex_doctor", { codexBin, codexArgs });
+export async function runMiCodeDoctor(
+  micodeBin: string | null,
+  micodeArgs: string | null,
+): Promise<MiCodeDoctorResult> {
+  return invoke<MiCodeDoctorResult>("micode_doctor", { micodeBin, micodeArgs });
 }
 
 export async function getWorkspaceFiles(workspaceId: string) {

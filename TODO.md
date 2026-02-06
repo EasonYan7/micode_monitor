@@ -1,7 +1,7 @@
 # MiCode ACP Migration TODO
 
-- [x] Fork/clone CodexMonitor codebase into current workspace
-- [x] Create migration branch `codex/micode-acp-migration`
+- [x] Fork/clone MiCodeMonitor codebase into current workspace
+- [x] Create migration branch `micode/micode-acp-migration`
 - [x] Introduce neutral provider/agent settings and compatibility migration
 - [x] Implement ACP transport (`micode --experimental-acp`) in backend
 - [x] Implement thread/session persistence shim for ACP (`sessions.json`)

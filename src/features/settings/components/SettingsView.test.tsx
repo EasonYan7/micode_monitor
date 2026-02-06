@@ -21,8 +21,8 @@ const baseSettings: AppSettings = {
   agentProvider: "micode-acp",
   agentBin: null,
   agentArgs: null,
-  codexBin: null,
-  codexArgs: null,
+  micodeBin: null,
+  micodeArgs: null,
   backendMode: "local",
   remoteBackendHost: "127.0.0.1:4732",
   remoteBackendToken: null,
@@ -95,7 +95,7 @@ const baseSettings: AppSettings = {
 
 const createDoctorResult = () => ({
   ok: true,
-  codexBin: null,
+  micodeBin: null,
   version: null,
   appServerOk: true,
   details: null,
@@ -135,7 +135,7 @@ const renderDisplaySection = (
     onDeleteWorkspaceGroup: vi.fn().mockResolvedValue(null),
     onAssignWorkspaceGroup: vi.fn().mockResolvedValue(null),
     onRunDoctor: vi.fn().mockResolvedValue(createDoctorResult()),
-    onUpdateWorkspaceCodexBin: vi.fn().mockResolvedValue(undefined),
+    onUpdateWorkspaceMiCodeBin: vi.fn().mockResolvedValue(undefined),
     onUpdateWorkspaceSettings: vi.fn().mockResolvedValue(undefined),
     scaleShortcutTitle: "Scale shortcut",
     scaleShortcutText: "Use Command +/-",
@@ -180,7 +180,7 @@ const renderFeaturesSection = (
     onDeleteWorkspaceGroup: vi.fn().mockResolvedValue(null),
     onAssignWorkspaceGroup: vi.fn().mockResolvedValue(null),
     onRunDoctor: vi.fn().mockResolvedValue(createDoctorResult()),
-    onUpdateWorkspaceCodexBin: vi.fn().mockResolvedValue(undefined),
+    onUpdateWorkspaceMiCodeBin: vi.fn().mockResolvedValue(undefined),
     onUpdateWorkspaceSettings: vi.fn().mockResolvedValue(undefined),
     scaleShortcutTitle: "Scale shortcut",
     scaleShortcutText: "Use Command +/-",
@@ -207,8 +207,8 @@ const workspace = (
   name: overrides.name,
   path: overrides.path ?? `/tmp/${overrides.id}`,
   connected: overrides.connected ?? false,
-  agent_bin: overrides.agent_bin ?? overrides.codex_bin ?? null,
-  codex_bin: overrides.codex_bin ?? overrides.agent_bin ?? null,
+  agent_bin: overrides.agent_bin ?? overrides.micode_bin ?? null,
+  micode_bin: overrides.micode_bin ?? overrides.agent_bin ?? null,
   kind: overrides.kind ?? "main",
   parentId: overrides.parentId ?? null,
   worktree: overrides.worktree ?? null,
@@ -219,8 +219,8 @@ const workspace = (
     gitRoot: null,
     agentHome: null,
     agentArgs: null,
-    codexHome: null,
-    codexArgs: null,
+    micodeHome: null,
+    micodeArgs: null,
     launchScript: null,
     launchScripts: null,
     worktreeSetupScript: null,
@@ -273,7 +273,7 @@ const renderEnvironmentsSection = (
     onDeleteWorkspaceGroup: vi.fn().mockResolvedValue(null),
     onAssignWorkspaceGroup: vi.fn().mockResolvedValue(null),
     onRunDoctor: vi.fn().mockResolvedValue(createDoctorResult()),
-    onUpdateWorkspaceCodexBin: vi.fn().mockResolvedValue(undefined),
+    onUpdateWorkspaceMiCodeBin: vi.fn().mockResolvedValue(undefined),
     onUpdateWorkspaceSettings,
     scaleShortcutTitle: "Scale shortcut",
     scaleShortcutText: "Use Command +/-",
@@ -533,11 +533,11 @@ describe("SettingsView MiCode overrides", () => {
       name: "Workspace",
       path: "/tmp/workspace",
       connected: false,
-      codex_bin: null,
+      micode_bin: null,
       kind: "main",
       parentId: null,
       worktree: null,
-      settings: { sidebarCollapsed: false, codexArgs: null },
+      settings: { sidebarCollapsed: false, micodeArgs: null },
     };
 
     render(
@@ -561,7 +561,7 @@ describe("SettingsView MiCode overrides", () => {
         openAppIconById={{}}
         onUpdateAppSettings={vi.fn().mockResolvedValue(undefined)}
         onRunDoctor={vi.fn().mockResolvedValue(createDoctorResult())}
-        onUpdateWorkspaceCodexBin={vi.fn().mockResolvedValue(undefined)}
+        onUpdateWorkspaceMiCodeBin={vi.fn().mockResolvedValue(undefined)}
         onUpdateWorkspaceSettings={onUpdateWorkspaceSettings}
         scaleShortcutTitle="Scale shortcut"
         scaleShortcutText="Use Command +/-"
@@ -571,7 +571,7 @@ describe("SettingsView MiCode overrides", () => {
         onDownloadDictationModel={vi.fn()}
         onCancelDictationDownload={vi.fn()}
         onRemoveDictationModel={vi.fn()}
-        initialSection="codex"
+        initialSection="micode"
       />,
     );
 
@@ -584,13 +584,13 @@ describe("SettingsView MiCode overrides", () => {
         "w1",
         expect.objectContaining({
           agentArgs: "--profile dev",
-          codexArgs: "--profile dev",
+          micodeArgs: "--profile dev",
         }),
       );
     });
   });
 
-  it("updates review mode in codex section", async () => {
+  it("updates review mode in micode section", async () => {
     cleanup();
     const onUpdateAppSettings = vi.fn().mockResolvedValue(undefined);
     render(
@@ -612,7 +612,7 @@ describe("SettingsView MiCode overrides", () => {
         openAppIconById={{}}
         onUpdateAppSettings={onUpdateAppSettings}
         onRunDoctor={vi.fn().mockResolvedValue(createDoctorResult())}
-        onUpdateWorkspaceCodexBin={vi.fn().mockResolvedValue(undefined)}
+        onUpdateWorkspaceMiCodeBin={vi.fn().mockResolvedValue(undefined)}
         onUpdateWorkspaceSettings={vi.fn().mockResolvedValue(undefined)}
         scaleShortcutTitle="Scale shortcut"
         scaleShortcutText="Use Command +/-"
@@ -622,7 +622,7 @@ describe("SettingsView MiCode overrides", () => {
         onDownloadDictationModel={vi.fn()}
         onCancelDictationDownload={vi.fn()}
         onRemoveDictationModel={vi.fn()}
-        initialSection="codex"
+        initialSection="micode"
       />,
     );
 
@@ -719,7 +719,7 @@ describe("SettingsView Shortcuts", () => {
         openAppIconById={{}}
         onUpdateAppSettings={vi.fn().mockResolvedValue(undefined)}
         onRunDoctor={vi.fn().mockResolvedValue(createDoctorResult())}
-        onUpdateWorkspaceCodexBin={vi.fn().mockResolvedValue(undefined)}
+        onUpdateWorkspaceMiCodeBin={vi.fn().mockResolvedValue(undefined)}
         onUpdateWorkspaceSettings={vi.fn().mockResolvedValue(undefined)}
         scaleShortcutTitle="Scale shortcut"
         scaleShortcutText="Use Command +/-"
@@ -760,7 +760,7 @@ describe("SettingsView Shortcuts", () => {
         openAppIconById={{}}
         onUpdateAppSettings={vi.fn().mockResolvedValue(undefined)}
         onRunDoctor={vi.fn().mockResolvedValue(createDoctorResult())}
-        onUpdateWorkspaceCodexBin={vi.fn().mockResolvedValue(undefined)}
+        onUpdateWorkspaceMiCodeBin={vi.fn().mockResolvedValue(undefined)}
         onUpdateWorkspaceSettings={vi.fn().mockResolvedValue(undefined)}
         scaleShortcutTitle="Scale shortcut"
         scaleShortcutText="Use Command +/-"

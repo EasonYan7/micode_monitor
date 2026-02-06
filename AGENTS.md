@@ -1,13 +1,13 @@
-# CodexMonitor Agent Guide
+# MiCodeMonitor Agent Guide
 
 All docs must canonical, no past commentary, only live state.
 
 ## Project Summary
-CodexMonitor is a Tauri app that orchestrates Codex agents across local workspaces.
+MiCodeMonitor is a Tauri app that orchestrates MiCode agents across local workspaces.
 
 - Frontend: React + Vite
 - Backend (app): Tauri Rust process
-- Backend (daemon): `src-tauri/src/bin/codex_monitor_daemon.rs`
+- Backend (daemon): `src-tauri/src/bin/micode_monitor_daemon.rs`
 - Shared backend domain logic: `src-tauri/src/shared/*`
 
 ## Backend Architecture
@@ -16,16 +16,16 @@ The backend separates shared domain logic from environment wiring.
 
 - Shared domain/core logic: `src-tauri/src/shared/*`
 - App wiring and platform concerns: feature folders + adapters
-- Daemon wiring and transport concerns: `src-tauri/src/bin/codex_monitor_daemon.rs`
+- Daemon wiring and transport concerns: `src-tauri/src/bin/micode_monitor_daemon.rs`
 
 ## Feature Folders
 
-### Codex
+### MiCode
 
-- `src-tauri/src/codex/mod.rs`
-- `src-tauri/src/codex/args.rs`
-- `src-tauri/src/codex/home.rs`
-- `src-tauri/src/codex/config.rs`
+- `src-tauri/src/micode/mod.rs`
+- `src-tauri/src/micode/args.rs`
+- `src-tauri/src/micode/home.rs`
+- `src-tauri/src/micode/config.rs`
 
 ### Files
 
@@ -54,12 +54,12 @@ Root-level single-file features remain at `src-tauri/src/*.rs` (for example: `me
 
 Shared logic that must work in both the app and the daemon lives under `src-tauri/src/shared/`.
 
-- `src-tauri/src/shared/codex_core.rs`
+- `src-tauri/src/shared/micode_core.rs`
   - Threads, approvals, login/cancel, account, skills, config model
 - `src-tauri/src/shared/workspaces_core.rs`
   - Workspace/worktree operations, persistence, sorting, git command helpers
 - `src-tauri/src/shared/settings_core.rs`
-  - App settings load/update, Codex config path
+  - App settings load/update, MiCode config path
 - `src-tauri/src/shared/files_core.rs`
   - File read/write logic
 - `src-tauri/src/shared/git_core.rs`
@@ -81,14 +81,14 @@ The app and daemon do not re-implement domain logic.
 
 ## Daemon Module Wrappers
 
-The daemon defines wrapper modules named `codex` and `files` inside `src-tauri/src/bin/codex_monitor_daemon.rs`.
+The daemon defines wrapper modules named `micode` and `files` inside `src-tauri/src/bin/micode_monitor_daemon.rs`.
 
 These wrappers re-export the daemon’s local modules:
 
-- Codex: `codex_args`, `codex_home`, `codex_config`
+- MiCode: `micode_args`, `micode_home`, `micode_config`
 - Files: `file_io`, `file_ops`, `file_policy`
 
-Shared cores use `crate::codex::*` and `crate::files::*` paths. The daemon wrappers satisfy those paths without importing app-only modules.
+Shared cores use `crate::micode::*` and `crate::files::*` paths. The daemon wrappers satisfy those paths without importing app-only modules.
 
 ## Key Paths
 
@@ -105,7 +105,7 @@ Shared cores use `crate::codex::*` and `crate::files::*` paths. The daemon wrapp
 ### Backend (App)
 
 - Tauri command registry: `src-tauri/src/lib.rs`
-- Codex adapters: `src-tauri/src/codex/*`
+- MiCode adapters: `src-tauri/src/micode/*`
 - Files adapters: `src-tauri/src/files/*`
 - Dictation adapters: `src-tauri/src/dictation/*`
 - Workspaces adapters: `src-tauri/src/workspaces/*`
@@ -114,7 +114,7 @@ Shared cores use `crate::codex::*` and `crate::files::*` paths. The daemon wrapp
 
 ### Backend (Daemon)
 
-- Daemon entrypoint: `src-tauri/src/bin/codex_monitor_daemon.rs`
+- Daemon entrypoint: `src-tauri/src/bin/micode_monitor_daemon.rs`
 - Daemon imports shared cores via `#[path = "../shared/mod.rs"] mod shared;`
 
 ## Architecture Guidelines
@@ -139,7 +139,7 @@ Keep `src/App.tsx` lean:
 
 - Shared logic goes in `src-tauri/src/shared/` first.
 - App and daemon are thin adapters around shared cores.
-- Avoid duplicating git/worktree/codex/settings/files logic in adapters.
+- Avoid duplicating git/worktree/micode/settings/files logic in adapters.
 - Prefer explicit, readable adapter helpers over clever abstractions.
 - Do not folderize single-file features unless you are splitting them.
 
@@ -162,7 +162,7 @@ Update the daemon when one of these is true:
 2. App-only behavior:
    - Update the app adapters or Tauri commands.
 3. Daemon-only transport/wiring behavior:
-   - Update `src-tauri/src/bin/codex_monitor_daemon.rs`.
+   - Update `src-tauri/src/bin/micode_monitor_daemon.rs`.
 
 ### How to Add a New Backend Command
 
@@ -173,7 +173,7 @@ Update the daemon when one of these is true:
    - Mirror it in `src/services/tauri.ts`.
 3. Wire it in the daemon.
    - Add a daemon method that calls the same shared core.
-   - Add the JSON-RPC handler branch in `codex_monitor_daemon.rs`.
+   - Add the JSON-RPC handler branch in `micode_monitor_daemon.rs`.
 
 ### Adapter Patterns to Reuse
 
@@ -182,15 +182,15 @@ Update the daemon when one of these is true:
 - App spawn adapter:
   - `spawn_with_app(...)` in `src-tauri/src/workspaces/commands.rs`
 - Daemon spawn adapter:
-  - `spawn_with_client(...)` in `src-tauri/src/bin/codex_monitor_daemon.rs`
+  - `spawn_with_client(...)` in `src-tauri/src/bin/micode_monitor_daemon.rs`
 - Daemon wrapper modules:
-  - `mod codex { ... }` and `mod files { ... }` in `codex_monitor_daemon.rs`
+  - `mod micode { ... }` and `mod files { ... }` in `micode_monitor_daemon.rs`
 
 If you find yourself copying logic between app and daemon, extract it into `src-tauri/src/shared/`.
 
 ## App-Server Flow
 
-- Backend spawns `codex app-server` using the `codex` binary.
+- Backend spawns `micode app-server` using the `micode` binary.
 - Initialize with `initialize` and then `initialized`.
 - Do not send requests before initialization.
 - JSON-RPC notifications stream over stdout.
@@ -231,18 +231,18 @@ The app uses a shared event hub so each native event has one `listen` and many s
 - Workspaces/worktrees:
   - Shared core: `src-tauri/src/shared/workspaces_core.rs`
   - App adapters: `src-tauri/src/workspaces/*`
-  - Daemon wiring: `src-tauri/src/bin/codex_monitor_daemon.rs`
-- Settings and Codex config:
+  - Daemon wiring: `src-tauri/src/bin/micode_monitor_daemon.rs`
+- Settings and MiCode config:
   - Shared core: `src-tauri/src/shared/settings_core.rs`
-  - App adapters: `src-tauri/src/codex/config.rs`, `src-tauri/src/settings/mod.rs`
-  - Daemon wiring: `src-tauri/src/bin/codex_monitor_daemon.rs`
+  - App adapters: `src-tauri/src/micode/config.rs`, `src-tauri/src/settings/mod.rs`
+  - Daemon wiring: `src-tauri/src/bin/micode_monitor_daemon.rs`
 - Files:
   - Shared core: `src-tauri/src/shared/files_core.rs`
   - App adapters: `src-tauri/src/files/*`
-- Codex threads/approvals/login:
-  - Shared core: `src-tauri/src/shared/codex_core.rs`
-  - App adapters: `src-tauri/src/codex/*`
-  - Daemon wiring: `src-tauri/src/bin/codex_monitor_daemon.rs`
+- MiCode threads/approvals/login:
+  - Shared core: `src-tauri/src/shared/micode_core.rs`
+  - App adapters: `src-tauri/src/micode/*`
+  - Daemon wiring: `src-tauri/src/bin/micode_monitor_daemon.rs`
 
 ## Threads Feature Split (Frontend)
 
@@ -301,10 +301,10 @@ At the end of a task:
 
 - The window uses `titleBarStyle: "Overlay"` and macOS private APIs for transparency.
 - Avoid breaking JSON-RPC format; the app-server is strict.
-- App settings and Codex feature toggles are best-effort synced to `CODEX_HOME/config.toml`.
+- App settings and MiCode feature toggles are best-effort synced to `CODEX_HOME/config.toml`.
 - UI preferences live in `localStorage`.
 - GitHub issues require `gh` to be installed and authenticated.
-- Custom prompts are loaded from `$CODEX_HOME/prompts` (or `~/.codex/prompts`).
+- Custom prompts are loaded from `$CODEX_HOME/prompts` (or `~/.micode/prompts`).
 
 ## Error Toasts
 

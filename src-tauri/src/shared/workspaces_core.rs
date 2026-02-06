@@ -6,8 +6,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::backend::app_server::WorkspaceSession;
-use crate::codex::args::resolve_workspace_codex_args;
-use crate::codex::home::resolve_workspace_codex_home;
+use crate::micode::args::resolve_workspace_micode_args;
+use crate::micode::home::resolve_workspace_micode_home;
 use crate::storage::write_workspaces;
 use crate::types::{
     AppSettings, WorkspaceEntry, WorkspaceInfo, WorkspaceKind, WorkspaceSettings, WorktreeInfo,
@@ -217,10 +217,10 @@ where
         let settings = app_settings.lock().await;
         (
             settings.agent_bin.clone(),
-            resolve_workspace_codex_args(&entry, None, Some(&settings)),
+            resolve_workspace_micode_args(&entry, None, Some(&settings)),
         )
     };
-    let agent_home = resolve_workspace_codex_home(&entry, None);
+    let agent_home = resolve_workspace_micode_home(&entry, None);
     let session = spawn_session(entry.clone(), default_bin, agent_args, agent_home).await?;
 
     if let Err(error) = {
@@ -411,10 +411,10 @@ where
         let settings = app_settings.lock().await;
         (
             settings.agent_bin.clone(),
-            resolve_workspace_codex_args(&entry, Some(&parent_entry), Some(&settings)),
+            resolve_workspace_micode_args(&entry, Some(&parent_entry), Some(&settings)),
         )
     };
-    let agent_home = resolve_workspace_codex_home(&entry, Some(&parent_entry));
+    let agent_home = resolve_workspace_micode_home(&entry, Some(&parent_entry));
     let session = spawn_session(entry.clone(), default_bin, agent_args, agent_home).await?;
 
     {
@@ -455,10 +455,10 @@ where
         let settings = app_settings.lock().await;
         (
             settings.agent_bin.clone(),
-            resolve_workspace_codex_args(&entry, parent_entry.as_ref(), Some(&settings)),
+            resolve_workspace_micode_args(&entry, parent_entry.as_ref(), Some(&settings)),
         )
     };
-    let agent_home = resolve_workspace_codex_home(&entry, parent_entry.as_ref());
+    let agent_home = resolve_workspace_micode_home(&entry, parent_entry.as_ref());
     let session = spawn_session(entry.clone(), default_bin, agent_args, agent_home).await?;
     sessions.lock().await.insert(entry.id, session);
     Ok(())
@@ -771,10 +771,10 @@ where
             let settings = app_settings.lock().await;
             (
                 settings.agent_bin.clone(),
-                resolve_workspace_codex_args(&entry_snapshot, Some(&parent), Some(&settings)),
+                resolve_workspace_micode_args(&entry_snapshot, Some(&parent), Some(&settings)),
             )
         };
-        let agent_home = resolve_workspace_codex_home(&entry_snapshot, Some(&parent));
+        let agent_home = resolve_workspace_micode_home(&entry_snapshot, Some(&parent));
         match spawn_session(entry_snapshot.clone(), default_bin, agent_args, agent_home).await {
             Ok(session) => {
                 sessions
@@ -946,8 +946,8 @@ where
         previous_entry,
         entry_snapshot,
         parent_entry,
-        previous_codex_home,
-        previous_codex_args,
+        previous_micode_home,
+        previous_micode_args,
         previous_worktree_setup_script,
         child_entries,
     ) = {
@@ -956,8 +956,8 @@ where
             .get(&id)
             .cloned()
             .ok_or_else(|| "workspace not found".to_string())?;
-        let previous_codex_home = previous_entry.settings.agent_home.clone();
-        let previous_codex_args = previous_entry.settings.agent_args.clone();
+        let previous_micode_home = previous_entry.settings.agent_home.clone();
+        let previous_micode_args = previous_entry.settings.agent_args.clone();
         let previous_worktree_setup_script = previous_entry.settings.worktree_setup_script.clone();
         let entry_snapshot = apply_settings_update(&mut workspaces, &id, settings)?;
         let parent_entry = entry_snapshot
@@ -974,32 +974,32 @@ where
             previous_entry,
             entry_snapshot,
             parent_entry,
-            previous_codex_home,
-            previous_codex_args,
+            previous_micode_home,
+            previous_micode_args,
             previous_worktree_setup_script,
             child_entries,
         )
     };
 
-    let codex_home_changed = previous_codex_home != entry_snapshot.settings.agent_home;
-    let codex_args_changed = previous_codex_args != entry_snapshot.settings.agent_args;
+    let micode_home_changed = previous_micode_home != entry_snapshot.settings.agent_home;
+    let micode_args_changed = previous_micode_args != entry_snapshot.settings.agent_args;
     let worktree_setup_script_changed =
         previous_worktree_setup_script != entry_snapshot.settings.worktree_setup_script;
     let connected = sessions.lock().await.contains_key(&id);
-    if connected && (codex_home_changed || codex_args_changed) {
+    if connected && (micode_home_changed || micode_args_changed) {
         let rollback_entry = previous_entry.clone();
         let (default_bin, agent_args) = {
             let settings = app_settings.lock().await;
             (
                 settings.agent_bin.clone(),
-                resolve_workspace_codex_args(
+                resolve_workspace_micode_args(
                     &entry_snapshot,
                     parent_entry.as_ref(),
                     Some(&settings),
                 ),
             )
         };
-        let agent_home = resolve_workspace_codex_home(&entry_snapshot, parent_entry.as_ref());
+        let agent_home = resolve_workspace_micode_home(&entry_snapshot, parent_entry.as_ref());
         let new_session = match spawn_session(
             entry_snapshot.clone(),
             default_bin,
@@ -1024,7 +1024,7 @@ where
             let _ = child.kill().await;
         }
     }
-    if codex_home_changed || codex_args_changed {
+    if micode_home_changed || micode_args_changed {
         let app_settings_snapshot = app_settings.lock().await.clone();
         let default_bin = app_settings_snapshot.agent_bin.clone();
         for child in &child_entries {
@@ -1032,14 +1032,14 @@ where
             if !connected {
                 continue;
             }
-            let previous_child_home = resolve_workspace_codex_home(child, Some(&previous_entry));
-            let next_child_home = resolve_workspace_codex_home(child, Some(&entry_snapshot));
-            let previous_child_args = resolve_workspace_codex_args(
+            let previous_child_home = resolve_workspace_micode_home(child, Some(&previous_entry));
+            let next_child_home = resolve_workspace_micode_home(child, Some(&entry_snapshot));
+            let previous_child_args = resolve_workspace_micode_args(
                 child,
                 Some(&previous_entry),
                 Some(&app_settings_snapshot),
             );
-            let next_child_args = resolve_workspace_codex_args(
+            let next_child_args = resolve_workspace_micode_args(
                 child,
                 Some(&entry_snapshot),
                 Some(&app_settings_snapshot),
@@ -1103,7 +1103,7 @@ where
     })
 }
 
-pub(crate) async fn update_workspace_codex_bin_core(
+pub(crate) async fn update_workspace_micode_bin_core(
     id: String,
     agent_bin: Option<String>,
     workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
@@ -1181,7 +1181,7 @@ mod tests {
     use uuid::Uuid;
 
     fn make_temp_dir() -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("codex-monitor-{}", Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("micode-monitor-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&dir).expect("failed to create temp dir");
         dir
     }

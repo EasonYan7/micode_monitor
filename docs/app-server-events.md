@@ -1,18 +1,18 @@
-# App-Server Events Reference (Codex `41b4962b0a7f5d73bb23d329ad9bb742545f6a2c`)
+# App-Server Events Reference (MiCode `41b4962b0a7f5d73bb23d329ad9bb742545f6a2c`)
 
 This document helps agents quickly answer:
-- Which app-server events CodexMonitor supports right now.
-- Which app-server requests CodexMonitor sends right now.
-- Where to look in CodexMonitor to add support.
-- Where to look in `../Codex` to compare event lists and find emitters.
+- Which app-server events MiCodeMonitor supports right now.
+- Which app-server requests MiCodeMonitor sends right now.
+- Where to look in MiCodeMonitor to add support.
+- Where to look in `../MiCode` to compare event lists and find emitters.
 
 When updating this document:
-1. Update the Codex hash in the title using `git -C ../Codex rev-parse HEAD`.
-2. Compare Codex events vs CodexMonitor routing.
-3. Compare Codex request methods vs CodexMonitor outgoing request methods.
+1. Update the MiCode hash in the title using `git -C ../MiCode rev-parse HEAD`.
+2. Compare MiCode events vs MiCodeMonitor routing.
+3. Compare MiCode request methods vs MiCodeMonitor outgoing request methods.
 4. Update supported and missing lists below.
 
-## Where To Look In CodexMonitor
+## Where To Look In MiCodeMonitor
 
 Primary app-server event source of truth (methods + typed parsing helpers):
 - `src/utils/appServerEvents.ts`
@@ -40,9 +40,9 @@ UI rendering of items:
 
 Primary outgoing request layer:
 - `src/services/tauri.ts`
-- `src-tauri/src/shared/codex_core.rs`
-- `src-tauri/src/codex/mod.rs`
-- `src-tauri/src/bin/codex_monitor_daemon.rs`
+- `src-tauri/src/shared/micode_core.rs`
+- `src-tauri/src/micode/mod.rs`
+- `src-tauri/src/bin/micode_monitor_daemon.rs`
 
 ## Supported Events (Current)
 
@@ -50,7 +50,7 @@ These are the app-server methods currently supported in
 `src/utils/appServerEvents.ts` (`SUPPORTED_APP_SERVER_METHODS`) and routed in
 `useAppServerEvents.ts`.
 
-- `codex/connected`
+- `micode/connected`
 - `*requestApproval` methods (matched via
   `isApprovalRequestMethod(method)`; suffix check)
 - `item/tool/requestUserInput`
@@ -58,7 +58,7 @@ These are the app-server methods currently supported in
 - `turn/started`
 - `thread/started`
 - `thread/name/updated`
-- `codex/backgroundThread`
+- `micode/backgroundThread`
 - `error`
 - `turn/completed`
 - `turn/plan/updated`
@@ -76,25 +76,25 @@ These are the app-server methods currently supported in
 - `item/commandExecution/outputDelta`
 - `item/commandExecution/terminalInteraction`
 - `item/fileChange/outputDelta`
-- `codex/event/skills_update_available` (handled via
+- `micode/event/skills_update_available` (handled via
   `isSkillsUpdateAvailableEvent(...)` in `useSkills.ts`)
 
-## Conversation Compaction Signals (Codex v2)
+## Conversation Compaction Signals (MiCode v2)
 
-Codex currently exposes two compaction signals:
+MiCode currently exposes two compaction signals:
 
 - Preferred: `item/started` + `item/completed` with `item.type = "contextCompaction"` (`ThreadItem::ContextCompaction`).
 - Deprecated: `thread/compacted` (`ContextCompactedNotification`).
 
-CodexMonitor status:
+MiCodeMonitor status:
 
 - It routes `item/started` and `item/completed`, so the preferred signal reaches the frontend event layer.
 - It renders/stores `contextCompaction` items via the normal item lifecycle.
 - It no longer routes deprecated `thread/compacted`.
 
-## Missing Events (Codex v2 Notifications)
+## Missing Events (MiCode v2 Notifications)
 
-Compared against Codex app-server protocol v2 notifications, the following
+Compared against MiCode app-server protocol v2 notifications, the following
 events are currently not routed:
 
 - `rawResponseItem/completed`
@@ -104,9 +104,9 @@ events are currently not routed:
 - `configWarning`
 - `windows/worldWritableWarning`
 
-## Supported Requests (CodexMonitor -> App-Server, v2)
+## Supported Requests (MiCodeMonitor -> App-Server, v2)
 
-These are v2 request methods CodexMonitor currently sends to Codex app-server:
+These are v2 request methods MiCodeMonitor currently sends to MiCode app-server:
 
 - `thread/start`
 - `thread/resume`
@@ -128,9 +128,9 @@ These are v2 request methods CodexMonitor currently sends to Codex app-server:
 - `skills/list`
 - `app/list`
 
-## Missing Requests (Codex v2 Request Methods)
+## Missing Requests (MiCode v2 Request Methods)
 
-Compared against Codex v2 request methods, CodexMonitor currently does not send:
+Compared against MiCode v2 request methods, MiCodeMonitor currently does not send:
 
 - `thread/unarchive`
 - `thread/rollback`
@@ -155,28 +155,28 @@ Compared against Codex v2 request methods, CodexMonitor currently does not send:
 - `item/tool/call`
 - `account/chatgptAuthTokens/refresh`
 
-## Where To Look In ../Codex
+## Where To Look In ../MiCode
 
 Start here for the authoritative v2 notification list:
-- `../Codex/codex-rs/app-server-protocol/src/protocol/common.rs`
+- `../MiCode/micode-rs/app-server-protocol/src/protocol/common.rs`
 
 Useful follow-ups:
 - Notification payload types:
-  - `../Codex/codex-rs/app-server-protocol/src/protocol/v2.rs`
+  - `../MiCode/micode-rs/app-server-protocol/src/protocol/v2.rs`
 - Emitters / wiring from core events to server notifications:
-  - `../Codex/codex-rs/app-server/src/bespoke_event_handling.rs`
+  - `../MiCode/micode-rs/app-server/src/bespoke_event_handling.rs`
 - Human-readable protocol notes:
-  - `../Codex/codex-rs/app-server/README.md`
+  - `../MiCode/micode-rs/app-server/README.md`
 
 ## Quick Comparison Workflow
 
 Use this workflow to update the lists above:
 
-1. Get the current Codex hash:
-   - `git -C ../Codex rev-parse HEAD`
-2. List Codex v2 notification methods:
-   - `rg -n \"=> \\\".*\\\" \\(v2::.*Notification\\)\" ../Codex/codex-rs/app-server-protocol/src/protocol/common.rs`
-3. List CodexMonitor routed methods:
+1. Get the current MiCode hash:
+   - `git -C ../MiCode rev-parse HEAD`
+2. List MiCode v2 notification methods:
+   - `rg -n \"=> \\\".*\\\" \\(v2::.*Notification\\)\" ../MiCode/micode-rs/app-server-protocol/src/protocol/common.rs`
+3. List MiCodeMonitor routed methods:
    - `rg -n \"SUPPORTED_APP_SERVER_METHODS\" src/utils/appServerEvents.ts`
 4. Update the Supported and Missing sections.
 
@@ -184,11 +184,11 @@ Use this workflow to update the lists above:
 
 Use this workflow to update request support lists:
 
-1. Get the current Codex hash:
-   - `git -C ../Codex rev-parse HEAD`
-2. List Codex request methods:
-   - `rg -n \"=> \\\".*\\\" \\{\" ../Codex/codex-rs/app-server-protocol/src/protocol/common.rs`
-3. List CodexMonitor outgoing requests:
+1. Get the current MiCode hash:
+   - `git -C ../MiCode rev-parse HEAD`
+2. List MiCode request methods:
+   - `rg -n \"=> \\\".*\\\" \\{\" ../MiCode/micode-rs/app-server-protocol/src/protocol/common.rs`
+3. List MiCodeMonitor outgoing requests:
    - `rg -n \"send_request\\(\\\"\" src-tauri/src -g\"*.rs\"`
 4. Update the Supported Requests and Missing Requests sections.
 
@@ -196,22 +196,22 @@ Use this workflow to update request support lists:
 
 Use this when the method list is unchanged but behavior looks off.
 
-1. Confirm the current Codex hash:
-   - `git -C ../Codex rev-parse HEAD`
+1. Confirm the current MiCode hash:
+   - `git -C ../MiCode rev-parse HEAD`
 2. Inspect the authoritative notification structs:
-   - `rg -n \"struct .*Notification\" ../Codex/codex-rs/app-server-protocol/src/protocol/v2.rs`
+   - `rg -n \"struct .*Notification\" ../MiCode/micode-rs/app-server-protocol/src/protocol/v2.rs`
 3. For a specific method, jump to its struct definition:
-   - Example: `rg -n \"struct TurnPlanUpdatedNotification|struct ThreadTokenUsageUpdatedNotification|struct AccountRateLimitsUpdatedNotification|struct ItemStartedNotification|struct ItemCompletedNotification\" ../Codex/codex-rs/app-server-protocol/src/protocol/v2.rs`
+   - Example: `rg -n \"struct TurnPlanUpdatedNotification|struct ThreadTokenUsageUpdatedNotification|struct AccountRateLimitsUpdatedNotification|struct ItemStartedNotification|struct ItemCompletedNotification\" ../MiCode/micode-rs/app-server-protocol/src/protocol/v2.rs`
 4. Compare payload shapes to the router expectations:
    - Parser/source of truth: `src/utils/appServerEvents.ts`
    - Router: `src/features/app/hooks/useAppServerEvents.ts`
    - Turn/plan/token/rate-limit normalization: `src/features/threads/utils/threadNormalize.ts`
    - Item shaping for display: `src/utils/threadItems.ts`
 5. Verify the ThreadItem schema (many UI issues start here):
-   - `rg -n \"enum ThreadItem|CommandExecution|FileChange|McpToolCall|EnteredReviewMode|ExitedReviewMode|ContextCompaction\" ../Codex/codex-rs/app-server-protocol/src/protocol/v2.rs`
+   - `rg -n \"enum ThreadItem|CommandExecution|FileChange|McpToolCall|EnteredReviewMode|ExitedReviewMode|ContextCompaction\" ../MiCode/micode-rs/app-server-protocol/src/protocol/v2.rs`
 6. Check for camelCase vs snake_case mismatches:
    - The protocol uses `#[serde(rename_all = \"camelCase\")]`, but fields are often declared in snake_case.
-   - CodexMonitor generally defends against this by checking both forms (for example in `threadNormalize.ts` and `useAppServerEvents.ts`), while centralizing method/type parsing in `appServerEvents.ts`.
+   - MiCodeMonitor generally defends against this by checking both forms (for example in `threadNormalize.ts` and `useAppServerEvents.ts`), while centralizing method/type parsing in `appServerEvents.ts`.
 7. If a schema change is found, fix it at the edges first:
    - Prefer updating `src/utils/appServerEvents.ts`, `useAppServerEvents.ts`, and `threadNormalize.ts` rather than spreading conditionals into components.
 

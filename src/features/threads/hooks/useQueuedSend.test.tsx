@@ -6,8 +6,8 @@ import { useQueuedSend } from "./useQueuedSend";
 
 const workspace: WorkspaceInfo = {
   id: "workspace-1",
-  name: "CodexMonitor",
-  path: "/tmp/codex",
+  name: "MiCodeMonitor",
+  path: "/tmp/micode",
   connected: true,
   settings: { sidebarCollapsed: false },
 };

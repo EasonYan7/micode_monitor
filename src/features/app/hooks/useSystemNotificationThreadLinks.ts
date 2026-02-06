@@ -12,7 +12,7 @@ type Params = {
   workspacesById: Map<string, WorkspaceInfo>;
   refreshWorkspaces: () => Promise<WorkspaceInfo[] | undefined>;
   connectWorkspace: (workspace: WorkspaceInfo) => Promise<void>;
-  setActiveTab: (tab: "projects" | "codex" | "git" | "log") => void;
+  setActiveTab: (tab: "projects" | "micode" | "git" | "log") => void;
   setCenterMode: (mode: "chat" | "diff") => void;
   setSelectedDiffPath: (path: string | null) => void;
   setActiveWorkspaceId: (workspaceId: string | null) => void;
@@ -55,7 +55,7 @@ export function useSystemNotificationThreadLinks({
 
     setCenterMode("chat");
     setSelectedDiffPath(null);
-    setActiveTab("codex");
+    setActiveTab("micode");
 
     let workspace = workspacesById.get(link.workspaceId) ?? null;
     if (!workspace && hasLoadedWorkspaces && !refreshInFlightRef.current) {
