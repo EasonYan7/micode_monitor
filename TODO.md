@@ -20,6 +20,7 @@
 - [x] Normalize `turn/interrupt` when backend reports `Not currently generating`
 - [x] Clear stale queued interrupt flags on non-retry turn errors
 - [x] Guard against stale processing-without-turn blocking new sends
+- [x] Populate GUI model picker from MiCode CLI bundle and apply selection via settings sync
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -49,3 +50,5 @@
 - Interrupt flow: convert `Not currently generating` into benign interrupt success; avoid noisy debug/user errors.
 - State hygiene: clear pending queued-interrupt flag on non-retry turn errors to prevent accidental cancel of next prompt.
 - Composer send guard: treat `isProcessing=true` without `activeTurnId` for >15s as stale, so new input is sent instead of silently queued.
+- Model picker parity: `model/list` now discovers visible models from installed MiCode CLI bundle (`AVAILABLE_MODELS`) instead of hardcoded `MiCode Auto`.
+- Model apply path: when turn request carries `model`, backend updates `~/.micode/settings.json -> model.preferredModel` and recreates ACP session once so selection takes effect.

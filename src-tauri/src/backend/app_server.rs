@@ -245,6 +245,243 @@ fn is_not_generating_message(message: &str) -> bool {
         .contains("not currently generating")
 }
 
+fn micode_settings_path() -> Option<PathBuf> {
+    let home = env::var("HOME").ok()?;
+    Some(PathBuf::from(home).join(".micode").join("settings.json"))
+}
+
+fn read_selected_auth_mode() -> Option<String> {
+    let settings_path = micode_settings_path()?;
+    let raw = std::fs::read_to_string(settings_path).ok()?;
+    let value: Value = serde_json::from_str(&raw).ok()?;
+    let selected = value
+        .get("selectedAuthType")
+        .and_then(Value::as_str)
+        .or_else(|| {
+            value
+                .get("security")
+                .and_then(|v| v.get("auth"))
+                .and_then(|v| v.get("selectedType"))
+                .and_then(Value::as_str)
+        })?
+        .trim()
+        .to_string();
+    if selected.is_empty() {
+        None
+    } else {
+        Some(selected)
+    }
+}
+
+fn read_preferred_model() -> Option<String> {
+    let settings_path = micode_settings_path()?;
+    let raw = std::fs::read_to_string(settings_path).ok()?;
+    let value: Value = serde_json::from_str(&raw).ok()?;
+    value
+        .get("model")
+        .and_then(|v| v.get("preferredModel"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(ToString::to_string)
+}
+
+fn set_preferred_model(model: &str) -> Result<bool, String> {
+    let trimmed = model.trim();
+    if trimmed.is_empty() {
+        return Ok(false);
+    }
+    let settings_path = micode_settings_path().ok_or_else(|| "missing HOME".to_string())?;
+    let mut root = if settings_path.is_file() {
+        let raw = std::fs::read_to_string(&settings_path).map_err(|e| e.to_string())?;
+        serde_json::from_str::<Value>(&raw).unwrap_or_else(|_| json!({}))
+    } else {
+        json!({})
+    };
+    if !root.is_object() {
+        root = json!({});
+    }
+    let current = root
+        .get("model")
+        .and_then(|v| v.get("preferredModel"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if current.trim() == trimmed {
+        return Ok(false);
+    }
+    let root_obj = root
+        .as_object_mut()
+        .ok_or_else(|| "invalid settings root".to_string())?;
+    let model_obj = root_obj
+        .entry("model".to_string())
+        .or_insert_with(|| json!({}));
+    if !model_obj.is_object() {
+        *model_obj = json!({});
+    }
+    if let Some(model_map) = model_obj.as_object_mut() {
+        model_map.insert(
+            "preferredModel".to_string(),
+            Value::String(trimmed.to_string()),
+        );
+    }
+    if let Some(parent) = settings_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let payload = serde_json::to_string_pretty(&root).map_err(|e| e.to_string())?;
+    std::fs::write(&settings_path, payload).map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
+fn find_executable_on_path(name: &str) -> Option<PathBuf> {
+    let path = env::var("PATH").ok()?;
+    for dir in path.split(':') {
+        if dir.trim().is_empty() {
+            continue;
+        }
+        let candidate = PathBuf::from(dir).join(name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+fn resolve_micode_cli_bundle_path(agent_bin: Option<&str>) -> Option<PathBuf> {
+    let resolved_bin = agent_bin
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| find_executable_on_path("micode"))?;
+    let canonical = std::fs::canonicalize(&resolved_bin).ok()?;
+    if canonical
+        .file_name()
+        .and_then(|v| v.to_str())
+        .map(|name| name.eq_ignore_ascii_case("cli.js"))
+        .unwrap_or(false)
+    {
+        return Some(canonical);
+    }
+    if let Ok(raw) = std::fs::read_to_string(&canonical) {
+        if let Some(token) = raw
+            .split_whitespace()
+            .find(|part| part.contains("@mi/mi-code-cli/dist/cli.js"))
+        {
+            let cleaned = token.trim_matches(|ch| ch == '"' || ch == '\'' || ch == ';');
+            let candidate = PathBuf::from(cleaned);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+fn parse_js_string_field(line: &str, field: &str) -> Option<String> {
+    let trimmed = line.trim();
+    let prefix = format!("{field}:");
+    let rest = trimmed.strip_prefix(&prefix)?.trim();
+    let start = rest.find('"')?;
+    let quoted = &rest[start..];
+    let end = quoted.rfind('"')?;
+    if end == 0 {
+        return None;
+    }
+    let literal = &quoted[..=end];
+    serde_json::from_str::<String>(literal).ok()
+}
+
+fn parse_js_bool_field(line: &str, field: &str) -> Option<bool> {
+    let trimmed = line.trim();
+    let prefix = format!("{field}:");
+    let rest = trimmed.strip_prefix(&prefix)?.trim().trim_end_matches(',');
+    match rest {
+        "true" => Some(true),
+        "false" => Some(false),
+        _ => None,
+    }
+}
+
+fn parse_models_from_cli_bundle(path: &Path) -> Vec<(String, String, String)> {
+    let raw = match std::fs::read_to_string(path) {
+        Ok(value) => value,
+        Err(_) => return Vec::new(),
+    };
+    let mut in_models = false;
+    let mut in_object = false;
+    let mut brace_depth = 0_i32;
+    let mut object_lines: Vec<String> = Vec::new();
+    let mut models: Vec<(String, String, String)> = Vec::new();
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if !in_models {
+            if trimmed.starts_with("var AVAILABLE_MODELS = [") {
+                in_models = true;
+            }
+            continue;
+        }
+        if trimmed.starts_with("function loadCustomMifyModels") {
+            break;
+        }
+        if trimmed.starts_with("//") {
+            continue;
+        }
+        if !in_object {
+            if trimmed.starts_with('{') {
+                in_object = true;
+                brace_depth = 0;
+                object_lines.clear();
+            } else {
+                continue;
+            }
+        }
+        object_lines.push(line.to_string());
+        brace_depth += trimmed.chars().filter(|ch| *ch == '{').count() as i32;
+        brace_depth -= trimmed.chars().filter(|ch| *ch == '}').count() as i32;
+        if in_object && brace_depth <= 0 {
+            let mut id: Option<String> = None;
+            let mut label: Option<String> = None;
+            let mut description: Option<String> = None;
+            let mut is_visible: Option<bool> = None;
+            for object_line in &object_lines {
+                if id.is_none() {
+                    id = parse_js_string_field(object_line, "id");
+                }
+                if label.is_none() {
+                    label = parse_js_string_field(object_line, "label");
+                }
+                if description.is_none() {
+                    description = parse_js_string_field(object_line, "description");
+                }
+                if is_visible.is_none() {
+                    is_visible = parse_js_bool_field(object_line, "isVisible");
+                }
+            }
+            if is_visible != Some(false) {
+                if let (Some(id), Some(label)) = (id, label) {
+                    models.push((id, label.clone(), description.unwrap_or(label)));
+                }
+            }
+            in_object = false;
+            object_lines.clear();
+        }
+    }
+    let mut deduped: Vec<(String, String, String)> = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for (id, label, description) in models {
+        if seen.insert(id.clone()) {
+            deduped.push((id, label, description));
+        }
+    }
+    deduped
+}
+
+fn discover_micode_models(agent_bin: Option<&str>) -> Vec<(String, String, String)> {
+    let Some(bundle_path) = resolve_micode_cli_bundle_path(agent_bin) else {
+        return Vec::new();
+    };
+    parse_models_from_cli_bundle(&bundle_path)
+}
+
 fn extract_thread_id(value: &Value) -> Option<String> {
     let params = value.get("params")?;
 
@@ -504,6 +741,25 @@ impl WorkspaceSession {
                     return Err("empty user message".to_string());
                 }
                 let mut session_id = thread.session_id.clone();
+                let requested_model = params
+                    .get("model")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(ToString::to_string);
+                if let Some(requested_model) = requested_model {
+                    if let Ok(changed) = set_preferred_model(&requested_model) {
+                        if changed {
+                            let fresh_session =
+                                self.create_session_for_cwd(self.entry.path.clone()).await?;
+                            self.thread_store
+                                .lock()
+                                .await
+                                .set_session_id(&thread_id, fresh_session.clone());
+                            session_id = fresh_session;
+                        }
+                    }
+                }
                 if session_id.trim().is_empty() {
                     // Some migrated/local records may have an empty session id.
                     // Recreate proactively to avoid one failed prompt + retry roundtrip.
@@ -692,10 +948,62 @@ impl WorkspaceSession {
                 Ok(response)
             }
             "model/list" => {
-                Ok(json!({ "result": { "models": [{ "id": "auto", "name": "MiCode Auto" }] } }))
+                let preferred = read_preferred_model();
+                let mut models = discover_micode_models(self.entry.agent_bin.as_deref());
+                if models.is_empty() {
+                    models.push((
+                        "auto".to_string(),
+                        "MiCode Auto".to_string(),
+                        "Use MiCode default model from local configuration".to_string(),
+                    ));
+                }
+                let has_preferred = preferred
+                    .as_ref()
+                    .map(|pref| models.iter().any(|(id, _, _)| id == pref))
+                    .unwrap_or(false);
+                let data = models
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, (id, label, description))| {
+                        let model_id = id.clone();
+                        let is_default = if let Some(pref) = preferred.as_ref() {
+                            id == *pref
+                        } else {
+                            index == 0
+                        };
+                        json!({
+                            "id": id,
+                            "model": model_id,
+                            "displayName": label,
+                            "description": description,
+                            "supportedReasoningEfforts": [],
+                            "defaultReasoningEffort": null,
+                            "isDefault": if has_preferred { is_default } else { index == 0 }
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                Ok(json!({ "result": { "data": data } }))
             }
             "account/read" => {
-                Ok(json!({ "result": { "provider": "micode-acp", "authMode": "unknown" } }))
+                let auth_mode = read_selected_auth_mode()
+                    .unwrap_or_else(|| "unknown".to_string())
+                    .to_ascii_lowercase();
+                let account_type = if auth_mode == "openai" {
+                    "apikey"
+                } else if auth_mode == "qwen-oauth" {
+                    "chatgpt"
+                } else {
+                    "unknown"
+                };
+                Ok(json!({
+                    "result": {
+                        "provider": "micode-acp",
+                        "authMode": auth_mode,
+                        "account": {
+                            "type": account_type
+                        }
+                    }
+                }))
             }
             "account/rateLimits/read" => {
                 Ok(json!({ "result": { "source": "synthetic", "limits": [] } }))
