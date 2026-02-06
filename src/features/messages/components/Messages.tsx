@@ -190,6 +190,49 @@ function sanitizeReasoningTitle(title: string) {
     .trim();
 }
 
+function looksLikeInternalPlanJson(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  const hasTitle = typeof record.title === "string" && record.title.trim().length > 0;
+  const hasWorktree =
+    typeof record.worktreeName === "string" ||
+    typeof record.worktree === "string" ||
+    typeof record.workspace === "string";
+  return hasTitle && hasWorktree;
+}
+
+function stripInternalJsonPreamble(text: string) {
+  let remaining = text;
+  // Some MiCode flows prepend internal routing JSON in fenced blocks.
+  // Hide those blocks in the chat transcript for end users.
+  while (true) {
+    const match = remaining.match(/^\s*```json\s*\n([\s\S]*?)\n```\s*/i);
+    if (!match) {
+      return remaining;
+    }
+    const rawJson = match[1]?.trim();
+    if (!rawJson) {
+      remaining = remaining.slice(match[0].length);
+      continue;
+    }
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(rawJson);
+    } catch {
+      return remaining;
+    }
+    const shouldStrip = Array.isArray(parsed)
+      ? parsed.every(looksLikeInternalPlanJson)
+      : looksLikeInternalPlanJson(parsed);
+    if (!shouldStrip) {
+      return remaining;
+    }
+    remaining = remaining.slice(match[0].length);
+  }
+}
+
 function parseReasoning(item: Extract<ConversationItem, { kind: "reasoning" }>) {
   const summary = item.summary ?? "";
   const content = item.content ?? "";
@@ -675,7 +718,9 @@ const MessageRow = memo(function MessageRow({
   onOpenThreadLink,
 }: MessageRowProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const hasText = item.text.trim().length > 0;
+  const displayText =
+    item.role === "assistant" ? stripInternalJsonPreamble(item.text) : item.text;
+  const hasText = displayText.trim().length > 0;
   const imageItems = useMemo(() => {
     if (!item.images || item.images.length === 0) {
       return [];
@@ -703,7 +748,7 @@ const MessageRow = memo(function MessageRow({
         )}
         {hasText && (
           <Markdown
-            value={item.text}
+            value={displayText}
             className="markdown"
             codeBlockStyle="message"
             codeBlockCopyUseModifier={codeBlockCopyUseModifier}

@@ -272,9 +272,32 @@ pub(crate) struct WorkspaceSession {
     event_tx: mpsc::UnboundedSender<AppServerEvent>,
     thread_store: Mutex<LocalThreadStore>,
     approval_requests: Mutex<HashMap<String, Value>>,
+    pending_prompt_streaming: Mutex<HashMap<String, bool>>,
 }
 
 impl WorkspaceSession {
+    async fn begin_prompt_tracking(&self, session_id: &str) {
+        self.pending_prompt_streaming
+            .lock()
+            .await
+            .insert(session_id.to_string(), false);
+    }
+
+    async fn mark_prompt_streaming(&self, session_id: &str) {
+        let mut pending = self.pending_prompt_streaming.lock().await;
+        if let Some(has_streaming) = pending.get_mut(session_id) {
+            *has_streaming = true;
+        }
+    }
+
+    async fn finish_prompt_tracking(&self, session_id: &str) -> bool {
+        self.pending_prompt_streaming
+            .lock()
+            .await
+            .remove(session_id)
+            .unwrap_or(false)
+    }
+
     async fn write_message(&self, value: Value) -> Result<(), String> {
         let mut stdin = self.stdin.lock().await;
         let mut line = serde_json::to_string(&value).map_err(|e| e.to_string())?;
@@ -476,18 +499,49 @@ impl WorkspaceSession {
                         "turn": { "id": turn_id, "threadId": thread.thread_id }
                     }),
                 );
-                let response = timeout(
+                let mut tracked_session_id = thread.session_id.clone();
+                self.begin_prompt_tracking(&tracked_session_id).await;
+                let response = match timeout(
                     Duration::from_secs(90),
                     self.send_acp_request(
                         "session/prompt",
                         json!({
-                            "sessionId": thread.session_id,
+                            "sessionId": tracked_session_id,
                             "prompt": [{ "type": "text", "text": prompt_text }]
                         }),
                     ),
                 )
                 .await
-                .map_err(|_| "turn/start timed out waiting for MiCode response".to_string())??;
+                {
+                    Ok(result) => {
+                        let _ = self.finish_prompt_tracking(&tracked_session_id).await;
+                        result?
+                    }
+                    Err(_) => {
+                        let had_streaming = self.finish_prompt_tracking(&tracked_session_id).await;
+                        if had_streaming {
+                            self.thread_store.lock().await.touch_message(&thread_id);
+                            let normalized_turn = json!({
+                                "id": turn_id,
+                                "threadId": thread.thread_id
+                            });
+                            self.emit_event(
+                                "turn/completed",
+                                json!({
+                                    "threadId": thread_id,
+                                    "turn": normalized_turn
+                                }),
+                            );
+                            return Ok(json!({
+                                "result": {
+                                    "stopReason": "end_turn",
+                                    "turn": normalized_turn
+                                }
+                            }));
+                        }
+                        return Err("turn/start timed out waiting for MiCode response".to_string());
+                    }
+                };
                 let response = if is_session_not_found_error(&response) {
                     // Session ids are process-local. Recreate once and retry.
                     let new_session = self.create_session_for_cwd(self.entry.path.clone()).await?;
@@ -495,7 +549,9 @@ impl WorkspaceSession {
                         .lock()
                         .await
                         .set_session_id(&thread_id, new_session.clone());
-                    timeout(
+                    tracked_session_id = new_session.clone();
+                    self.begin_prompt_tracking(&tracked_session_id).await;
+                    match timeout(
                         Duration::from_secs(90),
                         self.send_acp_request(
                             "session/prompt",
@@ -506,10 +562,40 @@ impl WorkspaceSession {
                         ),
                     )
                     .await
-                    .map_err(|_| {
-                        "turn/start timed out waiting for MiCode response after session recovery"
-                            .to_string()
-                    })??
+                    {
+                        Ok(result) => {
+                            let _ = self.finish_prompt_tracking(&tracked_session_id).await;
+                            result?
+                        }
+                        Err(_) => {
+                            let had_streaming =
+                                self.finish_prompt_tracking(&tracked_session_id).await;
+                            if had_streaming {
+                                self.thread_store.lock().await.touch_message(&thread_id);
+                                let normalized_turn = json!({
+                                    "id": turn_id,
+                                    "threadId": thread.thread_id
+                                });
+                                self.emit_event(
+                                    "turn/completed",
+                                    json!({
+                                        "threadId": thread_id,
+                                        "turn": normalized_turn
+                                    }),
+                                );
+                                return Ok(json!({
+                                    "result": {
+                                        "stopReason": "end_turn",
+                                        "turn": normalized_turn
+                                    }
+                                }));
+                            }
+                            return Err(
+                                "turn/start timed out waiting for MiCode response after session recovery"
+                                    .to_string(),
+                            );
+                        }
+                    }
                 } else {
                     response
                 };
@@ -989,6 +1075,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
         event_tx: event_tx.clone(),
         thread_store: Mutex::new(LocalThreadStore::load(&entry.path)),
         approval_requests: Mutex::new(HashMap::new()),
+        pending_prompt_streaming: Mutex::new(HashMap::new()),
     });
 
     let session_clone = Arc::clone(&session);
@@ -1013,7 +1100,11 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                 }
             };
 
-            if let Some(id) = value.get("id").and_then(Value::as_u64) {
+            let response_id = value.get("id").and_then(|id| {
+                id.as_u64()
+                    .or_else(|| id.as_str().and_then(|raw| raw.parse::<u64>().ok()))
+            });
+            if let Some(id) = response_id {
                 if value.get("result").is_some() || value.get("error").is_some() {
                     if let Some(tx) = session_clone.pending.lock().await.remove(&id) {
                         let _ = tx.send(value.clone());
@@ -1031,6 +1122,20 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                     };
                     if let Some(thread) = thread {
                         if let Some(update) = value.get("params").and_then(|v| v.get("update")) {
+                            let update_kind = update
+                                .get("sessionUpdate")
+                                .and_then(Value::as_str)
+                                .unwrap_or_default();
+                            if matches!(
+                                update_kind,
+                                "agent_message_chunk"
+                                    | "agent_thought_chunk"
+                                    | "tool_call"
+                                    | "tool_call_update"
+                                    | "plan"
+                            ) {
+                                session_clone.mark_prompt_streaming(&session_id).await;
+                            }
                             for event in translate_acp_update(
                                 &thread.thread_id,
                                 thread.message_index,

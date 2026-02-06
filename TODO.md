@@ -11,6 +11,8 @@
 - [x] Add tests for ACP mapping and settings migration
 - [x] Run available checks and fix regressions (`npm run typecheck`, targeted vitest)
 - [x] Sync slash autocomplete with MiCode ACP `available_commands_update`
+- [x] Stabilize turn completion when ACP stream ends but prompt response stalls
+- [x] Hide internal MiCode JSON routing preamble from assistant messages
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -31,3 +33,5 @@
 - Data integrity fix: enforce unique sessionId per workspace thread and auto-repair duplicate session mappings in sessions.json.
 - Slash passthrough mode: disable app-level slash interception/autocomplete; forward `/...` directly to MiCode.
 - Slash UX parity: wire ACP `available_commands_update` into composer so `/` suggestions now come from MiCode runtime commands.
+- Turn reliability: if ACP streamed chunks but `session/prompt` final response times out, synthesize `turn/completed` to prevent stuck "Working...".
+- UX polish: strip internal fenced JSON routing payloads (e.g. title/worktreeName blocks) from assistant message display.
