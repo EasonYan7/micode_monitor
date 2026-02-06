@@ -48,7 +48,11 @@ impl LocalThreadStore {
             .join("sessions.json");
         if let Ok(raw) = std::fs::read_to_string(&path) {
             if let Ok(records) = serde_json::from_str::<Vec<LocalThreadRecord>>(&raw) {
-                return Self { path, records };
+                let mut store = Self { path, records };
+                if store.repair_session_collisions() {
+                    store.persist();
+                }
+                return store;
             }
         }
         Self {
@@ -89,7 +93,12 @@ impl LocalThreadStore {
     fn by_session_id(&self, session_id: &str) -> Option<LocalThreadRecord> {
         self.records
             .iter()
-            .find(|entry| entry.session_id == session_id)
+            .filter(|entry| entry.session_id == session_id)
+            .max_by(|a, b| {
+                a.updated_at
+                    .cmp(&b.updated_at)
+                    .then(a.message_index.cmp(&b.message_index))
+            })
             .cloned()
     }
 
@@ -126,6 +135,15 @@ impl LocalThreadStore {
     }
 
     fn set_session_id(&mut self, thread_id: &str, session_id: String) {
+        let mut changed = false;
+        if !session_id.is_empty() {
+            for entry in self.records.iter_mut() {
+                if entry.thread_id != thread_id && entry.session_id == session_id {
+                    entry.session_id.clear();
+                    changed = true;
+                }
+            }
+        }
         if let Some(entry) = self
             .records
             .iter_mut()
@@ -133,6 +151,9 @@ impl LocalThreadStore {
         {
             entry.session_id = session_id;
             entry.updated_at = now_ts();
+            changed = true;
+        }
+        if changed {
             self.persist();
         }
     }
@@ -147,6 +168,37 @@ impl LocalThreadStore {
             entry.updated_at = now_ts();
             self.persist();
         }
+    }
+
+    fn repair_session_collisions(&mut self) -> bool {
+        let mut changed = false;
+        let mut canonical: HashMap<String, usize> = HashMap::new();
+        for idx in 0..self.records.len() {
+            let session_id = self.records[idx].session_id.clone();
+            if session_id.is_empty() {
+                continue;
+            }
+            match canonical.get(&session_id).copied() {
+                None => {
+                    canonical.insert(session_id, idx);
+                }
+                Some(prev_idx) => {
+                    let take_current = {
+                        let prev = &self.records[prev_idx];
+                        let cur = &self.records[idx];
+                        (cur.updated_at, cur.message_index) > (prev.updated_at, prev.message_index)
+                    };
+                    if take_current {
+                        self.records[prev_idx].session_id.clear();
+                        canonical.insert(session_id, idx);
+                    } else {
+                        self.records[idx].session_id.clear();
+                    }
+                    changed = true;
+                }
+            }
+        }
+        changed
     }
 }
 
@@ -262,6 +314,7 @@ impl WorkspaceSession {
         };
         let mut store = self.thread_store.lock().await;
         store.upsert(thread.clone());
+        store.set_session_id(&thread.thread_id, thread.session_id.clone());
         thread
     }
 
