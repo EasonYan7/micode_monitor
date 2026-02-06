@@ -15,6 +15,7 @@
 - [x] Hide internal MiCode JSON routing preamble from assistant messages
 - [x] Keep Debug/Log button always visible in sidebar corner actions
 - [x] Harden internal JSON preamble stripping for mixed-content code blocks
+- [x] Reduce first-response latency by proactively recreating empty ACP session ids
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -39,3 +40,4 @@
 - UX polish: strip internal fenced JSON routing payloads (e.g. title/worktreeName blocks) from assistant message display.
 - UX tweak: keep Debug log entrypoint always visible (not only on warnings) for faster troubleshooting.
 - JSON filtering refinement: strip internal routing code blocks when they include `title` + `worktree*` markers even if not strict JSON.
+- Latency optimization: when local thread record has empty `sessionId`, recreate session before `session/prompt` to avoid one failed roundtrip.

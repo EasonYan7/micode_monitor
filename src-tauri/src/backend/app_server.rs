@@ -491,6 +491,17 @@ impl WorkspaceSession {
                 if prompt_text.is_empty() {
                     return Err("empty user message".to_string());
                 }
+                let mut session_id = thread.session_id.clone();
+                if session_id.trim().is_empty() {
+                    // Some migrated/local records may have an empty session id.
+                    // Recreate proactively to avoid one failed prompt + retry roundtrip.
+                    let fresh_session = self.create_session_for_cwd(self.entry.path.clone()).await?;
+                    self.thread_store
+                        .lock()
+                        .await
+                        .set_session_id(&thread_id, fresh_session.clone());
+                    session_id = fresh_session;
+                }
                 let turn_id = Uuid::new_v4().to_string();
                 self.emit_event(
                     "turn/started",
@@ -499,7 +510,7 @@ impl WorkspaceSession {
                         "turn": { "id": turn_id, "threadId": thread.thread_id }
                     }),
                 );
-                let mut tracked_session_id = thread.session_id.clone();
+                let mut tracked_session_id = session_id.clone();
                 self.begin_prompt_tracking(&tracked_session_id).await;
                 let response = match timeout(
                     Duration::from_secs(90),
