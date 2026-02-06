@@ -423,15 +423,18 @@ impl WorkspaceSession {
                         "turn": { "id": turn_id, "threadId": thread.thread_id }
                     }),
                 );
-                let response = self
-                    .send_acp_request(
+                let response = timeout(
+                    Duration::from_secs(30),
+                    self.send_acp_request(
                         "session/prompt",
                         json!({
                             "sessionId": thread.session_id,
                             "prompt": [{ "type": "text", "text": prompt_text }]
                         }),
-                    )
-                    .await?;
+                    ),
+                )
+                .await
+                .map_err(|_| "turn/start timed out waiting for MiCode response".to_string())??;
                 let response = if is_session_not_found_error(&response) {
                     // Session ids are process-local. Recreate once and retry.
                     let new_session = self.create_session_for_cwd(self.entry.path.clone()).await?;
@@ -439,14 +442,21 @@ impl WorkspaceSession {
                         .lock()
                         .await
                         .set_session_id(&thread_id, new_session.clone());
-                    self.send_acp_request(
-                        "session/prompt",
-                        json!({
-                            "sessionId": new_session,
-                            "prompt": [{ "type": "text", "text": prompt_text }]
-                        }),
+                    timeout(
+                        Duration::from_secs(30),
+                        self.send_acp_request(
+                            "session/prompt",
+                            json!({
+                                "sessionId": new_session,
+                                "prompt": [{ "type": "text", "text": prompt_text }]
+                            }),
+                        ),
                     )
-                    .await?
+                    .await
+                    .map_err(|_| {
+                        "turn/start timed out waiting for MiCode response after session recovery"
+                            .to_string()
+                    })??
                 } else {
                     response
                 };
