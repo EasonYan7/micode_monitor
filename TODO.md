@@ -20,3 +20,4 @@
 - New reliability fix: auto-recreate ACP session and retry on `Session not found` during `turn/start`, and recreate session on `thread/resume`.
 - ACP compatibility fix: keep required `mcpServers` in `session/new` and stabilize streaming item IDs per turn to avoid fragmented/missing UI replies.
 - Build fix: align ACP update adapter turn index type with `message_index: u64` to restore successful Rust compile.
+- UX parity fix: normalize ACP `turn/start` response to always include `result.turn.id` so frontend no longer shows false "Turn failed to start."

@@ -454,14 +454,33 @@ impl WorkspaceSession {
                     return Err(format!("turn/start failed: {error}"));
                 }
                 self.thread_store.lock().await.touch_message(&thread_id);
+                let mut normalized_response = response.clone();
+                let normalized_turn = json!({
+                    "id": turn_id,
+                    "threadId": thread.thread_id
+                });
+                if let Some(result) = normalized_response
+                    .get_mut("result")
+                    .and_then(Value::as_object_mut)
+                {
+                    result
+                        .entry("turn".to_string())
+                        .or_insert_with(|| normalized_turn.clone());
+                } else {
+                    normalized_response = json!({
+                        "result": {
+                            "turn": normalized_turn
+                        }
+                    });
+                }
                 self.emit_event(
                     "turn/completed",
                     json!({
                         "threadId": thread_id,
-                        "turn": { "id": turn_id, "threadId": thread.thread_id }
+                        "turn": normalized_turn
                     }),
                 );
-                Ok(response)
+                Ok(normalized_response)
             }
             "turn/interrupt" => {
                 let thread_id = params
