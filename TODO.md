@@ -25,3 +25,5 @@
 - Runtime fix: stop injecting `CODEX_HOME` into MiCode ACP process (use `MICODE_HOME` env key) to prevent prompt hangs in GUI.
 - Runtime fix v2: do not inject any home env (`CODEX_HOME`/`MICODE_HOME`) for MiCode ACP by default; align runtime with terminal `micode`.
 - Runtime safeguard: add 30s timeout for ACP session/prompt so UI cannot stay in Working indefinitely.
+- UX fix: always optimistic-render user messages immediately after send.
+- Stability tweak: increase ACP prompt timeout from 30s to 90s to reduce false timeout during long streaming turns.

@@ -137,27 +137,23 @@ export function useThreadMessaging({
       const resolvedAccessMode =
         options?.accessMode !== undefined ? options.accessMode : accessMode;
 
-      const wasProcessing =
-        (threadStatusById[threadId]?.isProcessing ?? false) && steerEnabled;
-      if (wasProcessing) {
-        const optimisticText = finalText;
-        if (optimisticText || images.length > 0) {
-          dispatch({
-            type: "upsertItem",
-            workspaceId: workspace.id,
-            threadId,
-            item: {
-              id: `optimistic-user-${Date.now()}-${Math.random()
-                .toString(36)
-                .slice(2, 8)}`,
-              kind: "message",
-              role: "user",
-              text: optimisticText,
-              images: images.length > 0 ? images : undefined,
-            },
-            hasCustomName: Boolean(getCustomName(workspace.id, threadId)),
-          });
-        }
+      const optimisticText = finalText;
+      if (optimisticText || images.length > 0) {
+        dispatch({
+          type: "upsertItem",
+          workspaceId: workspace.id,
+          threadId,
+          item: {
+            id: `optimistic-user-${Date.now()}-${Math.random()
+              .toString(36)
+              .slice(2, 8)}`,
+            kind: "message",
+            role: "user",
+            text: optimisticText,
+            images: images.length > 0 ? images : undefined,
+          },
+          hasCustomName: Boolean(getCustomName(workspace.id, threadId)),
+        });
       }
       const timestamp = Date.now();
       recordThreadActivity(workspace.id, threadId, timestamp);

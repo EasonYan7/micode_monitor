@@ -424,7 +424,7 @@ impl WorkspaceSession {
                     }),
                 );
                 let response = timeout(
-                    Duration::from_secs(30),
+                    Duration::from_secs(90),
                     self.send_acp_request(
                         "session/prompt",
                         json!({
@@ -443,7 +443,7 @@ impl WorkspaceSession {
                         .await
                         .set_session_id(&thread_id, new_session.clone());
                     timeout(
-                        Duration::from_secs(30),
+                        Duration::from_secs(90),
                         self.send_acp_request(
                             "session/prompt",
                             json!({
