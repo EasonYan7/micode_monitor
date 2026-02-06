@@ -355,6 +355,7 @@ pub(crate) async fn send_user_message(
         let model_changed = crate::backend::app_server::set_preferred_model(&requested_model)?;
         if model_changed {
             if let Some(previous_session) = state.sessions.lock().await.remove(&workspace_id) {
+                previous_session.invalidate_all_thread_sessions().await;
                 let mut child = previous_session.child.lock().await;
                 let _ = child.kill().await;
             }

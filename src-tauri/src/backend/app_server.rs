@@ -170,6 +170,19 @@ impl LocalThreadStore {
         }
     }
 
+    fn clear_session_ids(&mut self) {
+        let mut changed = false;
+        for entry in self.records.iter_mut() {
+            if !entry.session_id.is_empty() {
+                entry.session_id.clear();
+                changed = true;
+            }
+        }
+        if changed {
+            self.persist();
+        }
+    }
+
     fn repair_session_collisions(&mut self) -> bool {
         let mut changed = false;
         let mut canonical: HashMap<String, usize> = HashMap::new();
@@ -525,6 +538,10 @@ pub(crate) struct WorkspaceSession {
 }
 
 impl WorkspaceSession {
+    pub(crate) async fn invalidate_all_thread_sessions(&self) {
+        self.thread_store.lock().await.clear_session_ids();
+    }
+
     async fn begin_prompt_tracking(&self, session_id: &str) {
         self.pending_prompt_streaming
             .lock()

@@ -22,6 +22,7 @@
 - [x] Guard against stale processing-without-turn blocking new sends
 - [x] Populate GUI model picker from MiCode CLI bundle and apply selection via settings sync
 - [x] Reconnect workspace ACP process when selected model changes to enforce runtime switch
+- [x] Invalidate persisted thread session ids when model-triggered reconnect happens
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -54,3 +55,4 @@
 - Model picker parity: `model/list` now discovers visible models from installed MiCode CLI bundle (`AVAILABLE_MODELS`) instead of hardcoded `MiCode Auto`.
 - Model apply path: when turn request carries `model`, backend updates `~/.micode/settings.json -> model.preferredModel` and recreates ACP session once so selection takes effect.
 - Runtime model switch fix: GUI model change now triggers workspace ACP reconnect (process restart) before send, so MiCode loads new `preferredModel` immediately.
+- Session hygiene fix: model-triggered reconnect now clears persisted thread `sessionId`s to prevent stale cross-thread event routing after ACP restart.
