@@ -38,62 +38,24 @@ type UseQueuedSendResult = {
   removeQueuedMessage: (threadId: string, messageId: string) => void;
 };
 
-type SlashCommandKind =
-  | "apps"
-  | "compact"
-  | "fork"
-  | "mcp"
-  | "new"
-  | "resume"
-  | "review"
-  | "status";
-
-function parseSlashCommand(text: string, appsEnabled: boolean): SlashCommandKind | null {
-  if (appsEnabled && /^\/apps\b/i.test(text)) {
-    return "apps";
-  }
-  if (/^\/fork\b/i.test(text)) {
-    return "fork";
-  }
-  if (/^\/mcp\b/i.test(text)) {
-    return "mcp";
-  }
-  if (/^\/review\b/i.test(text)) {
-    return "review";
-  }
-  if (/^\/compact\b/i.test(text)) {
-    return "compact";
-  }
-  if (/^\/new\b/i.test(text)) {
-    return "new";
-  }
-  if (/^\/resume\b/i.test(text)) {
-    return "resume";
-  }
-  if (/^\/status\b/i.test(text)) {
-    return "status";
-  }
-  return null;
-}
-
 export function useQueuedSend({
   activeThreadId,
   isProcessing,
   isReviewing,
   steerEnabled,
-  appsEnabled,
+  appsEnabled: _appsEnabled,
   activeWorkspace,
   connectWorkspace,
-  startThreadForWorkspace,
   sendUserMessage,
-  sendUserMessageToThread,
-  startFork,
-  startReview,
-  startResume,
-  startCompact,
-  startApps,
-  startMcp,
-  startStatus,
+  startThreadForWorkspace: _startThreadForWorkspace,
+  sendUserMessageToThread: _sendUserMessageToThread,
+  startFork: _startFork,
+  startReview: _startReview,
+  startResume: _startResume,
+  startCompact: _startCompact,
+  startApps: _startApps,
+  startMcp: _startMcp,
+  startStatus: _startStatus,
   clearActiveImages,
 }: UseQueuedSendOptions): UseQueuedSendResult {
   const [queuedByThread, setQueuedByThread] = useState<
@@ -137,63 +99,12 @@ export function useQueuedSend({
     }));
   }, []);
 
-  const runSlashCommand = useCallback(
-    async (command: SlashCommandKind, trimmed: string) => {
-      if (command === "fork") {
-        await startFork(trimmed);
-        return;
-      }
-      if (command === "review") {
-        await startReview(trimmed);
-        return;
-      }
-      if (command === "resume") {
-        await startResume(trimmed);
-        return;
-      }
-      if (command === "compact") {
-        await startCompact(trimmed);
-        return;
-      }
-      if (command === "apps") {
-        await startApps(trimmed);
-        return;
-      }
-      if (command === "mcp") {
-        await startMcp(trimmed);
-        return;
-      }
-      if (command === "status") {
-        await startStatus(trimmed);
-        return;
-      }
-      if (command === "new" && activeWorkspace) {
-        const threadId = await startThreadForWorkspace(activeWorkspace.id);
-        const rest = trimmed.replace(/^\/new\b/i, "").trim();
-        if (threadId && rest) {
-          await sendUserMessageToThread(activeWorkspace, threadId, rest, []);
-        }
-      }
-    },
-    [
-      activeWorkspace,
-      sendUserMessageToThread,
-      startFork,
-      startReview,
-      startResume,
-      startCompact,
-      startApps,
-      startMcp,
-      startStatus,
-      startThreadForWorkspace,
-    ],
-  );
-
   const handleSend = useCallback(
     async (text: string, images: string[] = []) => {
       const trimmed = text.trim();
-      const command = parseSlashCommand(trimmed, appsEnabled);
-      const nextImages = command ? [] : images;
+      // MiCode-first mode: do not intercept slash commands in the app.
+      // Forward `/...` prompts to MiCode as plain user input.
+      const nextImages = images;
       if (!trimmed && nextImages.length === 0) {
         return;
       }
@@ -214,17 +125,11 @@ export function useQueuedSend({
       if (activeWorkspace && !activeWorkspace.connected) {
         await connectWorkspace(activeWorkspace);
       }
-      if (command) {
-        await runSlashCommand(command, trimmed);
-        clearActiveImages();
-        return;
-      }
       await sendUserMessage(trimmed, nextImages);
       clearActiveImages();
     },
     [
       activeThreadId,
-      appsEnabled,
       activeWorkspace,
       clearActiveImages,
       connectWorkspace,
@@ -232,7 +137,6 @@ export function useQueuedSend({
       isProcessing,
       isReviewing,
       steerEnabled,
-      runSlashCommand,
       sendUserMessage,
     ],
   );
@@ -240,8 +144,7 @@ export function useQueuedSend({
   const queueMessage = useCallback(
     async (text: string, images: string[] = []) => {
       const trimmed = text.trim();
-      const command = parseSlashCommand(trimmed, appsEnabled);
-      const nextImages = command ? [] : images;
+      const nextImages = images;
       if (!trimmed && nextImages.length === 0) {
         return;
       }
@@ -260,7 +163,7 @@ export function useQueuedSend({
       enqueueMessage(activeThreadId, item);
       clearActiveImages();
     },
-    [activeThreadId, appsEnabled, clearActiveImages, enqueueMessage, isReviewing],
+    [activeThreadId, clearActiveImages, enqueueMessage, isReviewing],
   );
 
   useEffect(() => {
@@ -313,13 +216,7 @@ export function useQueuedSend({
     }));
     (async () => {
       try {
-        const trimmed = nextItem.text.trim();
-        const command = parseSlashCommand(trimmed, appsEnabled);
-        if (command) {
-          await runSlashCommand(command, trimmed);
-        } else {
-          await sendUserMessage(nextItem.text, nextItem.images ?? []);
-        }
+        await sendUserMessage(nextItem.text, nextItem.images ?? []);
       } catch {
         setInFlightByThread((prev) => ({ ...prev, [threadId]: null }));
         setHasStartedByThread((prev) => ({ ...prev, [threadId]: false }));
@@ -328,13 +225,11 @@ export function useQueuedSend({
     })();
   }, [
     activeThreadId,
-    appsEnabled,
     inFlightByThread,
     isProcessing,
     isReviewing,
     prependQueuedMessage,
     queuedByThread,
-    runSlashCommand,
     sendUserMessage,
   ]);
 

@@ -28,3 +28,4 @@
 - UX fix: always optimistic-render user messages immediately after send.
 - Stability tweak: increase ACP prompt timeout from 30s to 90s to reduce false timeout during long streaming turns.
 - Data integrity fix: enforce unique sessionId per workspace thread and auto-repair duplicate session mappings in sessions.json.
+- Slash passthrough mode: disable app-level slash interception/autocomplete; forward `/...` directly to MiCode.
