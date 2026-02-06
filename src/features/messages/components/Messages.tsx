@@ -1444,7 +1444,9 @@ export const Messages = memo(function Messages({
       />
       {!items.length && !userInputNode && !isThinking && !isLoadingMessages && (
         <div className="empty messages-empty">
-          {threadId ? "Send a prompt to the agent." : "Send a prompt to start a new agent."}
+          {threadId
+            ? "Send a prompt to MiCode."
+            : "Send a prompt to start a new MiCode session."}
         </div>
       )}
       {!items.length && !userInputNode && !isThinking && isLoadingMessages && (
