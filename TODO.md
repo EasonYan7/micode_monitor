@@ -24,6 +24,7 @@
 - [x] Reconnect workspace ACP process when selected model changes to enforce runtime switch
 - [x] Invalidate persisted thread session ids when model-triggered reconnect happens
 - [x] Reduce model-switch/thread-switch stalls via approval mapping cleanup and collaboration-mode fallback
+- [x] Stabilize ACP delta routing with active-turn session context (prevent cross-thread ghost chunks)
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -60,3 +61,5 @@
 - Runtime UX fix: map ACP permission requests to readable `workspace/requestApproval` payloads (no more `command:["{}"]`) and include raw context for debugging.
 - Compatibility fix: serve synthetic `collaborationMode/list` default in ACP adapter to avoid `Method not found` noise.
 - Prompt parsing fix: ACP `turn/start` adapter now accepts legacy `text` payload (in addition to `input[]`) to prevent empty-prompt stalls on mixed invoke paths.
+- Stream routing fix: session updates now bind to in-memory active prompt context (`sessionId -> threadId/turnId`) so assistant deltas don't drift to wrong thread after reconnect/model switch.
+- Event-id stability fix: assistant/reasoning/tool fallback item IDs now derive from stable `turnId` instead of mutable `messageIndex`, reducing missing-message and stuck-working edge cases.

@@ -580,6 +580,30 @@ fn build_initialize_params(_client_version: &str) -> Value {
     })
 }
 
+#[derive(Clone)]
+struct ActivePromptContext {
+    thread_id: String,
+    turn_id: String,
+}
+
+impl ActivePromptContext {
+    fn new(thread_id: String, turn_id: String) -> Self {
+        Self { thread_id, turn_id }
+    }
+
+    fn agent_item_id(&self) -> String {
+        format!("agent-{}-{}", self.thread_id, self.turn_id)
+    }
+
+    fn reasoning_item_id(&self) -> String {
+        format!("reasoning-{}-{}", self.thread_id, self.turn_id)
+    }
+
+    fn fallback_tool_item_id(&self) -> String {
+        format!("tool-{}-{}", self.thread_id, self.turn_id)
+    }
+}
+
 pub(crate) struct WorkspaceSession {
     pub(crate) entry: WorkspaceEntry,
     pub(crate) child: Mutex<Child>,
@@ -591,6 +615,7 @@ pub(crate) struct WorkspaceSession {
     thread_store: Mutex<LocalThreadStore>,
     approval_requests: Mutex<HashMap<String, Value>>,
     pending_prompt_streaming: Mutex<HashMap<String, bool>>,
+    active_prompts: Mutex<HashMap<String, ActivePromptContext>>,
 }
 
 impl WorkspaceSession {
@@ -603,6 +628,21 @@ impl WorkspaceSession {
             .lock()
             .await
             .insert(session_id.to_string(), false);
+    }
+
+    async fn register_active_prompt(&self, session_id: &str, thread_id: &str, turn_id: &str) {
+        self.active_prompts.lock().await.insert(
+            session_id.to_string(),
+            ActivePromptContext::new(thread_id.to_string(), turn_id.to_string()),
+        );
+    }
+
+    async fn active_prompt(&self, session_id: &str) -> Option<ActivePromptContext> {
+        self.active_prompts.lock().await.get(session_id).cloned()
+    }
+
+    async fn clear_active_prompt(&self, session_id: &str) {
+        self.active_prompts.lock().await.remove(session_id);
     }
 
     async fn mark_prompt_streaming(&self, session_id: &str) {
@@ -618,6 +658,12 @@ impl WorkspaceSession {
             .await
             .remove(session_id)
             .unwrap_or(false)
+    }
+
+    async fn finish_prompt_lifecycle(&self, session_id: &str) -> bool {
+        let had_streaming = self.finish_prompt_tracking(session_id).await;
+        self.clear_active_prompt(session_id).await;
+        had_streaming
     }
 
     async fn write_message(&self, value: Value) -> Result<(), String> {
@@ -863,6 +909,8 @@ impl WorkspaceSession {
                 );
                 let mut tracked_session_id = session_id.clone();
                 self.begin_prompt_tracking(&tracked_session_id).await;
+                self.register_active_prompt(&tracked_session_id, &thread_id, &turn_id)
+                    .await;
                 let response = match timeout(
                     Duration::from_secs(90),
                     self.send_acp_request(
@@ -876,11 +924,11 @@ impl WorkspaceSession {
                 .await
                 {
                     Ok(result) => {
-                        let _ = self.finish_prompt_tracking(&tracked_session_id).await;
+                        let _ = self.finish_prompt_lifecycle(&tracked_session_id).await;
                         result?
                     }
                     Err(_) => {
-                        let had_streaming = self.finish_prompt_tracking(&tracked_session_id).await;
+                        let had_streaming = self.finish_prompt_lifecycle(&tracked_session_id).await;
                         if had_streaming {
                             self.thread_store.lock().await.touch_message(&thread_id);
                             let normalized_turn = json!({
@@ -913,6 +961,8 @@ impl WorkspaceSession {
                         .set_session_id(&thread_id, new_session.clone());
                     tracked_session_id = new_session.clone();
                     self.begin_prompt_tracking(&tracked_session_id).await;
+                    self.register_active_prompt(&tracked_session_id, &thread_id, &turn_id)
+                        .await;
                     match timeout(
                         Duration::from_secs(90),
                         self.send_acp_request(
@@ -926,12 +976,12 @@ impl WorkspaceSession {
                     .await
                     {
                         Ok(result) => {
-                            let _ = self.finish_prompt_tracking(&tracked_session_id).await;
+                            let _ = self.finish_prompt_lifecycle(&tracked_session_id).await;
                             result?
                         }
                         Err(_) => {
                             let had_streaming =
-                                self.finish_prompt_tracking(&tracked_session_id).await;
+                                self.finish_prompt_lifecycle(&tracked_session_id).await;
                             if had_streaming {
                                 self.thread_store.lock().await.touch_message(&thread_id);
                                 let normalized_turn = json!({
@@ -1330,13 +1380,11 @@ fn session_id_from_notification(value: &Value) -> Option<String> {
 }
 
 fn translate_acp_update(
-    thread_id: &str,
-    turn_index: u64,
+    context: &ActivePromptContext,
     update: &Value,
     workspace_id: &str,
 ) -> Vec<AppServerEvent> {
     let mut events = Vec::new();
-    let turn_seq = turn_index.saturating_add(1);
     let kind = update
         .get("sessionUpdate")
         .and_then(Value::as_str)
@@ -1356,8 +1404,8 @@ fn translate_acp_update(
                     message: json!({
                         "method": "item/agentMessage/delta",
                         "params": {
-                            "threadId": thread_id,
-                            "itemId": format!("agent-{thread_id}-{turn_seq}"),
+                            "threadId": context.thread_id,
+                            "itemId": context.agent_item_id(),
                             "delta": delta
                         }
                     }),
@@ -1377,8 +1425,8 @@ fn translate_acp_update(
                     message: json!({
                         "method": "item/reasoning/textDelta",
                         "params": {
-                            "threadId": thread_id,
-                            "itemId": format!("reasoning-{thread_id}-{turn_seq}"),
+                            "threadId": context.thread_id,
+                            "itemId": context.reasoning_item_id(),
                             "delta": delta
                         }
                     }),
@@ -1392,8 +1440,8 @@ fn translate_acp_update(
                 message: json!({
                     "method": "turn/plan/updated",
                     "params": {
-                        "threadId": thread_id,
-                        "turnId": format!("turn-{}", Uuid::new_v4()),
+                        "threadId": context.thread_id,
+                        "turnId": context.turn_id,
                         "explanation": null,
                         "plan": plan
                     }
@@ -1410,7 +1458,7 @@ fn translate_acp_update(
                 message: json!({
                     "method": "micode/availableCommands/updated",
                     "params": {
-                        "threadId": thread_id,
+                        "threadId": context.thread_id,
                         "availableCommands": commands
                     }
                 }),
@@ -1421,7 +1469,7 @@ fn translate_acp_update(
                 .get("toolCallId")
                 .and_then(Value::as_str)
                 .map(|value| format!("tool-{value}"))
-                .unwrap_or_else(|| format!("tool-{}-{turn_seq}", Uuid::new_v4()));
+                .unwrap_or_else(|| context.fallback_tool_item_id());
             let title = update
                 .get("title")
                 .and_then(Value::as_str)
@@ -1431,7 +1479,7 @@ fn translate_acp_update(
                 message: json!({
                     "method": "item/started",
                     "params": {
-                        "threadId": thread_id,
+                        "threadId": context.thread_id,
                         "item": {
                             "id": item_id,
                             "type": "mcpToolCall",
@@ -1447,7 +1495,7 @@ fn translate_acp_update(
                 .get("toolCallId")
                 .and_then(Value::as_str)
                 .map(|value| format!("tool-{value}"))
-                .unwrap_or_else(|| format!("tool-{}-{turn_seq}", Uuid::new_v4()));
+                .unwrap_or_else(|| context.fallback_tool_item_id());
             let title = update
                 .get("title")
                 .and_then(Value::as_str)
@@ -1457,7 +1505,7 @@ fn translate_acp_update(
                 message: json!({
                     "method": "item/completed",
                     "params": {
-                        "threadId": thread_id,
+                        "threadId": context.thread_id,
                         "item": {
                             "id": item_id,
                             "type": "mcpToolCall",
@@ -1525,6 +1573,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
         thread_store: Mutex::new(LocalThreadStore::load(&entry.path)),
         approval_requests: Mutex::new(HashMap::new()),
         pending_prompt_streaming: Mutex::new(HashMap::new()),
+        active_prompts: Mutex::new(HashMap::new()),
     });
 
     let session_clone = Arc::clone(&session);
@@ -1565,32 +1614,40 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
             if let Some(method) = value.get("method").and_then(Value::as_str) {
                 if method == "session/update" {
                     let session_id = session_id_from_notification(&value).unwrap_or_default();
-                    let thread = {
-                        let store = session_clone.thread_store.lock().await;
-                        store.by_session_id(&session_id)
-                    };
-                    if let Some(thread) = thread {
-                        if let Some(update) = value.get("params").and_then(|v| v.get("update")) {
-                            let update_kind = update
-                                .get("sessionUpdate")
-                                .and_then(Value::as_str)
-                                .unwrap_or_default();
-                            if matches!(
-                                update_kind,
-                                "agent_message_chunk"
-                                    | "agent_thought_chunk"
-                                    | "tool_call"
-                                    | "tool_call_update"
-                                    | "plan"
-                            ) {
-                                session_clone.mark_prompt_streaming(&session_id).await;
-                            }
-                            for event in translate_acp_update(
-                                &thread.thread_id,
-                                thread.message_index,
-                                update,
-                                &workspace_id,
-                            ) {
+                    if let Some(update) = value.get("params").and_then(|v| v.get("update")) {
+                        let update_kind = update
+                            .get("sessionUpdate")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default();
+                        let context = if let Some(active) = session_clone.active_prompt(&session_id).await
+                        {
+                            Some(active)
+                        } else if update_kind == "available_commands_update" {
+                            let thread = {
+                                let store = session_clone.thread_store.lock().await;
+                                store.by_session_id(&session_id)
+                            };
+                            thread.map(|entry| {
+                                ActivePromptContext::new(
+                                    entry.thread_id,
+                                    "out-of-turn".to_string(),
+                                )
+                            })
+                        } else {
+                            None
+                        };
+                        if matches!(
+                            update_kind,
+                            "agent_message_chunk"
+                                | "agent_thought_chunk"
+                                | "tool_call"
+                                | "tool_call_update"
+                                | "plan"
+                        ) {
+                            session_clone.mark_prompt_streaming(&session_id).await;
+                        }
+                        if let Some(context) = context {
+                            for event in translate_acp_update(&context, update, &workspace_id) {
                                 let _ = event_tx.send(event);
                             }
                         }
@@ -1698,7 +1755,10 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
 
 #[cfg(test)]
 mod tests {
-    use super::{build_initialize_params, extract_approval_command, translate_acp_update, WorkspaceSession};
+    use super::{
+        build_initialize_params, extract_approval_command, translate_acp_update,
+        ActivePromptContext, WorkspaceSession,
+    };
     use serde_json::json;
 
     #[test]
@@ -1718,7 +1778,8 @@ mod tests {
             "sessionUpdate": "agent_message_chunk",
             "content": { "type": "text", "text": "hello" }
         });
-        let events = translate_acp_update("thread-1", 0, &update, "ws-1");
+        let context = ActivePromptContext::new("thread-1".to_string(), "turn-1".to_string());
+        let events = translate_acp_update(&context, &update, "ws-1");
         assert_eq!(events.len(), 1);
         let method = events[0]
             .message
@@ -1735,7 +1796,8 @@ mod tests {
                 { "content": "step1", "status": "pending", "priority": "high" }
             ]
         });
-        let events = translate_acp_update("thread-2", 1, &update, "ws-2");
+        let context = ActivePromptContext::new("thread-2".to_string(), "turn-2".to_string());
+        let events = translate_acp_update(&context, &update, "ws-2");
         assert_eq!(events.len(), 1);
         let method = events[0]
             .message
@@ -1752,7 +1814,8 @@ mod tests {
                 { "name": "status", "description": "Show status" }
             ]
         });
-        let events = translate_acp_update("thread-3", 2, &update, "ws-3");
+        let context = ActivePromptContext::new("thread-3".to_string(), "turn-3".to_string());
+        let events = translate_acp_update(&context, &update, "ws-3");
         assert_eq!(events.len(), 1);
         let method = events[0]
             .message
