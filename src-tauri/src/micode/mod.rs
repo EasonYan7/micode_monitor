@@ -20,7 +20,7 @@ use crate::backend::app_server::{
 use crate::backend::events::AppServerEvent;
 use crate::event_sink::TauriEventSink;
 use crate::remote_backend;
-use crate::shared::micode_core;
+use crate::shared::{micode_core, workspaces_core};
 use crate::shared::process_core::tokio_command;
 use crate::state::AppState;
 use crate::types::WorkspaceEntry;
@@ -345,6 +345,39 @@ pub(crate) async fn send_user_message(
         .await;
     }
 
+    let requested_model = model
+        .as_ref()
+        .map(String::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string);
+    if let Some(requested_model) = requested_model {
+        let model_changed = crate::backend::app_server::set_preferred_model(&requested_model)?;
+        if model_changed {
+            if let Some(previous_session) = state.sessions.lock().await.remove(&workspace_id) {
+                let mut child = previous_session.child.lock().await;
+                let _ = child.kill().await;
+            }
+            let app_for_spawn = app.clone();
+            workspaces_core::connect_workspace_core(
+                workspace_id.clone(),
+                &state.workspaces,
+                &state.sessions,
+                &state.app_settings,
+                move |entry, default_bin, agent_args, agent_home| {
+                    spawn_workspace_session(
+                        entry,
+                        default_bin,
+                        agent_args,
+                        app_for_spawn.clone(),
+                        agent_home,
+                    )
+                },
+            )
+            .await?;
+        }
+    }
+
     micode_core::send_user_message_core(
         &state.sessions,
         workspace_id,
@@ -518,8 +551,12 @@ pub(crate) async fn micode_login_cancel(
         .await;
     }
 
-    micode_core::micode_login_cancel_core(&state.sessions, &state.micode_login_cancels, workspace_id)
-        .await
+    micode_core::micode_login_cancel_core(
+        &state.sessions,
+        &state.micode_login_cancels,
+        workspace_id,
+    )
+    .await
 }
 
 #[tauri::command]

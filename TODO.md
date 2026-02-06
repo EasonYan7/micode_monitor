@@ -21,6 +21,7 @@
 - [x] Clear stale queued interrupt flags on non-retry turn errors
 - [x] Guard against stale processing-without-turn blocking new sends
 - [x] Populate GUI model picker from MiCode CLI bundle and apply selection via settings sync
+- [x] Reconnect workspace ACP process when selected model changes to enforce runtime switch
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -52,3 +53,4 @@
 - Composer send guard: treat `isProcessing=true` without `activeTurnId` for >15s as stale, so new input is sent instead of silently queued.
 - Model picker parity: `model/list` now discovers visible models from installed MiCode CLI bundle (`AVAILABLE_MODELS`) instead of hardcoded `MiCode Auto`.
 - Model apply path: when turn request carries `model`, backend updates `~/.micode/settings.json -> model.preferredModel` and recreates ACP session once so selection takes effect.
+- Runtime model switch fix: GUI model change now triggers workspace ACP reconnect (process restart) before send, so MiCode loads new `preferredModel` immediately.

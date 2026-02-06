@@ -273,7 +273,7 @@ fn read_selected_auth_mode() -> Option<String> {
     }
 }
 
-fn read_preferred_model() -> Option<String> {
+pub(crate) fn read_preferred_model() -> Option<String> {
     let settings_path = micode_settings_path()?;
     let raw = std::fs::read_to_string(settings_path).ok()?;
     let value: Value = serde_json::from_str(&raw).ok()?;
@@ -286,7 +286,7 @@ fn read_preferred_model() -> Option<String> {
         .map(ToString::to_string)
 }
 
-fn set_preferred_model(model: &str) -> Result<bool, String> {
+pub(crate) fn set_preferred_model(model: &str) -> Result<bool, String> {
     let trimmed = model.trim();
     if trimmed.is_empty() {
         return Ok(false);
