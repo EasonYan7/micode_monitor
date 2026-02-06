@@ -335,8 +335,12 @@ export function SettingsView({
   >(null);
   const [environmentError, setEnvironmentError] = useState<string | null>(null);
   const [environmentSaving, setEnvironmentSaving] = useState(false);
-  const [codexPathDraft, setCodexPathDraft] = useState(appSettings.codexBin ?? "");
-  const [codexArgsDraft, setCodexArgsDraft] = useState(appSettings.codexArgs ?? "");
+  const [codexPathDraft, setCodexPathDraft] = useState(
+    appSettings.agentBin ?? appSettings.codexBin ?? "",
+  );
+  const [codexArgsDraft, setCodexArgsDraft] = useState(
+    appSettings.agentArgs ?? appSettings.codexArgs ?? "",
+  );
   const [remoteHostDraft, setRemoteHostDraft] = useState(appSettings.remoteBackendHost);
   const [remoteTokenDraft, setRemoteTokenDraft] = useState(appSettings.remoteBackendToken ?? "");
   const [scaleDraft, setScaleDraft] = useState(
@@ -487,7 +491,11 @@ export function SettingsView({
   }, [environmentDraftScript]);
   const environmentDirty = environmentDraftNormalized !== environmentSavedScript;
   const hasCodexHomeOverrides = useMemo(
-    () => projects.some((workspace) => workspace.settings.codexHome != null),
+    () =>
+      projects.some(
+        (workspace) =>
+          workspace.settings.agentHome != null || workspace.settings.codexHome != null,
+      ),
     [projects],
   );
 
@@ -519,12 +527,12 @@ export function SettingsView({
   }, [onClose]);
 
   useEffect(() => {
-    setCodexPathDraft(appSettings.codexBin ?? "");
-  }, [appSettings.codexBin]);
+    setCodexPathDraft(appSettings.agentBin ?? appSettings.codexBin ?? "");
+  }, [appSettings.agentBin, appSettings.codexBin]);
 
   useEffect(() => {
-    setCodexArgsDraft(appSettings.codexArgs ?? "");
-  }, [appSettings.codexArgs]);
+    setCodexArgsDraft(appSettings.agentArgs ?? appSettings.codexArgs ?? "");
+  }, [appSettings.agentArgs, appSettings.codexArgs]);
 
   useEffect(() => {
     setRemoteHostDraft(appSettings.remoteBackendHost);
@@ -614,21 +622,21 @@ export function SettingsView({
       buildWorkspaceOverrideDrafts(
         projects,
         prev,
-        (workspace) => workspace.codex_bin ?? null,
+        (workspace) => workspace.agent_bin ?? workspace.codex_bin ?? null,
       ),
     );
     setCodexHomeOverrideDrafts((prev) =>
       buildWorkspaceOverrideDrafts(
         projects,
         prev,
-        (workspace) => workspace.settings.codexHome ?? null,
+        (workspace) => workspace.settings.agentHome ?? workspace.settings.codexHome ?? null,
       ),
     );
     setCodexArgsOverrideDrafts((prev) =>
       buildWorkspaceOverrideDrafts(
         projects,
         prev,
-        (workspace) => workspace.settings.codexArgs ?? null,
+        (workspace) => workspace.settings.agentArgs ?? workspace.settings.codexArgs ?? null,
       ),
     );
   }, [projects]);
@@ -694,8 +702,8 @@ export function SettingsView({
   const nextCodexBin = codexPathDraft.trim() ? codexPathDraft.trim() : null;
   const nextCodexArgs = codexArgsDraft.trim() ? codexArgsDraft.trim() : null;
   const codexDirty =
-    nextCodexBin !== (appSettings.codexBin ?? null) ||
-    nextCodexArgs !== (appSettings.codexArgs ?? null);
+    nextCodexBin !== (appSettings.agentBin ?? appSettings.codexBin ?? null) ||
+    nextCodexArgs !== (appSettings.agentArgs ?? appSettings.codexArgs ?? null);
 
   const trimmedScale = scaleDraft.trim();
   const parsedPercent = trimmedScale
@@ -708,6 +716,8 @@ export function SettingsView({
     try {
       await onUpdateAppSettings({
         ...appSettings,
+        agentBin: nextCodexBin,
+        agentArgs: nextCodexArgs,
         codexBin: nextCodexBin,
         codexArgs: nextCodexArgs,
       });
@@ -1212,7 +1222,7 @@ export function SettingsView({
               onClick={() => setActiveSection("codex")}
             >
               <TerminalSquare aria-hidden />
-              Codex
+              MiCode
             </button>
             <button
               type="button"
@@ -1575,7 +1585,7 @@ export function SettingsView({
                 <div className="settings-toggle-row">
                   <div>
                     <div className="settings-toggle-title">
-                      Show remaining Codex limits
+                      Show remaining agent limits
                     </div>
                     <div className="settings-toggle-subtitle">
                       Display what is left instead of what is used.
@@ -2964,20 +2974,20 @@ export function SettingsView({
             )}
             {activeSection === "codex" && (
               <section className="settings-section">
-                <div className="settings-section-title">Codex</div>
+                <div className="settings-section-title">MiCode</div>
                 <div className="settings-section-subtitle">
-                  Configure the Codex CLI used by CodexMonitor and validate the install.
+                  Configure the MiCode CLI used by this app and validate the install.
                 </div>
                 <div className="settings-field">
                   <label className="settings-field-label" htmlFor="codex-path">
-                    Default Codex path
+                    Default agent path
                   </label>
                   <div className="settings-field-row">
                     <input
                       id="codex-path"
                       className="settings-input"
                       value={codexPathDraft}
-                      placeholder="codex"
+                      placeholder="micode"
                       onChange={(event) => setCodexPathDraft(event.target.value)}
                     />
                     <button type="button" className="ghost" onClick={handleBrowseCodex}>
@@ -2995,7 +3005,7 @@ export function SettingsView({
                     Leave empty to use the system PATH resolution.
                   </div>
                   <label className="settings-field-label" htmlFor="codex-args">
-                    Default Codex args
+                    Default agent args
                   </label>
                   <div className="settings-field-row">
                     <input
@@ -3014,8 +3024,8 @@ export function SettingsView({
                     </button>
                   </div>
                   <div className="settings-help">
-                    Extra flags passed before <code>app-server</code>. Use quotes for values with
-                    spaces.
+                    Extra flags passed to <code>micode</code> before{" "}
+                    <code>--experimental-acp</code>. Use quotes for values with spaces.
                   </div>
                 <div className="settings-field-actions">
                   {codexDirty && (
@@ -3044,7 +3054,7 @@ export function SettingsView({
                     className={`settings-doctor ${doctorState.result.ok ? "ok" : "error"}`}
                   >
                     <div className="settings-doctor-title">
-                      {doctorState.result.ok ? "Codex looks good" : "Codex issue detected"}
+                      {doctorState.result.ok ? "Agent CLI looks good" : "Agent CLI issue detected"}
                     </div>
                     <div className="settings-doctor-body">
                       <div>
@@ -3182,7 +3192,7 @@ export function SettingsView({
                       />
                     </div>
                     <div className="settings-help">
-                      Start the daemon separately and point CodexMonitor to it (host:port + token).
+                      Start the daemon separately and point Agent Monitor to it (host:port + token).
                     </div>
                   </div>
                 )}
@@ -3192,7 +3202,7 @@ export function SettingsView({
                   meta={globalAgentsMeta}
                   error={globalAgentsError}
                   value={globalAgentsContent}
-                  placeholder="Add global instructions for Codex agents…"
+                  placeholder="Add global instructions for agents…"
                   disabled={globalAgentsLoading}
                   refreshDisabled={globalAgentsRefreshDisabled}
                   saveDisabled={globalAgentsSaveDisabled}
@@ -3227,7 +3237,7 @@ export function SettingsView({
                   meta={globalConfigMeta}
                   error={globalConfigError}
                   value={globalConfigContent}
-                  placeholder="Edit the global Codex config.toml…"
+                  placeholder="Edit the global agent config.toml…"
                   disabled={globalConfigLoading}
                   refreshDisabled={globalConfigRefreshDisabled}
                   saveDisabled={globalConfigSaveDisabled}
@@ -3271,7 +3281,7 @@ export function SettingsView({
                             <input
                               className="settings-input settings-input--compact"
                               value={codexBinOverrideDrafts[workspace.id] ?? ""}
-                              placeholder="Codex binary override"
+                              placeholder="MiCode binary override"
                               onChange={(event) =>
                                 setCodexBinOverrideDrafts((prev) => ({
                                   ...prev,
@@ -3281,12 +3291,15 @@ export function SettingsView({
                               onBlur={async () => {
                                 const draft = codexBinOverrideDrafts[workspace.id] ?? "";
                                 const nextValue = normalizeOverrideValue(draft);
-                                if (nextValue === (workspace.codex_bin ?? null)) {
+                                if (
+                                  nextValue ===
+                                  (workspace.agent_bin ?? workspace.codex_bin ?? null)
+                                ) {
                                   return;
                                 }
                                 await onUpdateWorkspaceCodexBin(workspace.id, nextValue);
                               }}
-                              aria-label={`Codex binary override for ${workspace.name}`}
+                              aria-label={`MiCode binary override for ${workspace.name}`}
                             />
                             <button
                               type="button"
@@ -3316,10 +3329,16 @@ export function SettingsView({
                               onBlur={async () => {
                                 const draft = codexHomeOverrideDrafts[workspace.id] ?? "";
                                 const nextValue = normalizeOverrideValue(draft);
-                                if (nextValue === (workspace.settings.codexHome ?? null)) {
+                                if (
+                                  nextValue ===
+                                  (workspace.settings.agentHome ??
+                                    workspace.settings.codexHome ??
+                                    null)
+                                ) {
                                   return;
                                 }
                                 await onUpdateWorkspaceSettings(workspace.id, {
+                                  agentHome: nextValue,
                                   codexHome: nextValue,
                                 });
                               }}
@@ -3334,6 +3353,7 @@ export function SettingsView({
                                   [workspace.id]: "",
                                 }));
                                 await onUpdateWorkspaceSettings(workspace.id, {
+                                  agentHome: null,
                                   codexHome: null,
                                 });
                               }}
@@ -3345,7 +3365,7 @@ export function SettingsView({
                             <input
                               className="settings-input settings-input--compact"
                               value={codexArgsOverrideDrafts[workspace.id] ?? ""}
-                              placeholder="Codex args override"
+                              placeholder="MiCode args override"
                               onChange={(event) =>
                                 setCodexArgsOverrideDrafts((prev) => ({
                                   ...prev,
@@ -3355,14 +3375,20 @@ export function SettingsView({
                               onBlur={async () => {
                                 const draft = codexArgsOverrideDrafts[workspace.id] ?? "";
                                 const nextValue = normalizeOverrideValue(draft);
-                                if (nextValue === (workspace.settings.codexArgs ?? null)) {
+                                if (
+                                  nextValue ===
+                                  (workspace.settings.agentArgs ??
+                                    workspace.settings.codexArgs ??
+                                    null)
+                                ) {
                                   return;
                                 }
                                 await onUpdateWorkspaceSettings(workspace.id, {
+                                  agentArgs: nextValue,
                                   codexArgs: nextValue,
                                 });
                               }}
-                              aria-label={`Codex args override for ${workspace.name}`}
+                              aria-label={`MiCode args override for ${workspace.name}`}
                             />
                             <button
                               type="button"
@@ -3373,6 +3399,7 @@ export function SettingsView({
                                   [workspace.id]: "",
                                 }));
                                 await onUpdateWorkspaceSettings(workspace.id, {
+                                  agentArgs: null,
                                   codexArgs: null,
                                 });
                               }}
@@ -3395,7 +3422,7 @@ export function SettingsView({
               <section className="settings-section">
                 <div className="settings-section-title">Features</div>
                 <div className="settings-section-subtitle">
-                  Manage stable and experimental Codex features.
+                  Manage stable and experimental agent features.
                 </div>
                 {hasCodexHomeOverrides && (
                   <div className="settings-help">
@@ -3408,7 +3435,7 @@ export function SettingsView({
                   <div>
                     <div className="settings-toggle-title">Config file</div>
                     <div className="settings-toggle-subtitle">
-                      Open the Codex config in Finder.
+                      Open the agent config in Finder.
                     </div>
                   </div>
                   <button type="button" className="ghost" onClick={handleOpenConfig}>
@@ -3450,7 +3477,7 @@ export function SettingsView({
                   <div>
                     <div className="settings-toggle-title">Personality</div>
                     <div className="settings-toggle-subtitle">
-                      Choose Codex communication style (writes top-level{" "}
+                      Choose agent communication style (writes top-level{" "}
                       <code>personality</code> in config.toml).
                     </div>
                   </div>
@@ -3520,7 +3547,7 @@ export function SettingsView({
                   <div>
                     <div className="settings-toggle-title">Multi-agent</div>
                     <div className="settings-toggle-subtitle">
-                      Enable multi-agent collaboration tools in Codex.
+                      Enable multi-agent collaboration tools in the agent.
                     </div>
                   </div>
                   <button

@@ -310,7 +310,7 @@ describe("SettingsView Display", () => {
     renderDisplaySection({ onUpdateAppSettings });
 
     const row = screen
-      .getByText("Show remaining Codex limits")
+      .getByText("Show remaining agent limits")
       .closest(".settings-toggle-row") as HTMLElement | null;
     if (!row) {
       throw new Error("Expected remaining limits row");
@@ -525,8 +525,8 @@ describe("SettingsView Environments", () => {
   });
 });
 
-describe("SettingsView Codex overrides", () => {
-  it("updates workspace Codex args override on blur", async () => {
+describe("SettingsView MiCode overrides", () => {
+  it("updates workspace MiCode args override on blur", async () => {
     const onUpdateWorkspaceSettings = vi.fn().mockResolvedValue(undefined);
     const workspace: WorkspaceInfo = {
       id: "w1",
@@ -575,14 +575,18 @@ describe("SettingsView Codex overrides", () => {
       />,
     );
 
-    const input = screen.getByLabelText("Codex args override for Workspace");
+    const input = screen.getByLabelText("MiCode args override for Workspace");
     fireEvent.change(input, { target: { value: "--profile dev" } });
     fireEvent.blur(input);
 
     await waitFor(() => {
-      expect(onUpdateWorkspaceSettings).toHaveBeenCalledWith("w1", {
-        codexArgs: "--profile dev",
-      });
+      expect(onUpdateWorkspaceSettings).toHaveBeenCalledWith(
+        "w1",
+        expect.objectContaining({
+          agentArgs: "--profile dev",
+          codexArgs: "--profile dev",
+        }),
+      );
     });
   });
 

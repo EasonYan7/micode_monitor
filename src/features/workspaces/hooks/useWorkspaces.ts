@@ -659,7 +659,7 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
         : "";
 
     const confirmed = await ask(
-      `Are you sure you want to delete "${workspaceName}"?\n\nThis will remove the workspace from CodexMonitor.${detail}`,
+      `Are you sure you want to delete "${workspaceName}"?\n\nThis will remove the workspace from Agent Monitor.${detail}`,
       {
         title: "Delete Workspace",
         kind: "warning",
@@ -711,7 +711,7 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
     const workspaceName = workspace?.name || "this worktree";
 
     const confirmed = await ask(
-      `Are you sure you want to delete "${workspaceName}"?\n\nThis will close the agent, remove its worktree, and delete it from CodexMonitor.`,
+      `Are you sure you want to delete "${workspaceName}"?\n\nThis will close the agent, remove its worktree, and delete it from Agent Monitor.`,
       {
         title: "Delete Worktree",
         kind: "warning",

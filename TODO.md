@@ -7,8 +7,8 @@
 - [x] Implement thread/session persistence shim for ACP (`sessions.json`)
 - [x] Add ACP->app-server event adapter to preserve frontend contract
 - [x] Wire command compatibility layer (keep old invoke names)
-- [ ] Update frontend types/settings labels to MiCode/Agent naming
-- [ ] Add tests for ACP mapping and settings migration
+- [x] Update frontend types/settings labels to MiCode/Agent naming
+- [x] Add tests for ACP mapping and settings migration
 - [x] Run available checks and fix regressions (`npm run typecheck`, targeted vitest)
 - [ ] Final integration validation and documentation
 
@@ -16,4 +16,5 @@
 - Rust full `cargo check` is blocked locally by missing `cmake` (required by `whisper-rs` build script).
 - Completed checks:
   - `npm run typecheck`
-  - `npm test -- src/features/settings/hooks/useAppSettings.test.ts src/features/settings/components/SettingsView.test.tsx`
+  - `npm test -- src/features/settings/components/SettingsView.test.tsx src/features/home/components/Home.test.tsx src/features/settings/hooks/useAppSettings.test.ts`
+- Added ACP event mapping unit tests in `src-tauri/src/backend/app_server.rs` (not executed locally due Rust build dependency constraints).

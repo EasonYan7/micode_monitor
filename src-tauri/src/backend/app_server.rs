@@ -961,7 +961,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
 
 #[cfg(test)]
 mod tests {
-    use super::{build_initialize_params, extract_thread_id};
+    use super::{build_initialize_params, extract_thread_id, translate_acp_update};
     use serde_json::json;
 
     #[test]
@@ -991,5 +991,37 @@ mod tests {
                 .and_then(|value| value.as_u64()),
             Some(1)
         );
+    }
+
+    #[test]
+    fn translate_agent_message_chunk_to_delta_event() {
+        let update = json!({
+            "sessionUpdate": "agent_message_chunk",
+            "content": { "type": "text", "text": "hello" }
+        });
+        let events = translate_acp_update("thread-1", &update, "ws-1");
+        assert_eq!(events.len(), 1);
+        let method = events[0]
+            .message
+            .get("method")
+            .and_then(|value| value.as_str());
+        assert_eq!(method, Some("item/agentMessage/delta"));
+    }
+
+    #[test]
+    fn translate_plan_to_turn_plan_updated_event() {
+        let update = json!({
+            "sessionUpdate": "plan",
+            "entries": [
+                { "content": "step1", "status": "pending", "priority": "high" }
+            ]
+        });
+        let events = translate_acp_update("thread-2", &update, "ws-2");
+        assert_eq!(events.len(), 1);
+        let method = events[0]
+            .message
+            .get("method")
+            .and_then(|value| value.as_str());
+        assert_eq!(method, Some("turn/plan/updated"));
     }
 }
