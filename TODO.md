@@ -23,3 +23,4 @@
 - UX parity fix: normalize ACP `turn/start` response to always include `result.turn.id` so frontend no longer shows false "Turn failed to start."
 - Copy cleanup: replace user-facing "agent" prompts with "MiCode" in messaging/workspace entry points.
 - Runtime fix: stop injecting `CODEX_HOME` into MiCode ACP process (use `MICODE_HOME` env key) to prevent prompt hangs in GUI.
+- Runtime fix v2: do not inject any home env (`CODEX_HOME`/`MICODE_HOME`) for MiCode ACP by default; align runtime with terminal `micode`.

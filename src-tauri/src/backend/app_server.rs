@@ -879,11 +879,10 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
     apply_codex_args(&mut command, agent_args.as_deref())?;
     command.current_dir(&entry.path);
     command.arg("--experimental-acp");
-    if let Some(agent_home) = agent_home {
-        // For MiCode ACP, avoid forcing CODEX_HOME which can stall prompt execution.
-        // Keep an explicit MiCode-specific override hook instead.
-        command.env("MICODE_HOME", agent_home);
-    }
+    // Do not inject CODEX_HOME/MICODE_HOME by default for MiCode ACP.
+    // Keeping CLI runtime environment aligned with terminal `micode` avoids
+    // accidental profile/auth mismatch and stalled prompts.
+    let _ = agent_home;
     command.stdin(std::process::Stdio::piped());
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::piped());
