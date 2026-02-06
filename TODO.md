@@ -16,6 +16,9 @@
 - [x] Keep Debug/Log button always visible in sidebar corner actions
 - [x] Harden internal JSON preamble stripping for mixed-content code blocks
 - [x] Reduce first-response latency by proactively recreating empty ACP session ids
+- [x] Treat user-triggered abort as cancelled turn (not fatal start error)
+- [x] Normalize `turn/interrupt` when backend reports `Not currently generating`
+- [x] Clear stale queued interrupt flags on non-retry turn errors
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -41,3 +44,6 @@
 - UX tweak: keep Debug log entrypoint always visible (not only on warnings) for faster troubleshooting.
 - JSON filtering refinement: strip internal routing code blocks when they include `title` + `worktree*` markers even if not strict JSON.
 - Latency optimization: when local thread record has empty `sessionId`, recreate session before `session/prompt` to avoid one failed roundtrip.
+- Abort flow: map `Request was aborted` to cancelled turn completion so UI does not surface false fatal `turn/start` errors.
+- Interrupt flow: convert `Not currently generating` into benign interrupt success; avoid noisy debug/user errors.
+- State hygiene: clear pending queued-interrupt flag on non-retry turn errors to prevent accidental cancel of next prompt.

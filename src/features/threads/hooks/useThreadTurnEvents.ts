@@ -199,6 +199,7 @@ export function useThreadTurnEvents({
       markProcessing(threadId, false);
       markReviewing(threadId, false);
       setActiveTurnId(threadId, null);
+      pendingInterruptsRef.current.delete(threadId);
       const message = payload.message
         ? `Turn failed: ${payload.message}`
         : "Turn failed.";

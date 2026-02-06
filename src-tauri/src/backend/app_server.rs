@@ -233,6 +233,18 @@ fn is_session_not_found_error(value: &Value) -> bool {
         .unwrap_or(false)
 }
 
+fn is_request_aborted_message(message: &str) -> bool {
+    message
+        .to_ascii_lowercase()
+        .contains("request was aborted")
+}
+
+fn is_not_generating_message(message: &str) -> bool {
+    message
+        .to_ascii_lowercase()
+        .contains("not currently generating")
+}
+
 fn extract_thread_id(value: &Value) -> Option<String> {
     let params = value.get("params")?;
 
@@ -611,6 +623,26 @@ impl WorkspaceSession {
                     response
                 };
                 if let Some(error) = acp_error_message(&response) {
+                    if is_request_aborted_message(&error) {
+                        self.thread_store.lock().await.touch_message(&thread_id);
+                        let normalized_turn = json!({
+                            "id": turn_id,
+                            "threadId": thread.thread_id
+                        });
+                        self.emit_event(
+                            "turn/completed",
+                            json!({
+                                "threadId": thread_id,
+                                "turn": normalized_turn
+                            }),
+                        );
+                        return Ok(json!({
+                            "result": {
+                                "stopReason": "cancelled",
+                                "turn": normalized_turn
+                            }
+                        }));
+                    }
                     return Err(format!("turn/start failed: {error}"));
                 }
                 self.thread_store.lock().await.touch_message(&thread_id);
@@ -652,6 +684,9 @@ impl WorkspaceSession {
                     .send_acp_request("session/cancel", json!({ "sessionId": thread.session_id }))
                     .await?;
                 if let Some(error) = acp_error_message(&response) {
+                    if is_not_generating_message(&error) {
+                        return Ok(json!({ "result": null }));
+                    }
                     return Err(format!("turn/interrupt failed: {error}"));
                 }
                 Ok(response)
