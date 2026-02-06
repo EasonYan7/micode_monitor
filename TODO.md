@@ -18,3 +18,4 @@
   - `npm run typecheck`
   - `npm test -- src/features/settings/components/SettingsView.test.tsx src/features/home/components/Home.test.tsx src/features/settings/hooks/useAppSettings.test.ts`
 - New reliability fix: auto-recreate ACP session and retry on `Session not found` during `turn/start`, and recreate session on `thread/resume`.
+- MCP integration fix: stop sending `mcpServers: []` in ACP `session/new` to avoid clearing user-configured MiCode MCP servers.

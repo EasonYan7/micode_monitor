@@ -295,7 +295,8 @@ impl WorkspaceSession {
 
     async fn create_session_for_cwd(&self, cwd: String) -> Result<String, String> {
         let response = self
-            .send_acp_request("session/new", json!({ "cwd": cwd, "mcpServers": [] }))
+            // Do not force an empty MCP server list; let micode use its configured servers.
+            .send_acp_request("session/new", json!({ "cwd": cwd }))
             .await?;
         let result = response.get("result").cloned().ok_or_else(|| {
             acp_error_message(&response).unwrap_or_else(|| "missing ACP result".to_string())
