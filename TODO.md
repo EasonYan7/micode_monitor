@@ -17,4 +17,4 @@
 - Completed checks:
   - `npm run typecheck`
   - `npm test -- src/features/settings/components/SettingsView.test.tsx src/features/home/components/Home.test.tsx src/features/settings/hooks/useAppSettings.test.ts`
-- Added ACP event mapping unit tests in `src-tauri/src/backend/app_server.rs` (not executed locally due Rust build dependency constraints).
+- New reliability fix: auto-recreate ACP session and retry on `Session not found` during `turn/start`, and recreate session on `thread/resume`.

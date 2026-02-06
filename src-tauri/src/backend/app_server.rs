@@ -125,6 +125,18 @@ impl LocalThreadStore {
         }
     }
 
+    fn set_session_id(&mut self, thread_id: &str, session_id: String) {
+        if let Some(entry) = self
+            .records
+            .iter_mut()
+            .find(|entry| entry.thread_id == thread_id)
+        {
+            entry.session_id = session_id;
+            entry.updated_at = now_ts();
+            self.persist();
+        }
+    }
+
     fn touch_message(&mut self, thread_id: &str) {
         if let Some(entry) = self
             .records
@@ -143,6 +155,30 @@ fn now_ts() -> i64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs() as i64
+}
+
+fn acp_error_message(value: &Value) -> Option<String> {
+    let error = value.get("error")?;
+    let message = error
+        .get("message")
+        .and_then(Value::as_str)
+        .unwrap_or("ACP error");
+    let details = error
+        .get("data")
+        .and_then(|v| v.get("details"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    if details.is_empty() {
+        Some(message.to_string())
+    } else {
+        Some(format!("{message}: {details}"))
+    }
+}
+
+fn is_session_not_found_error(value: &Value) -> bool {
+    acp_error_message(value)
+        .map(|msg| msg.to_ascii_lowercase().contains("session not found"))
+        .unwrap_or(false)
 }
 
 fn extract_thread_id(value: &Value) -> Option<String> {
@@ -257,6 +293,20 @@ impl WorkspaceSession {
             .to_string()
     }
 
+    async fn create_session_for_cwd(&self, cwd: String) -> Result<String, String> {
+        let response = self
+            .send_acp_request("session/new", json!({ "cwd": cwd, "mcpServers": [] }))
+            .await?;
+        let result = response.get("result").cloned().ok_or_else(|| {
+            acp_error_message(&response).unwrap_or_else(|| "missing ACP result".to_string())
+        })?;
+        result
+            .get("sessionId")
+            .and_then(Value::as_str)
+            .map(|v| v.to_string())
+            .ok_or_else(|| "missing sessionId from ACP session/new".to_string())
+    }
+
     pub(crate) async fn send_request(&self, method: &str, params: Value) -> Result<Value, String> {
         match method {
             "thread/start" => {
@@ -265,15 +315,7 @@ impl WorkspaceSession {
                     .and_then(Value::as_str)
                     .unwrap_or(self.entry.path.as_str())
                     .to_string();
-                let response = self
-                    .send_acp_request("session/new", json!({ "cwd": cwd, "mcpServers": [] }))
-                    .await?;
-                let session_id = response
-                    .get("result")
-                    .and_then(|v| v.get("sessionId"))
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| "missing sessionId from ACP session/new".to_string())?
-                    .to_string();
+                let session_id = self.create_session_for_cwd(cwd).await?;
                 let thread = self.create_local_thread(session_id).await;
                 self.emit_event(
                     "thread/started",
@@ -316,7 +358,14 @@ impl WorkspaceSession {
                     .get("threadId")
                     .and_then(Value::as_str)
                     .ok_or_else(|| "missing threadId".to_string())?;
-                let thread = self.get_thread_by_id(thread_id).await?;
+                let mut thread = self.get_thread_by_id(thread_id).await?;
+                // ACP has no persistent session/load. Always create a fresh session on resume.
+                let new_session = self.create_session_for_cwd(self.entry.path.clone()).await?;
+                self.thread_store
+                    .lock()
+                    .await
+                    .set_session_id(&thread.thread_id, new_session.clone());
+                thread.session_id = new_session;
                 Ok(json!({
                     "result": {
                         "thread": { "id": thread.thread_id, "name": thread.title },
@@ -382,6 +431,27 @@ impl WorkspaceSession {
                         }),
                     )
                     .await?;
+                let response = if is_session_not_found_error(&response) {
+                    // Session ids are process-local. Recreate once and retry.
+                    let new_session = self.create_session_for_cwd(self.entry.path.clone()).await?;
+                    self.thread_store
+                        .lock()
+                        .await
+                        .set_session_id(&thread_id, new_session.clone());
+                    self.send_acp_request(
+                        "session/prompt",
+                        json!({
+                            "sessionId": new_session,
+                            "prompt": [{ "type": "text", "text": prompt_text }]
+                        }),
+                    )
+                    .await?
+                } else {
+                    response
+                };
+                if let Some(error) = acp_error_message(&response) {
+                    return Err(format!("turn/start failed: {error}"));
+                }
                 self.thread_store.lock().await.touch_message(&thread_id);
                 self.emit_event(
                     "turn/completed",
@@ -401,6 +471,9 @@ impl WorkspaceSession {
                 let response = self
                     .send_acp_request("session/cancel", json!({ "sessionId": thread.session_id }))
                     .await?;
+                if let Some(error) = acp_error_message(&response) {
+                    return Err(format!("turn/interrupt failed: {error}"));
+                }
                 Ok(response)
             }
             "model/list" => {
