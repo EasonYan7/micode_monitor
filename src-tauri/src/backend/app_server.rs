@@ -258,6 +258,79 @@ fn is_not_generating_message(message: &str) -> bool {
         .contains("not currently generating")
 }
 
+fn split_shell_like_tokens(value: &str) -> Vec<String> {
+    value
+        .split_whitespace()
+        .map(str::trim)
+        .filter(|segment| !segment.is_empty())
+        .map(ToString::to_string)
+        .collect()
+}
+
+fn extract_command_tokens(value: Option<&Value>) -> Vec<String> {
+    let Some(value) = value else {
+        return Vec::new();
+    };
+    match value {
+        Value::String(raw) => split_shell_like_tokens(raw),
+        Value::Array(items) => items
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::trim)
+            .filter(|segment| !segment.is_empty())
+            .map(ToString::to_string)
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn sanitize_approval_title(raw: Option<&str>) -> Option<String> {
+    let title = raw?.trim();
+    if title.is_empty()
+        || title == "{}"
+        || title == "[]"
+        || title.eq_ignore_ascii_case("null")
+        || title.eq_ignore_ascii_case("undefined")
+    {
+        None
+    } else {
+        Some(title.to_string())
+    }
+}
+
+fn extract_approval_command(params: &Value) -> Vec<String> {
+    let tool_call = params.get("toolCall");
+    let mut command = extract_command_tokens(tool_call.and_then(|value| value.get("command")));
+    if command.is_empty() {
+        command = extract_command_tokens(tool_call.and_then(|value| value.get("argv")));
+    }
+    if command.is_empty() {
+        command = extract_command_tokens(tool_call.and_then(|value| value.get("args")));
+    }
+    if command.is_empty() {
+        command = extract_command_tokens(params.get("command"));
+    }
+    if command.is_empty() {
+        command = extract_command_tokens(params.get("argv"));
+    }
+    if command.is_empty() {
+        command = extract_command_tokens(params.get("args"));
+    }
+    if command.is_empty() {
+        if let Some(title) = sanitize_approval_title(
+            tool_call
+                .and_then(|value| value.get("title"))
+                .and_then(Value::as_str),
+        ) {
+            command.push(title);
+        }
+    }
+    if command.is_empty() {
+        command.push("Approve action".to_string());
+    }
+    command
+}
+
 fn micode_settings_path() -> Option<PathBuf> {
     let home = env::var("HOME").ok()?;
     Some(PathBuf::from(home).join(".micode").join("settings.json"))
@@ -495,23 +568,6 @@ fn discover_micode_models(agent_bin: Option<&str>) -> Vec<(String, String, Strin
     parse_models_from_cli_bundle(&bundle_path)
 }
 
-fn extract_thread_id(value: &Value) -> Option<String> {
-    let params = value.get("params")?;
-
-    params
-        .get("threadId")
-        .or_else(|| params.get("thread_id"))
-        .and_then(|t| t.as_str())
-        .map(|s| s.to_string())
-        .or_else(|| {
-            params
-                .get("thread")
-                .and_then(|thread| thread.get("id"))
-                .and_then(|t| t.as_str())
-                .map(|s| s.to_string())
-        })
-}
-
 fn build_initialize_params(_client_version: &str) -> Value {
     json!({
         "protocolVersion": ACP_PROTOCOL_VERSION,
@@ -615,7 +671,7 @@ impl WorkspaceSession {
     }
 
     fn parse_prompt_from_turn_start(params: &Value) -> String {
-        params
+        let from_input = params
             .get("input")
             .and_then(Value::as_array)
             .into_iter()
@@ -632,7 +688,17 @@ impl WorkspaceSession {
             .collect::<Vec<_>>()
             .join("\n")
             .trim()
-            .to_string()
+            .to_string();
+        if !from_input.is_empty() {
+            return from_input;
+        }
+        params
+            .get("text")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string)
+            .unwrap_or_default()
     }
 
     async fn create_session_for_cwd(&self, cwd: String) -> Result<String, String> {
@@ -1029,10 +1095,22 @@ impl WorkspaceSession {
             "app/list" => {
                 Ok(json!({ "result": { "apps": [], "hasMore": false, "nextCursor": null } }))
             }
+            "collaborationMode/list" => Ok(json!({
+                "result": {
+                    "data": [
+                        {
+                            "mode": "default",
+                            "label": "Default",
+                            "settings": {}
+                        }
+                    ]
+                }
+            })),
             _ => self.send_acp_request(method, params).await,
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) async fn send_notification(
         &self,
         method: &str,
@@ -1543,20 +1621,16 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                             .map(|entry| entry.thread_id)
                             .unwrap_or_default()
                     };
-                    let title = params
-                        .get("toolCall")
-                        .and_then(|v| v.get("title"))
-                        .and_then(Value::as_str)
-                        .unwrap_or("Approve action")
-                        .to_string();
+                    let command = extract_approval_command(&params);
                     let _ = event_tx.send(AppServerEvent {
                         workspace_id: workspace_id.clone(),
                         message: json!({
                             "id": request_id,
-                            "method": "item/tool/requestApproval",
+                            "method": "workspace/requestApproval",
                             "params": {
                                 "threadId": thread_id,
-                                "command": [title]
+                                "command": command,
+                                "raw": params
                             }
                         }),
                     });
@@ -1624,26 +1698,8 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
 
 #[cfg(test)]
 mod tests {
-    use super::{build_initialize_params, extract_thread_id, translate_acp_update};
+    use super::{build_initialize_params, extract_approval_command, translate_acp_update, WorkspaceSession};
     use serde_json::json;
-
-    #[test]
-    fn extract_thread_id_reads_camel_case() {
-        let value = json!({ "params": { "threadId": "thread-123" } });
-        assert_eq!(extract_thread_id(&value), Some("thread-123".to_string()));
-    }
-
-    #[test]
-    fn extract_thread_id_reads_snake_case() {
-        let value = json!({ "params": { "thread_id": "thread-456" } });
-        assert_eq!(extract_thread_id(&value), Some("thread-456".to_string()));
-    }
-
-    #[test]
-    fn extract_thread_id_returns_none_when_missing() {
-        let value = json!({ "params": {} });
-        assert_eq!(extract_thread_id(&value), None);
-    }
 
     #[test]
     fn build_initialize_params_sets_protocol_version() {
@@ -1703,5 +1759,26 @@ mod tests {
             .get("method")
             .and_then(|value| value.as_str());
         assert_eq!(method, Some("micode/availableCommands/updated"));
+    }
+
+    #[test]
+    fn parse_prompt_from_turn_start_falls_back_to_text() {
+        let params = json!({
+            "threadId": "thread-1",
+            "text": "hello from text"
+        });
+        let prompt = WorkspaceSession::parse_prompt_from_turn_start(&params);
+        assert_eq!(prompt, "hello from text");
+    }
+
+    #[test]
+    fn extract_approval_command_ignores_empty_object_title() {
+        let params = json!({
+            "toolCall": {
+                "title": "{}"
+            }
+        });
+        let command = extract_approval_command(&params);
+        assert_eq!(command, vec!["Approve action"]);
     }
 }
