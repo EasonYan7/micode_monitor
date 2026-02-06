@@ -7,7 +7,7 @@ pub(crate) fn resolve_workspace_codex_home(
     entry: &WorkspaceEntry,
     parent_entry: Option<&WorkspaceEntry>,
 ) -> Option<PathBuf> {
-    if let Some(value) = entry.settings.codex_home.as_ref() {
+    if let Some(value) = entry.settings.agent_home.as_ref() {
         let base = PathBuf::from(&entry.path);
         if let Some(path) = normalize_codex_home_with_base(value, &base) {
             return Some(path);
@@ -15,7 +15,7 @@ pub(crate) fn resolve_workspace_codex_home(
     }
     if entry.kind.is_worktree() {
         if let Some(parent) = parent_entry {
-            if let Some(value) = parent.settings.codex_home.as_ref() {
+            if let Some(value) = parent.settings.agent_home.as_ref() {
                 let base = PathBuf::from(&parent.path);
                 if let Some(path) = normalize_codex_home_with_base(value, &base) {
                     return Some(path);
@@ -195,7 +195,7 @@ mod tests {
     fn workspace_entry(
         kind: WorkspaceKind,
         path: &str,
-        codex_home: Option<&str>,
+        agent_home: Option<&str>,
     ) -> WorkspaceEntry {
         let worktree = if kind.is_worktree() {
             Some(WorktreeInfo {
@@ -208,12 +208,12 @@ mod tests {
             id: "workspace-id".to_string(),
             name: "workspace".to_string(),
             path: path.to_string(),
-            codex_bin: None,
+            agent_bin: None,
             kind,
             parent_id: None,
             worktree,
             settings: WorkspaceSettings {
-                codex_home: codex_home.map(|value| value.to_string()),
+                agent_home: agent_home.map(|value| value.to_string()),
                 ..WorkspaceSettings::default()
             },
         }
@@ -273,7 +273,10 @@ mod tests {
         assert_eq!(appdata, Some(PathBuf::from("/tmp/appdata-root/Codex")));
 
         let appdata_lower = normalize_codex_home("$appdata/Codex");
-        assert_eq!(appdata_lower, Some(PathBuf::from("/tmp/appdata-root/Codex")));
+        assert_eq!(
+            appdata_lower,
+            Some(PathBuf::from("/tmp/appdata-root/Codex"))
+        );
 
         match prev_home {
             Some(value) => std::env::set_var("HOME", value),

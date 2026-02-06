@@ -1,10 +1,10 @@
+#[path = "../codex/args.rs"]
+mod agent_args;
+#[path = "../codex/home.rs"]
+mod agent_home;
 #[allow(dead_code)]
 #[path = "../backend/mod.rs"]
 mod backend;
-#[path = "../codex/args.rs"]
-mod codex_args;
-#[path = "../codex/home.rs"]
-mod codex_home;
 #[path = "../codex/config.rs"]
 mod codex_config;
 #[path = "../files/io.rs"]
@@ -15,28 +15,28 @@ mod file_ops;
 mod file_policy;
 #[path = "../rules.rs"]
 mod rules;
-#[path = "../storage.rs"]
-mod storage;
 #[path = "../shared/mod.rs"]
 mod shared;
+#[path = "../storage.rs"]
+mod storage;
+#[allow(dead_code)]
+#[path = "../types.rs"]
+mod types;
 #[path = "../utils.rs"]
 mod utils;
 #[path = "../workspaces/settings.rs"]
 mod workspace_settings;
-#[allow(dead_code)]
-#[path = "../types.rs"]
-mod types;
 
 // Provide feature-style module paths for shared cores when compiled in the daemon.
 mod codex {
     pub(crate) mod args {
-        pub(crate) use crate::codex_args::*;
+        pub(crate) use crate::agent_args::*;
     }
     pub(crate) mod config {
         pub(crate) use crate::codex_config::*;
     }
     pub(crate) mod home {
-        pub(crate) use crate::codex_home::*;
+        pub(crate) use crate::agent_home::*;
     }
 }
 
@@ -67,17 +67,13 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc, Mutex};
 
-use backend::app_server::{
-    spawn_workspace_session, WorkspaceSession,
-};
+use backend::app_server::{spawn_workspace_session, WorkspaceSession};
 use backend::events::{AppServerEvent, EventSink, TerminalExit, TerminalOutput};
-use storage::{read_settings, read_workspaces};
-use shared::{codex_core, files_core, git_core, settings_core, workspaces_core, worktree_core};
 use shared::codex_core::CodexLoginCancelState;
+use shared::{codex_core, files_core, git_core, settings_core, workspaces_core, worktree_core};
+use storage::{read_settings, read_workspaces};
+use types::{AppSettings, WorkspaceEntry, WorkspaceInfo, WorkspaceSettings, WorktreeSetupStatus};
 use workspace_settings::apply_workspace_settings_update;
-use types::{
-    AppSettings, WorkspaceEntry, WorkspaceInfo, WorkspaceSettings, WorktreeSetupStatus,
-};
 
 const DEFAULT_LISTEN_ADDR: &str = "127.0.0.1:4732";
 
@@ -86,14 +82,14 @@ fn spawn_with_client(
     client_version: String,
     entry: WorkspaceEntry,
     default_bin: Option<String>,
-    codex_args: Option<String>,
-    codex_home: Option<PathBuf>,
+    agent_args: Option<String>,
+    agent_home: Option<PathBuf>,
 ) -> impl std::future::Future<Output = Result<Arc<WorkspaceSession>, String>> {
     spawn_workspace_session(
         entry,
         default_bin,
-        codex_args,
-        codex_home,
+        agent_args,
+        agent_home,
         client_version,
         event_sink,
     )
@@ -179,25 +175,25 @@ impl DaemonState {
     async fn add_workspace(
         &self,
         path: String,
-        codex_bin: Option<String>,
+        agent_bin: Option<String>,
         client_version: String,
     ) -> Result<WorkspaceInfo, String> {
         let client_version = client_version.clone();
         workspaces_core::add_workspace_core(
             path,
-            codex_bin,
+            agent_bin,
             &self.workspaces,
             &self.sessions,
             &self.app_settings,
             &self.storage_path,
-            move |entry, default_bin, codex_args, codex_home| {
+            move |entry, default_bin, agent_args, agent_home| {
                 spawn_with_client(
                     self.event_sink.clone(),
                     client_version.clone(),
                     entry,
                     default_bin,
-                    codex_args,
-                    codex_home,
+                    agent_args,
+                    agent_home,
                 )
             },
         )
@@ -238,28 +234,35 @@ impl DaemonState {
             |root, args| {
                 workspaces_core::run_git_command_unit(root, args, git_core::run_git_command_owned)
             },
-            move |entry, default_bin, codex_args, codex_home| {
+            move |entry, default_bin, agent_args, agent_home| {
                 spawn_with_client(
                     self.event_sink.clone(),
                     client_version.clone(),
                     entry,
                     default_bin,
-                    codex_args,
-                    codex_home,
+                    agent_args,
+                    agent_home,
                 )
             },
         )
         .await
     }
 
-    async fn worktree_setup_status(&self, workspace_id: String) -> Result<WorktreeSetupStatus, String> {
+    async fn worktree_setup_status(
+        &self,
+        workspace_id: String,
+    ) -> Result<WorktreeSetupStatus, String> {
         workspaces_core::worktree_setup_status_core(&self.workspaces, &workspace_id, &self.data_dir)
             .await
     }
 
     async fn worktree_setup_mark_ran(&self, workspace_id: String) -> Result<(), String> {
-        workspaces_core::worktree_setup_mark_ran_core(&self.workspaces, &workspace_id, &self.data_dir)
-            .await
+        workspaces_core::worktree_setup_mark_ran_core(
+            &self.workspaces,
+            &workspace_id,
+            &self.data_dir,
+        )
+        .await
     }
 
     async fn remove_workspace(&self, id: String) -> Result<(), String> {
@@ -326,18 +329,20 @@ impl DaemonState {
                 }
             },
             |value| worktree_core::sanitize_worktree_name(value),
-            |root, name, current| worktree_core::unique_worktree_path_for_rename(root, name, current),
+            |root, name, current| {
+                worktree_core::unique_worktree_path_for_rename(root, name, current)
+            },
             |root, args| {
                 workspaces_core::run_git_command_unit(root, args, git_core::run_git_command_owned)
             },
-            move |entry, default_bin, codex_args, codex_home| {
+            move |entry, default_bin, agent_args, agent_home| {
                 spawn_with_client(
                     self.event_sink.clone(),
                     client_version.clone(),
                     entry,
                     default_bin,
-                    codex_args,
-                    codex_home,
+                    agent_args,
+                    agent_home,
                 )
             },
         )
@@ -403,14 +408,14 @@ impl DaemonState {
             |workspaces, workspace_id, next_settings| {
                 apply_workspace_settings_update(workspaces, workspace_id, next_settings)
             },
-            move |entry, default_bin, codex_args, codex_home| {
+            move |entry, default_bin, agent_args, agent_home| {
                 spawn_with_client(
                     self.event_sink.clone(),
                     client_version.clone(),
                     entry,
                     default_bin,
-                    codex_args,
-                    codex_home,
+                    agent_args,
+                    agent_home,
                 )
             },
         )
@@ -420,11 +425,11 @@ impl DaemonState {
     async fn update_workspace_codex_bin(
         &self,
         id: String,
-        codex_bin: Option<String>,
+        agent_bin: Option<String>,
     ) -> Result<WorkspaceInfo, String> {
         workspaces_core::update_workspace_codex_bin_core(
             id,
-            codex_bin,
+            agent_bin,
             &self.workspaces,
             &self.sessions,
             &self.storage_path,
@@ -446,14 +451,14 @@ impl DaemonState {
             &self.workspaces,
             &self.sessions,
             &self.app_settings,
-            move |entry, default_bin, codex_args, codex_home| {
+            move |entry, default_bin, agent_args, agent_home| {
                 spawn_with_client(
                     self.event_sink.clone(),
                     client_version.clone(),
                     entry,
                     default_bin,
-                    codex_args,
-                    codex_home,
+                    agent_args,
+                    agent_home,
                 )
             },
         )
@@ -513,7 +518,11 @@ impl DaemonState {
         codex_core::start_thread_core(&self.sessions, workspace_id).await
     }
 
-    async fn resume_thread(&self, workspace_id: String, thread_id: String) -> Result<Value, String> {
+    async fn resume_thread(
+        &self,
+        workspace_id: String,
+        thread_id: String,
+    ) -> Result<Value, String> {
         codex_core::resume_thread_core(&self.sessions, workspace_id, thread_id).await
     }
 
@@ -539,11 +548,19 @@ impl DaemonState {
         codex_core::list_mcp_server_status_core(&self.sessions, workspace_id, cursor, limit).await
     }
 
-    async fn archive_thread(&self, workspace_id: String, thread_id: String) -> Result<Value, String> {
+    async fn archive_thread(
+        &self,
+        workspace_id: String,
+        thread_id: String,
+    ) -> Result<Value, String> {
         codex_core::archive_thread_core(&self.sessions, workspace_id, thread_id).await
     }
 
-    async fn compact_thread(&self, workspace_id: String, thread_id: String) -> Result<Value, String> {
+    async fn compact_thread(
+        &self,
+        workspace_id: String,
+        thread_id: String,
+    ) -> Result<Value, String> {
         codex_core::compact_thread_core(&self.sessions, workspace_id, thread_id).await
     }
 
@@ -645,8 +662,13 @@ impl DaemonState {
         request_id: Value,
         result: Value,
     ) -> Result<Value, String> {
-        codex_core::respond_to_server_request_core(&self.sessions, workspace_id, request_id, result)
-            .await?;
+        codex_core::respond_to_server_request_core(
+            &self.sessions,
+            workspace_id,
+            request_id,
+            result,
+        )
+        .await?;
         Ok(json!({ "ok": true }))
     }
 
@@ -748,8 +770,7 @@ fn read_workspace_file_inner(
         buffer.truncate(MAX_WORKSPACE_FILE_BYTES as usize);
     }
 
-    let content =
-        String::from_utf8(buffer).map_err(|_| "File is not valid UTF-8".to_string())?;
+    let content = String::from_utf8(buffer).map_err(|_| "File is not valid UTF-8".to_string())?;
     Ok(WorkspaceFileResponse { content, truncated })
 }
 
@@ -842,15 +863,19 @@ fn build_error_response(id: Option<u64>, message: &str) -> Option<String> {
             "id": id,
             "error": { "message": message }
         }))
-        .unwrap_or_else(|_| "{\"id\":0,\"error\":{\"message\":\"serialization failed\"}}".to_string()),
+        .unwrap_or_else(|_| {
+            "{\"id\":0,\"error\":{\"message\":\"serialization failed\"}}".to_string()
+        }),
     )
 }
 
 fn build_result_response(id: Option<u64>, result: Value) -> Option<String> {
     let id = id?;
-    Some(serde_json::to_string(&json!({ "id": id, "result": result })).unwrap_or_else(|_| {
-        "{\"id\":0,\"error\":{\"message\":\"serialization failed\"}}".to_string()
-    }))
+    Some(
+        serde_json::to_string(&json!({ "id": id, "result": result })).unwrap_or_else(|_| {
+            "{\"id\":0,\"error\":{\"message\":\"serialization failed\"}}".to_string()
+        }),
+    )
 }
 
 fn build_event_notification(event: DaemonEvent) -> Option<String> {
@@ -925,12 +950,15 @@ fn parse_optional_bool(value: &Value, key: &str) -> Option<bool> {
 
 fn parse_optional_string_array(value: &Value, key: &str) -> Option<Vec<String>> {
     match value {
-        Value::Object(map) => map.get(key).and_then(|value| value.as_array()).map(|items| {
-            items
-                .iter()
-                .filter_map(|item| item.as_str().map(|value| value.to_string()))
-                .collect::<Vec<_>>()
-        }),
+        Value::Object(map) => map
+            .get(key)
+            .and_then(|value| value.as_array())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| item.as_str().map(|value| value.to_string()))
+                    .collect::<Vec<_>>()
+            }),
         _ => None,
     }
 }
@@ -990,8 +1018,9 @@ async fn handle_rpc_request(
         }
         "add_workspace" => {
             let path = parse_string(&params, "path")?;
-            let codex_bin = parse_optional_string(&params, "codex_bin");
-            let workspace = state.add_workspace(path, codex_bin, client_version).await?;
+            let agent_bin = parse_optional_string(&params, "codex_bin")
+                .or_else(|| parse_optional_string(&params, "agent_bin"));
+            let workspace = state.add_workspace(path, agent_bin, client_version).await?;
             serde_json::to_value(workspace).map_err(|err| err.to_string())
         }
         "add_worktree" => {
@@ -1059,8 +1088,9 @@ async fn handle_rpc_request(
         }
         "update_workspace_codex_bin" => {
             let id = parse_string(&params, "id")?;
-            let codex_bin = parse_optional_string(&params, "codex_bin");
-            let workspace = state.update_workspace_codex_bin(id, codex_bin).await?;
+            let agent_bin = parse_optional_string(&params, "codex_bin")
+                .or_else(|| parse_optional_string(&params, "agent_bin"));
+            let workspace = state.update_workspace_codex_bin(id, agent_bin).await?;
             serde_json::to_value(workspace).map_err(|err| err.to_string())
         }
         "list_workspace_files" => {
@@ -1139,7 +1169,9 @@ async fn handle_rpc_request(
             let workspace_id = parse_string(&params, "workspaceId")?;
             let cursor = parse_optional_string(&params, "cursor");
             let limit = parse_optional_u32(&params, "limit");
-            state.list_mcp_server_status(workspace_id, cursor, limit).await
+            state
+                .list_mcp_server_status(workspace_id, cursor, limit)
+                .await
         }
         "archive_thread" => {
             let workspace_id = parse_string(&params, "workspaceId")?;
@@ -1194,7 +1226,9 @@ async fn handle_rpc_request(
                 .cloned()
                 .ok_or("missing `target`")?;
             let delivery = parse_optional_string(&params, "delivery");
-            state.start_review(workspace_id, thread_id, target, delivery).await
+            state
+                .start_review(workspace_id, thread_id, target, delivery)
+                .await
         }
         "model_list" => {
             let workspace_id = parse_string(&params, "workspaceId")?;

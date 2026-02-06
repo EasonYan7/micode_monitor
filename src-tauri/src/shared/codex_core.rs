@@ -5,8 +5,8 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::{Mutex, oneshot};
 use tokio::sync::oneshot::error::TryRecvError;
+use tokio::sync::{oneshot, Mutex};
 use tokio::time::timeout;
 use tokio::time::Instant;
 
@@ -293,9 +293,9 @@ pub(crate) async fn account_read_core(
     };
 
     let (entry, parent_entry) = resolve_workspace_and_parent(workspaces, &workspace_id).await?;
-    let codex_home = resolve_workspace_codex_home(&entry, parent_entry.as_ref())
+    let agent_home = resolve_workspace_codex_home(&entry, parent_entry.as_ref())
         .or_else(resolve_default_codex_home);
-    let fallback = read_auth_account(codex_home);
+    let fallback = read_auth_account(agent_home);
 
     Ok(build_account_response(response, fallback))
 }
@@ -317,14 +317,16 @@ pub(crate) async fn codex_login_core(
                 CodexLoginCancelState::LoginId(_) => {}
             }
         }
-        cancels.insert(workspace_id.clone(), CodexLoginCancelState::PendingStart(cancel_tx));
+        cancels.insert(
+            workspace_id.clone(),
+            CodexLoginCancelState::PendingStart(cancel_tx),
+        );
     }
 
     let start = Instant::now();
     let mut cancel_rx = cancel_rx;
-    let mut login_request: Pin<Box<_>> = Box::pin(
-        session.send_request("account/login/start", json!({ "type": "chatgpt" })),
-    );
+    let mut login_request: Pin<Box<_>> =
+        Box::pin(session.send_request("account/login/start", json!({ "type": "chatgpt" })));
 
     let response = loop {
         match cancel_rx.try_recv() {
@@ -374,7 +376,10 @@ pub(crate) async fn codex_login_core(
 
     {
         let mut cancels = codex_login_cancels.lock().await;
-        cancels.insert(workspace_id, CodexLoginCancelState::LoginId(login_id.clone()));
+        cancels.insert(
+            workspace_id,
+            CodexLoginCancelState::LoginId(login_id.clone()),
+        );
     }
 
     Ok(json!({
@@ -477,8 +482,8 @@ pub(crate) async fn remember_approval_rule_core(
         return Err("empty command".to_string());
     }
 
-    let codex_home = resolve_codex_home_for_workspace_core(workspaces, &workspace_id).await?;
-    let rules_path = rules::default_rules_path(&codex_home);
+    let agent_home = resolve_codex_home_for_workspace_core(workspaces, &workspace_id).await?;
+    let rules_path = rules::default_rules_path(&agent_home);
     rules::append_prefix_rule(&rules_path, &command)?;
 
     Ok(json!({
@@ -491,7 +496,7 @@ pub(crate) async fn get_config_model_core(
     workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
     workspace_id: String,
 ) -> Result<Value, String> {
-    let codex_home = resolve_codex_home_for_workspace_core(workspaces, &workspace_id).await?;
-    let model = codex_config::read_config_model(Some(codex_home))?;
+    let agent_home = resolve_codex_home_for_workspace_core(workspaces, &workspace_id).await?;
+    let model = codex_config::read_config_model(Some(agent_home))?;
     Ok(json!({ "model": model }))
 }

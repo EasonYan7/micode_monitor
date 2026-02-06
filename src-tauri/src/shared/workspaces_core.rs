@@ -86,7 +86,7 @@ pub(crate) async fn list_workspaces_core(
             id: entry.id.clone(),
             name: entry.name.clone(),
             path: entry.path.clone(),
-            codex_bin: entry.codex_bin.clone(),
+            agent_bin: entry.agent_bin.clone(),
             connected: sessions.contains_key(&entry.id),
             kind: entry.kind.clone(),
             parent_id: entry.parent_id.clone(),
@@ -182,7 +182,7 @@ pub(crate) async fn worktree_setup_mark_ran_core(
 
 pub(crate) async fn add_workspace_core<F, Fut>(
     path: String,
-    codex_bin: Option<String>,
+    agent_bin: Option<String>,
     workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
     sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
     app_settings: &Mutex<AppSettings>,
@@ -206,22 +206,22 @@ where
         id: Uuid::new_v4().to_string(),
         name: name.clone(),
         path: path.clone(),
-        codex_bin,
+        agent_bin,
         kind: WorkspaceKind::Main,
         parent_id: None,
         worktree: None,
         settings: WorkspaceSettings::default(),
     };
 
-    let (default_bin, codex_args) = {
+    let (default_bin, agent_args) = {
         let settings = app_settings.lock().await;
         (
-            settings.codex_bin.clone(),
+            settings.agent_bin.clone(),
             resolve_workspace_codex_args(&entry, None, Some(&settings)),
         )
     };
-    let codex_home = resolve_workspace_codex_home(&entry, None);
-    let session = spawn_session(entry.clone(), default_bin, codex_args, codex_home).await?;
+    let agent_home = resolve_workspace_codex_home(&entry, None);
+    let session = spawn_session(entry.clone(), default_bin, agent_args, agent_home).await?;
 
     if let Err(error) = {
         let mut workspaces = workspaces.lock().await;
@@ -244,7 +244,7 @@ where
         id: entry.id,
         name: entry.name,
         path: entry.path,
-        codex_bin: entry.codex_bin,
+        agent_bin: entry.agent_bin,
         connected: true,
         kind: entry.kind,
         parent_id: entry.parent_id,
@@ -268,7 +268,11 @@ where
         .iter()
         .map(|value| value.to_string())
         .collect::<Vec<_>>();
-    async move { run_git_command(repo_path, args_owned).await.map(|_output| ()) }
+    async move {
+        run_git_command(repo_path, args_owned)
+            .await
+            .map(|_output| ())
+    }
 }
 
 pub(crate) async fn add_worktree_core<
@@ -391,7 +395,7 @@ where
         id: Uuid::new_v4().to_string(),
         name: name.clone().unwrap_or_else(|| branch.clone()),
         path: worktree_path_string,
-        codex_bin: parent_entry.codex_bin.clone(),
+        agent_bin: parent_entry.agent_bin.clone(),
         kind: WorkspaceKind::Worktree,
         parent_id: Some(parent_entry.id.clone()),
         worktree: Some(WorktreeInfo { branch }),
@@ -403,15 +407,15 @@ where
         },
     };
 
-    let (default_bin, codex_args) = {
+    let (default_bin, agent_args) = {
         let settings = app_settings.lock().await;
         (
-            settings.codex_bin.clone(),
+            settings.agent_bin.clone(),
             resolve_workspace_codex_args(&entry, Some(&parent_entry), Some(&settings)),
         )
     };
-    let codex_home = resolve_workspace_codex_home(&entry, Some(&parent_entry));
-    let session = spawn_session(entry.clone(), default_bin, codex_args, codex_home).await?;
+    let agent_home = resolve_workspace_codex_home(&entry, Some(&parent_entry));
+    let session = spawn_session(entry.clone(), default_bin, agent_args, agent_home).await?;
 
     {
         let mut workspaces = workspaces.lock().await;
@@ -426,7 +430,7 @@ where
         id: entry.id,
         name: entry.name,
         path: entry.path,
-        codex_bin: entry.codex_bin,
+        agent_bin: entry.agent_bin,
         connected: true,
         kind: entry.kind,
         parent_id: entry.parent_id,
@@ -447,35 +451,27 @@ where
     Fut: Future<Output = Result<Arc<WorkspaceSession>, String>>,
 {
     let (entry, parent_entry) = resolve_entry_and_parent(workspaces, &workspace_id).await?;
-    let (default_bin, codex_args) = {
+    let (default_bin, agent_args) = {
         let settings = app_settings.lock().await;
         (
-            settings.codex_bin.clone(),
+            settings.agent_bin.clone(),
             resolve_workspace_codex_args(&entry, parent_entry.as_ref(), Some(&settings)),
         )
     };
-    let codex_home = resolve_workspace_codex_home(&entry, parent_entry.as_ref());
-    let session = spawn_session(entry.clone(), default_bin, codex_args, codex_home).await?;
+    let agent_home = resolve_workspace_codex_home(&entry, parent_entry.as_ref());
+    let session = spawn_session(entry.clone(), default_bin, agent_args, agent_home).await?;
     sessions.lock().await.insert(entry.id, session);
     Ok(())
 }
 
-async fn kill_session_by_id(
-    sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
-    id: &str,
-) {
+async fn kill_session_by_id(sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>, id: &str) {
     if let Some(session) = sessions.lock().await.remove(id) {
         let mut child = session.child.lock().await;
         let _ = child.kill().await;
     }
 }
 
-pub(crate) async fn remove_workspace_core<
-    FRunGit,
-    FutRunGit,
-    FIsMissing,
-    FRemoveDirAll,
->(
+pub(crate) async fn remove_workspace_core<FRunGit, FutRunGit, FIsMissing, FRemoveDirAll>(
     id: String,
     workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
     sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
@@ -518,11 +514,8 @@ where
 
         let child_path = PathBuf::from(&child.path);
         if child_path.exists() {
-            if let Err(error) = run_git_command(
-                &repo_path,
-                &["worktree", "remove", "--force", &child.path],
-            )
-            .await
+            if let Err(error) =
+                run_git_command(&repo_path, &["worktree", "remove", "--force", &child.path]).await
             {
                 if is_missing_worktree_error(&error) {
                     if child_path.exists() {
@@ -739,8 +732,8 @@ where
         )
         .await
         {
-            let _ = run_git_command(&parent_root, &["branch", "-m", &final_branch, &old_branch])
-                .await;
+            let _ =
+                run_git_command(&parent_root, &["branch", "-m", &final_branch, &old_branch]).await;
             return Err(error);
         }
     }
@@ -774,15 +767,15 @@ where
     let was_connected = sessions.lock().await.contains_key(&entry_snapshot.id);
     if was_connected {
         kill_session_by_id(sessions, &entry_snapshot.id).await;
-        let (default_bin, codex_args) = {
+        let (default_bin, agent_args) = {
             let settings = app_settings.lock().await;
             (
-                settings.codex_bin.clone(),
+                settings.agent_bin.clone(),
                 resolve_workspace_codex_args(&entry_snapshot, Some(&parent), Some(&settings)),
             )
         };
-        let codex_home = resolve_workspace_codex_home(&entry_snapshot, Some(&parent));
-        match spawn_session(entry_snapshot.clone(), default_bin, codex_args, codex_home).await {
+        let agent_home = resolve_workspace_codex_home(&entry_snapshot, Some(&parent));
+        match spawn_session(entry_snapshot.clone(), default_bin, agent_args, agent_home).await {
             Ok(session) => {
                 sessions
                     .lock()
@@ -803,7 +796,7 @@ where
         id: entry_snapshot.id,
         name: entry_snapshot.name,
         path: entry_snapshot.path,
-        codex_bin: entry_snapshot.codex_bin,
+        agent_bin: entry_snapshot.agent_bin,
         connected,
         kind: entry_snapshot.kind,
         parent_id: entry_snapshot.parent_id,
@@ -905,7 +898,11 @@ where
             &["push", &remote_name, &format!("{new_branch}:{new_branch}")],
         )
         .await?;
-        run_git_command(&parent_root, &["push", &remote_name, &format!(":{old_branch}")]).await?;
+        run_git_command(
+            &parent_root,
+            &["push", &remote_name, &format!(":{old_branch}")],
+        )
+        .await?;
     } else {
         run_git_command(&parent_root, &["push", &remote_name, &new_branch]).await?;
     }
@@ -924,11 +921,7 @@ where
     Ok(())
 }
 
-pub(crate) async fn update_workspace_settings_core<
-    FApplySettings,
-    FSpawn,
-    FutSpawn,
->(
+pub(crate) async fn update_workspace_settings_core<FApplySettings, FSpawn, FutSpawn>(
     id: String,
     mut settings: WorkspaceSettings,
     workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
@@ -939,8 +932,11 @@ pub(crate) async fn update_workspace_settings_core<
     spawn_session: FSpawn,
 ) -> Result<WorkspaceInfo, String>
 where
-    FApplySettings: Fn(&mut HashMap<String, WorkspaceEntry>, &str, WorkspaceSettings)
-        -> Result<WorkspaceEntry, String>,
+    FApplySettings: Fn(
+        &mut HashMap<String, WorkspaceEntry>,
+        &str,
+        WorkspaceSettings,
+    ) -> Result<WorkspaceEntry, String>,
     FSpawn: Fn(WorkspaceEntry, Option<String>, Option<String>, Option<PathBuf>) -> FutSpawn,
     FutSpawn: Future<Output = Result<Arc<WorkspaceSession>, String>>,
 {
@@ -960,8 +956,8 @@ where
             .get(&id)
             .cloned()
             .ok_or_else(|| "workspace not found".to_string())?;
-        let previous_codex_home = previous_entry.settings.codex_home.clone();
-        let previous_codex_args = previous_entry.settings.codex_args.clone();
+        let previous_codex_home = previous_entry.settings.agent_home.clone();
+        let previous_codex_args = previous_entry.settings.agent_args.clone();
         let previous_worktree_setup_script = previous_entry.settings.worktree_setup_script.clone();
         let entry_snapshot = apply_settings_update(&mut workspaces, &id, settings)?;
         let parent_entry = entry_snapshot
@@ -985,31 +981,40 @@ where
         )
     };
 
-    let codex_home_changed = previous_codex_home != entry_snapshot.settings.codex_home;
-    let codex_args_changed = previous_codex_args != entry_snapshot.settings.codex_args;
+    let codex_home_changed = previous_codex_home != entry_snapshot.settings.agent_home;
+    let codex_args_changed = previous_codex_args != entry_snapshot.settings.agent_args;
     let worktree_setup_script_changed =
         previous_worktree_setup_script != entry_snapshot.settings.worktree_setup_script;
     let connected = sessions.lock().await.contains_key(&id);
     if connected && (codex_home_changed || codex_args_changed) {
         let rollback_entry = previous_entry.clone();
-        let (default_bin, codex_args) = {
+        let (default_bin, agent_args) = {
             let settings = app_settings.lock().await;
             (
-                settings.codex_bin.clone(),
-                resolve_workspace_codex_args(&entry_snapshot, parent_entry.as_ref(), Some(&settings)),
+                settings.agent_bin.clone(),
+                resolve_workspace_codex_args(
+                    &entry_snapshot,
+                    parent_entry.as_ref(),
+                    Some(&settings),
+                ),
             )
         };
-        let codex_home = resolve_workspace_codex_home(&entry_snapshot, parent_entry.as_ref());
-        let new_session =
-            match spawn_session(entry_snapshot.clone(), default_bin, codex_args, codex_home).await
-            {
-                Ok(session) => session,
-                Err(error) => {
-                    let mut workspaces = workspaces.lock().await;
-                    workspaces.insert(rollback_entry.id.clone(), rollback_entry);
-                    return Err(error);
-                }
-            };
+        let agent_home = resolve_workspace_codex_home(&entry_snapshot, parent_entry.as_ref());
+        let new_session = match spawn_session(
+            entry_snapshot.clone(),
+            default_bin,
+            agent_args,
+            agent_home,
+        )
+        .await
+        {
+            Ok(session) => session,
+            Err(error) => {
+                let mut workspaces = workspaces.lock().await;
+                workspaces.insert(rollback_entry.id.clone(), rollback_entry);
+                return Err(error);
+            }
+        };
         if let Some(old_session) = sessions
             .lock()
             .await
@@ -1021,7 +1026,7 @@ where
     }
     if codex_home_changed || codex_args_changed {
         let app_settings_snapshot = app_settings.lock().await.clone();
-        let default_bin = app_settings_snapshot.codex_bin.clone();
+        let default_bin = app_settings_snapshot.agent_bin.clone();
         for child in &child_entries {
             let connected = sessions.lock().await.contains_key(&child.id);
             if !connected {
@@ -1029,10 +1034,16 @@ where
             }
             let previous_child_home = resolve_workspace_codex_home(child, Some(&previous_entry));
             let next_child_home = resolve_workspace_codex_home(child, Some(&entry_snapshot));
-            let previous_child_args =
-                resolve_workspace_codex_args(child, Some(&previous_entry), Some(&app_settings_snapshot));
-            let next_child_args =
-                resolve_workspace_codex_args(child, Some(&entry_snapshot), Some(&app_settings_snapshot));
+            let previous_child_args = resolve_workspace_codex_args(
+                child,
+                Some(&previous_entry),
+                Some(&app_settings_snapshot),
+            );
+            let next_child_args = resolve_workspace_codex_args(
+                child,
+                Some(&entry_snapshot),
+                Some(&app_settings_snapshot),
+            );
             if previous_child_home == next_child_home && previous_child_args == next_child_args {
                 continue;
             }
@@ -1053,11 +1064,7 @@ where
                     continue;
                 }
             };
-            if let Some(old_session) = sessions
-                .lock()
-                .await
-                .insert(child.id.clone(), new_session)
-            {
+            if let Some(old_session) = sessions.lock().await.insert(child.id.clone(), new_session) {
                 let mut child = old_session.child.lock().await;
                 let _ = child.kill().await;
             }
@@ -1087,7 +1094,7 @@ where
         id: entry_snapshot.id,
         name: entry_snapshot.name,
         path: entry_snapshot.path,
-        codex_bin: entry_snapshot.codex_bin,
+        agent_bin: entry_snapshot.agent_bin,
         connected,
         kind: entry_snapshot.kind,
         parent_id: entry_snapshot.parent_id,
@@ -1098,7 +1105,7 @@ where
 
 pub(crate) async fn update_workspace_codex_bin_core(
     id: String,
-    codex_bin: Option<String>,
+    agent_bin: Option<String>,
     workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
     sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
     storage_path: &PathBuf,
@@ -1107,7 +1114,7 @@ pub(crate) async fn update_workspace_codex_bin_core(
         let mut workspaces = workspaces.lock().await;
         let entry_snapshot = match workspaces.get_mut(&id) {
             Some(entry) => {
-                entry.codex_bin = codex_bin.clone();
+                entry.agent_bin = agent_bin.clone();
                 entry.clone()
             }
             None => return Err("workspace not found".to_string()),
@@ -1122,7 +1129,7 @@ pub(crate) async fn update_workspace_codex_bin_core(
         id: entry_snapshot.id,
         name: entry_snapshot.name,
         path: entry_snapshot.path,
-        codex_bin: entry_snapshot.codex_bin,
+        agent_bin: entry_snapshot.agent_bin,
         connected,
         kind: entry_snapshot.kind,
         parent_id: entry_snapshot.parent_id,
@@ -1163,9 +1170,7 @@ fn sort_workspaces(workspaces: &mut [WorkspaceInfo]) {
         if a_order != b_order {
             return a_order.cmp(&b_order);
         }
-        a.name
-            .cmp(&b.name)
-            .then_with(|| a.id.cmp(&b.id))
+        a.name.cmp(&b.name).then_with(|| a.id.cmp(&b.id))
     });
 }
 

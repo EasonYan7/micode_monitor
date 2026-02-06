@@ -7,8 +7,8 @@ use std::time::{Duration, Instant, SystemTime};
 const RULES_DIR: &str = "rules";
 const DEFAULT_RULES_FILE: &str = "default.rules";
 
-pub(crate) fn default_rules_path(codex_home: &Path) -> PathBuf {
-    codex_home.join(RULES_DIR).join(DEFAULT_RULES_FILE)
+pub(crate) fn default_rules_path(agent_home: &Path) -> PathBuf {
+    agent_home.join(RULES_DIR).join(DEFAULT_RULES_FILE)
 }
 
 pub(crate) fn append_prefix_rule(path: &Path, pattern: &[String]) -> Result<(), String> {
@@ -96,9 +96,7 @@ fn is_lock_stale(path: &Path, stale_after: Duration) -> bool {
 
 fn format_prefix_rule(pattern: &[String]) -> String {
     let items = format_pattern_list(pattern);
-    format!(
-        "prefix_rule(\n    pattern = [{items}],\n    decision = \"allow\",\n)\n"
-    )
+    format!("prefix_rule(\n    pattern = [{items}],\n    decision = \"allow\",\n)\n")
 }
 
 fn format_pattern_list(pattern: &[String]) -> String {

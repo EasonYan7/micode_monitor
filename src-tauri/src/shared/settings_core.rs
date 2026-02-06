@@ -48,9 +48,7 @@ pub(crate) async fn update_app_settings_core(
     settings_path: &PathBuf,
 ) -> Result<AppSettings, String> {
     let _ = codex_config::write_collab_enabled(settings.experimental_collab_enabled);
-    let _ = codex_config::write_collaboration_modes_enabled(
-        settings.collaboration_modes_enabled,
-    );
+    let _ = codex_config::write_collaboration_modes_enabled(settings.collaboration_modes_enabled);
     let _ = codex_config::write_steer_enabled(settings.steer_enabled);
     let _ = codex_config::write_unified_exec_enabled(settings.unified_exec_enabled);
     let _ = codex_config::write_apps_enabled(settings.experimental_apps_enabled);

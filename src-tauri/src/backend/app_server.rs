@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::env;
@@ -5,17 +6,144 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::time::timeout;
+use uuid::Uuid;
 
 use crate::backend::events::{AppServerEvent, EventSink};
-use crate::shared::process_core::tokio_command;
 use crate::codex::args::apply_codex_args;
+use crate::shared::process_core::tokio_command;
 use crate::types::WorkspaceEntry;
+
+const ACP_PROTOCOL_VERSION: u32 = 1;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct LocalThreadRecord {
+    #[serde(rename = "threadId")]
+    thread_id: String,
+    #[serde(rename = "sessionId")]
+    session_id: String,
+    title: String,
+    archived: bool,
+    #[serde(rename = "updatedAt")]
+    updated_at: i64,
+    #[serde(rename = "messageIndex")]
+    message_index: u64,
+}
+
+#[derive(Default)]
+struct LocalThreadStore {
+    path: PathBuf,
+    records: Vec<LocalThreadRecord>,
+}
+
+impl LocalThreadStore {
+    fn load(workspace_path: &str) -> Self {
+        let path = PathBuf::from(workspace_path)
+            .join(".codexmonitor")
+            .join("sessions.json");
+        if let Ok(raw) = std::fs::read_to_string(&path) {
+            if let Ok(records) = serde_json::from_str::<Vec<LocalThreadRecord>>(&raw) {
+                return Self { path, records };
+            }
+        }
+        Self {
+            path,
+            records: Vec::new(),
+        }
+    }
+
+    fn persist(&self) {
+        if let Some(parent) = self.path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(raw) = serde_json::to_string_pretty(&self.records) {
+            let _ = std::fs::write(&self.path, raw);
+        }
+    }
+
+    fn upsert(&mut self, record: LocalThreadRecord) {
+        if let Some(existing) = self
+            .records
+            .iter_mut()
+            .find(|entry| entry.thread_id == record.thread_id)
+        {
+            *existing = record;
+        } else {
+            self.records.push(record);
+        }
+        self.persist();
+    }
+
+    fn by_thread_id(&self, thread_id: &str) -> Option<LocalThreadRecord> {
+        self.records
+            .iter()
+            .find(|entry| entry.thread_id == thread_id)
+            .cloned()
+    }
+
+    fn by_session_id(&self, session_id: &str) -> Option<LocalThreadRecord> {
+        self.records
+            .iter()
+            .find(|entry| entry.session_id == session_id)
+            .cloned()
+    }
+
+    fn list_unarchived(&self) -> Vec<LocalThreadRecord> {
+        self.records
+            .iter()
+            .filter(|entry| !entry.archived)
+            .cloned()
+            .collect()
+    }
+
+    fn set_archived(&mut self, thread_id: &str, archived: bool) {
+        if let Some(entry) = self
+            .records
+            .iter_mut()
+            .find(|entry| entry.thread_id == thread_id)
+        {
+            entry.archived = archived;
+            entry.updated_at = now_ts();
+            self.persist();
+        }
+    }
+
+    fn set_title(&mut self, thread_id: &str, title: String) {
+        if let Some(entry) = self
+            .records
+            .iter_mut()
+            .find(|entry| entry.thread_id == thread_id)
+        {
+            entry.title = title;
+            entry.updated_at = now_ts();
+            self.persist();
+        }
+    }
+
+    fn touch_message(&mut self, thread_id: &str) {
+        if let Some(entry) = self
+            .records
+            .iter_mut()
+            .find(|entry| entry.thread_id == thread_id)
+        {
+            entry.message_index = entry.message_index.saturating_add(1);
+            entry.updated_at = now_ts();
+            self.persist();
+        }
+    }
+}
+
+fn now_ts() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64
+}
 
 fn extract_thread_id(value: &Value) -> Option<String> {
     let params = value.get("params")?;
@@ -34,15 +162,14 @@ fn extract_thread_id(value: &Value) -> Option<String> {
         })
 }
 
-fn build_initialize_params(client_version: &str) -> Value {
+fn build_initialize_params(_client_version: &str) -> Value {
     json!({
-        "clientInfo": {
-            "name": "codex_monitor",
-            "title": "Codex Monitor",
-            "version": client_version
-        },
-        "capabilities": {
-            "experimentalApi": true
+        "protocolVersion": ACP_PROTOCOL_VERSION,
+        "clientCapabilities": {
+            "fs": {
+                "readTextFile": false,
+                "writeTextFile": false
+            }
         }
     })
 }
@@ -53,8 +180,10 @@ pub(crate) struct WorkspaceSession {
     pub(crate) stdin: Mutex<ChildStdin>,
     pub(crate) pending: Mutex<HashMap<u64, oneshot::Sender<Value>>>,
     pub(crate) next_id: AtomicU64,
-    /// Callbacks for background threads - events for these threadIds are sent through the channel
     pub(crate) background_thread_callbacks: Mutex<HashMap<String, mpsc::UnboundedSender<Value>>>,
+    event_tx: mpsc::UnboundedSender<AppServerEvent>,
+    thread_store: Mutex<LocalThreadStore>,
+    approval_requests: Mutex<HashMap<String, Value>>,
 }
 
 impl WorkspaceSession {
@@ -68,13 +197,227 @@ impl WorkspaceSession {
             .map_err(|e| e.to_string())
     }
 
-    pub(crate) async fn send_request(&self, method: &str, params: Value) -> Result<Value, String> {
+    async fn send_acp_request(&self, method: &str, params: Value) -> Result<Value, String> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = oneshot::channel();
         self.pending.lock().await.insert(id, tx);
-        self.write_message(json!({ "id": id, "method": method, "params": params }))
-            .await?;
+        self.write_message(
+            json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params }),
+        )
+        .await?;
         rx.await.map_err(|_| "request canceled".to_string())
+    }
+
+    fn emit_event(&self, method: &str, params: Value) {
+        let _ = self.event_tx.send(AppServerEvent {
+            workspace_id: self.entry.id.clone(),
+            message: json!({ "method": method, "params": params }),
+        });
+    }
+
+    async fn create_local_thread(&self, session_id: String) -> LocalThreadRecord {
+        let thread = LocalThreadRecord {
+            thread_id: Uuid::new_v4().to_string(),
+            session_id,
+            title: "New Thread".to_string(),
+            archived: false,
+            updated_at: now_ts(),
+            message_index: 0,
+        };
+        let mut store = self.thread_store.lock().await;
+        store.upsert(thread.clone());
+        thread
+    }
+
+    async fn get_thread_by_id(&self, thread_id: &str) -> Result<LocalThreadRecord, String> {
+        let store = self.thread_store.lock().await;
+        store
+            .by_thread_id(thread_id)
+            .ok_or_else(|| format!("thread not found: {thread_id}"))
+    }
+
+    fn parse_prompt_from_turn_start(params: &Value) -> String {
+        params
+            .get("input")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|item| {
+                if item.get("type").and_then(Value::as_str) == Some("text") {
+                    item.get("text")
+                        .and_then(Value::as_str)
+                        .map(|v| v.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+            .trim()
+            .to_string()
+    }
+
+    pub(crate) async fn send_request(&self, method: &str, params: Value) -> Result<Value, String> {
+        match method {
+            "thread/start" => {
+                let cwd = params
+                    .get("cwd")
+                    .and_then(Value::as_str)
+                    .unwrap_or(self.entry.path.as_str())
+                    .to_string();
+                let response = self
+                    .send_acp_request("session/new", json!({ "cwd": cwd, "mcpServers": [] }))
+                    .await?;
+                let session_id = response
+                    .get("result")
+                    .and_then(|v| v.get("sessionId"))
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| "missing sessionId from ACP session/new".to_string())?
+                    .to_string();
+                let thread = self.create_local_thread(session_id).await;
+                self.emit_event(
+                    "thread/started",
+                    json!({
+                        "thread": {
+                            "id": thread.thread_id,
+                            "name": thread.title
+                        }
+                    }),
+                );
+                Ok(json!({
+                    "result": {
+                        "thread": {
+                            "id": thread.thread_id,
+                            "name": thread.title
+                        }
+                    }
+                }))
+            }
+            "thread/list" => {
+                let store = self.thread_store.lock().await;
+                let mut data = store.list_unarchived();
+                data.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+                let threads = data
+                    .into_iter()
+                    .map(|entry| {
+                        json!({
+                            "id": entry.thread_id,
+                            "name": entry.title,
+                            "updatedAt": entry.updated_at
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                Ok(
+                    json!({ "result": { "threads": threads, "hasMore": false, "nextCursor": null } }),
+                )
+            }
+            "thread/resume" => {
+                let thread_id = params
+                    .get("threadId")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| "missing threadId".to_string())?;
+                let thread = self.get_thread_by_id(thread_id).await?;
+                Ok(json!({
+                    "result": {
+                        "thread": { "id": thread.thread_id, "name": thread.title },
+                        "items": []
+                    }
+                }))
+            }
+            "thread/archive" => {
+                let thread_id = params
+                    .get("threadId")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| "missing threadId".to_string())?;
+                self.thread_store.lock().await.set_archived(thread_id, true);
+                Ok(json!({ "result": { "ok": true } }))
+            }
+            "thread/name/set" => {
+                let thread_id = params
+                    .get("threadId")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| "missing threadId".to_string())?;
+                let name = params
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("New Thread")
+                    .trim()
+                    .to_string();
+                self.thread_store
+                    .lock()
+                    .await
+                    .set_title(thread_id, name.clone());
+                self.emit_event(
+                    "thread/name/updated",
+                    json!({ "threadId": thread_id, "threadName": name }),
+                );
+                Ok(json!({ "result": { "ok": true } }))
+            }
+            "thread/compact/start" => Ok(json!({ "result": { "ok": true, "mode": "synthetic" } })),
+            "turn/start" => {
+                let thread_id = params
+                    .get("threadId")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| "missing threadId".to_string())?
+                    .to_string();
+                let thread = self.get_thread_by_id(&thread_id).await?;
+                let prompt_text = Self::parse_prompt_from_turn_start(&params);
+                if prompt_text.is_empty() {
+                    return Err("empty user message".to_string());
+                }
+                let turn_id = Uuid::new_v4().to_string();
+                self.emit_event(
+                    "turn/started",
+                    json!({
+                        "threadId": thread_id,
+                        "turn": { "id": turn_id, "threadId": thread.thread_id }
+                    }),
+                );
+                let response = self
+                    .send_acp_request(
+                        "session/prompt",
+                        json!({
+                            "sessionId": thread.session_id,
+                            "prompt": [{ "type": "text", "text": prompt_text }]
+                        }),
+                    )
+                    .await?;
+                self.thread_store.lock().await.touch_message(&thread_id);
+                self.emit_event(
+                    "turn/completed",
+                    json!({
+                        "threadId": thread_id,
+                        "turn": { "id": turn_id, "threadId": thread.thread_id }
+                    }),
+                );
+                Ok(response)
+            }
+            "turn/interrupt" => {
+                let thread_id = params
+                    .get("threadId")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| "missing threadId".to_string())?;
+                let thread = self.get_thread_by_id(thread_id).await?;
+                let response = self
+                    .send_acp_request("session/cancel", json!({ "sessionId": thread.session_id }))
+                    .await?;
+                Ok(response)
+            }
+            "model/list" => {
+                Ok(json!({ "result": { "models": [{ "id": "auto", "name": "MiCode Auto" }] } }))
+            }
+            "account/read" => {
+                Ok(json!({ "result": { "provider": "micode-acp", "authMode": "unknown" } }))
+            }
+            "account/rateLimits/read" => {
+                Ok(json!({ "result": { "source": "synthetic", "limits": [] } }))
+            }
+            "skills/list" => Ok(json!({ "result": { "skills": [] } })),
+            "app/list" => {
+                Ok(json!({ "result": { "apps": [], "hasMore": false, "nextCursor": null } }))
+            }
+            _ => self.send_acp_request(method, params).await,
+        }
     }
 
     pub(crate) async fn send_notification(
@@ -83,20 +426,69 @@ impl WorkspaceSession {
         params: Option<Value>,
     ) -> Result<(), String> {
         let value = if let Some(params) = params {
-            json!({ "method": method, "params": params })
+            json!({ "jsonrpc": "2.0", "method": method, "params": params })
         } else {
-            json!({ "method": method })
+            json!({ "jsonrpc": "2.0", "method": method })
         };
         self.write_message(value).await
     }
 
     pub(crate) async fn send_response(&self, id: Value, result: Value) -> Result<(), String> {
-        self.write_message(json!({ "id": id, "result": result }))
+        let id_key = id
+            .as_i64()
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| id.to_string());
+        let original = self.approval_requests.lock().await.remove(&id_key);
+        if let Some(original) = original {
+            let options = original
+                .get("options")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            let decision = result
+                .get("decision")
+                .and_then(Value::as_str)
+                .unwrap_or("decline");
+            let preferred = if decision == "accept" {
+                ["allow_once", "allow_always"]
+            } else {
+                ["reject_once", "reject_always"]
+            };
+            let option_id = preferred
+                .iter()
+                .find_map(|kind| {
+                    options.iter().find_map(|opt| {
+                        if opt.get("kind").and_then(Value::as_str) == Some(*kind) {
+                            opt.get("optionId")
+                                .and_then(Value::as_str)
+                                .map(|v| v.to_string())
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .or_else(|| {
+                    options.iter().find_map(|opt| {
+                        opt.get("optionId")
+                            .and_then(Value::as_str)
+                            .map(|v| v.to_string())
+                    })
+                });
+            let mapped = if let Some(option_id) = option_id {
+                json!({ "outcome": { "outcome": "selected", "optionId": option_id } })
+            } else {
+                json!({ "outcome": { "outcome": "cancelled" } })
+            };
+            return self
+                .write_message(json!({ "jsonrpc": "2.0", "id": id, "result": mapped }))
+                .await;
+        }
+        self.write_message(json!({ "jsonrpc": "2.0", "id": id, "result": result }))
             .await
     }
 }
 
-pub(crate) fn build_codex_path_env(codex_bin: Option<&str>) -> Option<String> {
+pub(crate) fn build_codex_path_env(agent_bin: Option<&str>) -> Option<String> {
     let mut paths: Vec<String> = env::var("PATH")
         .unwrap_or_default()
         .split(':')
@@ -119,19 +511,9 @@ pub(crate) fn build_codex_path_env(codex_bin: Option<&str>) -> Option<String> {
         extras.push(format!("{home}/.local/share/mise/shims"));
         extras.push(format!("{home}/.cargo/bin"));
         extras.push(format!("{home}/.bun/bin"));
-        let nvm_root = Path::new(&home).join(".nvm/versions/node");
-        if let Ok(entries) = std::fs::read_dir(nvm_root) {
-            for entry in entries.flatten() {
-                let bin_path = entry.path().join("bin");
-                if bin_path.is_dir() {
-                    extras.push(bin_path.to_string_lossy().to_string());
-                }
-            }
-        }
     }
-    if let Some(bin_path) = codex_bin.filter(|value| !value.trim().is_empty()) {
-        let parent = Path::new(bin_path).parent();
-        if let Some(parent) = parent {
+    if let Some(bin_path) = agent_bin.filter(|value| !value.trim().is_empty()) {
+        if let Some(parent) = Path::new(bin_path).parent() {
             extras.push(parent.to_string_lossy().to_string());
         }
     }
@@ -147,22 +529,22 @@ pub(crate) fn build_codex_path_env(codex_bin: Option<&str>) -> Option<String> {
     }
 }
 
-pub(crate) fn build_codex_command_with_bin(codex_bin: Option<String>) -> Command {
-    let bin = codex_bin
+pub(crate) fn build_codex_command_with_bin(agent_bin: Option<String>) -> Command {
+    let bin = agent_bin
         .clone()
         .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| "codex".into());
+        .unwrap_or_else(|| "micode".into());
     let mut command = tokio_command(bin);
-    if let Some(path_env) = build_codex_path_env(codex_bin.as_deref()) {
+    if let Some(path_env) = build_codex_path_env(agent_bin.as_deref()) {
         command.env("PATH", path_env);
     }
     command
 }
 
 pub(crate) async fn check_codex_installation(
-    codex_bin: Option<String>,
+    agent_bin: Option<String>,
 ) -> Result<Option<String>, String> {
-    let mut command = build_codex_command_with_bin(codex_bin);
+    let mut command = build_codex_command_with_bin(agent_bin);
     command.arg("--version");
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::piped());
@@ -170,7 +552,7 @@ pub(crate) async fn check_codex_installation(
     let output = match timeout(Duration::from_secs(5), command.output()).await {
         Ok(result) => result.map_err(|e| {
             if e.kind() == ErrorKind::NotFound {
-                "Codex CLI not found. Install Codex and ensure `codex` is on your PATH."
+                "MiCode CLI not found. Install micode and ensure `micode` is on your PATH."
                     .to_string()
             } else {
                 e.to_string()
@@ -178,7 +560,7 @@ pub(crate) async fn check_codex_installation(
         })?,
         Err(_) => {
             return Err(
-                "Timed out while checking Codex CLI. Make sure `codex --version` runs in Terminal."
+                "Timed out while checking MiCode CLI. Make sure `micode --version` runs in Terminal."
                     .to_string(),
             );
         }
@@ -192,42 +574,209 @@ pub(crate) async fn check_codex_installation(
         } else {
             stderr.trim()
         };
-        if detail.is_empty() {
-            return Err(
-                "Codex CLI failed to start. Try running `codex --version` in Terminal."
-                    .to_string(),
-            );
-        }
-        return Err(format!(
-            "Codex CLI failed to start: {detail}. Try running `codex --version` in Terminal."
-        ));
+        return Err(if detail.is_empty() {
+            "MiCode CLI failed to start. Try running `micode --version` in Terminal.".to_string()
+        } else {
+            format!("MiCode CLI failed to start: {detail}")
+        });
     }
 
     let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    Ok(if version.is_empty() { None } else { Some(version) })
+    Ok(if version.is_empty() {
+        None
+    } else {
+        Some(version)
+    })
+}
+
+pub(crate) async fn check_acp_handshake(
+    agent_bin: Option<String>,
+    agent_args: Option<String>,
+) -> Result<bool, String> {
+    let mut command = build_codex_command_with_bin(agent_bin);
+    apply_codex_args(&mut command, agent_args.as_deref())?;
+    command.arg("--experimental-acp");
+    command.stdin(std::process::Stdio::piped());
+    command.stdout(std::process::Stdio::piped());
+    command.stderr(std::process::Stdio::null());
+    let mut child = command.spawn().map_err(|e| e.to_string())?;
+    let mut stdin = child.stdin.take().ok_or("missing stdin")?;
+    let stdout = child.stdout.take().ok_or("missing stdout")?;
+    let init = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": ACP_PROTOCOL_VERSION,
+            "clientCapabilities": {
+                "fs": { "readTextFile": false, "writeTextFile": false }
+            }
+        }
+    });
+    let mut line = serde_json::to_string(&init).map_err(|e| e.to_string())?;
+    line.push('\n');
+    stdin
+        .write_all(line.as_bytes())
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut lines = BufReader::new(stdout).lines();
+    let result = timeout(Duration::from_secs(5), lines.next_line()).await;
+    let _ = child.kill().await;
+    match result {
+        Ok(Ok(Some(line))) => Ok(line.contains("\"result\"") && line.contains("protocolVersion")),
+        Ok(Ok(None)) => Ok(false),
+        Ok(Err(err)) => Err(err.to_string()),
+        Err(_) => Ok(false),
+    }
+}
+
+fn session_id_from_notification(value: &Value) -> Option<String> {
+    value
+        .get("params")
+        .and_then(|params| params.get("sessionId"))
+        .and_then(Value::as_str)
+        .map(|v| v.to_string())
+}
+
+fn translate_acp_update(
+    thread_id: &str,
+    update: &Value,
+    workspace_id: &str,
+) -> Vec<AppServerEvent> {
+    let mut events = Vec::new();
+    let kind = update
+        .get("sessionUpdate")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+
+    match kind {
+        "agent_message_chunk" => {
+            let delta = update
+                .get("content")
+                .and_then(|content| content.get("text"))
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            if !delta.is_empty() {
+                events.push(AppServerEvent {
+                    workspace_id: workspace_id.to_string(),
+                    message: json!({
+                        "method": "item/agentMessage/delta",
+                        "params": {
+                            "threadId": thread_id,
+                            "itemId": format!("agent-{}", Uuid::new_v4()),
+                            "delta": delta
+                        }
+                    }),
+                });
+            }
+        }
+        "agent_thought_chunk" => {
+            let delta = update
+                .get("content")
+                .and_then(|content| content.get("text"))
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            if !delta.is_empty() {
+                events.push(AppServerEvent {
+                    workspace_id: workspace_id.to_string(),
+                    message: json!({
+                        "method": "item/reasoning/textDelta",
+                        "params": {
+                            "threadId": thread_id,
+                            "itemId": format!("reasoning-{}", Uuid::new_v4()),
+                            "delta": delta
+                        }
+                    }),
+                });
+            }
+        }
+        "plan" => {
+            let plan = update.get("entries").cloned().unwrap_or_else(|| json!([]));
+            events.push(AppServerEvent {
+                workspace_id: workspace_id.to_string(),
+                message: json!({
+                    "method": "turn/plan/updated",
+                    "params": {
+                        "threadId": thread_id,
+                        "turnId": format!("turn-{}", Uuid::new_v4()),
+                        "explanation": null,
+                        "plan": plan
+                    }
+                }),
+            });
+        }
+        "tool_call" => {
+            let item_id = format!("tool-{}", Uuid::new_v4());
+            let title = update
+                .get("title")
+                .and_then(Value::as_str)
+                .unwrap_or("Tool Call");
+            events.push(AppServerEvent {
+                workspace_id: workspace_id.to_string(),
+                message: json!({
+                    "method": "item/started",
+                    "params": {
+                        "threadId": thread_id,
+                        "item": {
+                            "id": item_id,
+                            "type": "mcpToolCall",
+                            "title": title,
+                            "status": "in_progress"
+                        }
+                    }
+                }),
+            });
+        }
+        "tool_call_update" => {
+            let title = update
+                .get("title")
+                .and_then(Value::as_str)
+                .unwrap_or("Tool Call");
+            events.push(AppServerEvent {
+                workspace_id: workspace_id.to_string(),
+                message: json!({
+                    "method": "item/completed",
+                    "params": {
+                        "threadId": thread_id,
+                        "item": {
+                            "id": format!("tool-{}", Uuid::new_v4()),
+                            "type": "mcpToolCall",
+                            "title": title,
+                            "status": "completed"
+                        }
+                    }
+                }),
+            });
+        }
+        _ => {}
+    }
+
+    events
 }
 
 pub(crate) async fn spawn_workspace_session<E: EventSink>(
     entry: WorkspaceEntry,
     default_codex_bin: Option<String>,
-    codex_args: Option<String>,
-    codex_home: Option<PathBuf>,
+    agent_args: Option<String>,
+    agent_home: Option<PathBuf>,
     client_version: String,
     event_sink: E,
 ) -> Result<Arc<WorkspaceSession>, String> {
-    let codex_bin = entry
-        .codex_bin
+    let agent_bin = entry
+        .agent_bin
         .clone()
         .filter(|value| !value.trim().is_empty())
         .or(default_codex_bin);
-    let _ = check_codex_installation(codex_bin.clone()).await?;
+    let _ = check_codex_installation(agent_bin.clone()).await?;
 
-    let mut command = build_codex_command_with_bin(codex_bin);
-    apply_codex_args(&mut command, codex_args.as_deref())?;
+    let mut command = build_codex_command_with_bin(agent_bin);
+    apply_codex_args(&mut command, agent_args.as_deref())?;
     command.current_dir(&entry.path);
-    command.arg("app-server");
-    if let Some(codex_home) = codex_home {
-        command.env("CODEX_HOME", codex_home);
+    command.arg("--experimental-acp");
+    if let Some(agent_home) = agent_home {
+        command.env("CODEX_HOME", agent_home);
     }
     command.stdin(std::process::Stdio::piped());
     command.stdout(std::process::Stdio::piped());
@@ -238,6 +787,14 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
     let stdout = child.stdout.take().ok_or("missing stdout")?;
     let stderr = child.stderr.take().ok_or("missing stderr")?;
 
+    let (event_tx, mut event_rx) = mpsc::unbounded_channel::<AppServerEvent>();
+    let sink_for_forward = event_sink.clone();
+    tokio::spawn(async move {
+        while let Some(event) = event_rx.recv().await {
+            sink_for_forward.emit_app_server_event(event);
+        }
+    });
+
     let session = Arc::new(WorkspaceSession {
         entry: entry.clone(),
         child: Mutex::new(child),
@@ -245,11 +802,13 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
         pending: Mutex::new(HashMap::new()),
         next_id: AtomicU64::new(1),
         background_thread_callbacks: Mutex::new(HashMap::new()),
+        event_tx: event_tx.clone(),
+        thread_store: Mutex::new(LocalThreadStore::load(&entry.path)),
+        approval_requests: Mutex::new(HashMap::new()),
     });
 
     let session_clone = Arc::clone(&session);
     let workspace_id = entry.id.clone();
-    let event_sink_clone = event_sink.clone();
     tokio::spawn(async move {
         let mut lines = BufReader::new(stdout).lines();
         while let Ok(Some(line)) = lines.next_line().await {
@@ -259,69 +818,92 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
             let value: Value = match serde_json::from_str(&line) {
                 Ok(value) => value,
                 Err(err) => {
-                    let payload = AppServerEvent {
+                    let _ = event_tx.send(AppServerEvent {
                         workspace_id: workspace_id.clone(),
                         message: json!({
                             "method": "codex/parseError",
                             "params": { "error": err.to_string(), "raw": line },
                         }),
-                    };
-                    event_sink_clone.emit_app_server_event(payload);
+                    });
                     continue;
                 }
             };
 
-            let maybe_id = value.get("id").and_then(|id| id.as_u64());
-            let has_method = value.get("method").is_some();
-            let has_result_or_error = value.get("result").is_some() || value.get("error").is_some();
-
-            // Check if this event is for a background thread
-            let thread_id = extract_thread_id(&value);
-
-            if let Some(id) = maybe_id {
-                if has_result_or_error {
+            if let Some(id) = value.get("id").and_then(Value::as_u64) {
+                if value.get("result").is_some() || value.get("error").is_some() {
                     if let Some(tx) = session_clone.pending.lock().await.remove(&id) {
-                        let _ = tx.send(value);
+                        let _ = tx.send(value.clone());
                     }
-                } else if has_method {
-                    // Check for background thread callback
-                    let mut sent_to_background = false;
-                    if let Some(ref tid) = thread_id {
-                        let callbacks = session_clone.background_thread_callbacks.lock().await;
-                        if let Some(tx) = callbacks.get(tid) {
-                            let _ = tx.send(value.clone());
-                            sent_to_background = true;
+                    continue;
+                }
+            }
+
+            if let Some(method) = value.get("method").and_then(Value::as_str) {
+                if method == "session/update" {
+                    let session_id = session_id_from_notification(&value).unwrap_or_default();
+                    let thread = {
+                        let store = session_clone.thread_store.lock().await;
+                        store.by_session_id(&session_id)
+                    };
+                    if let Some(thread) = thread {
+                        if let Some(update) = value.get("params").and_then(|v| v.get("update")) {
+                            for event in
+                                translate_acp_update(&thread.thread_id, update, &workspace_id)
+                            {
+                                let _ = event_tx.send(event);
+                            }
                         }
                     }
-                    // Don't emit to frontend if this is a background thread event
-                    if !sent_to_background {
-                        let payload = AppServerEvent {
-                            workspace_id: workspace_id.clone(),
-                            message: value,
-                        };
-                        event_sink_clone.emit_app_server_event(payload);
-                    }
-                } else if let Some(tx) = session_clone.pending.lock().await.remove(&id) {
-                    let _ = tx.send(value);
+                    continue;
                 }
-            } else if has_method {
-                // Check for background thread callback
-                let mut sent_to_background = false;
-                if let Some(ref tid) = thread_id {
-                    let callbacks = session_clone.background_thread_callbacks.lock().await;
-                    if let Some(tx) = callbacks.get(tid) {
-                        let _ = tx.send(value.clone());
-                        sent_to_background = true;
-                    }
-                }
-                // Don't emit to frontend if this is a background thread event
-                if !sent_to_background {
-                    let payload = AppServerEvent {
-                        workspace_id: workspace_id.clone(),
-                        message: value,
+
+                if method == "session/request_permission" {
+                    let request_id = value.get("id").cloned().unwrap_or(Value::Null);
+                    let id_key = request_id
+                        .as_i64()
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| request_id.to_string());
+                    let params = value.get("params").cloned().unwrap_or(Value::Null);
+                    session_clone
+                        .approval_requests
+                        .lock()
+                        .await
+                        .insert(id_key, params.clone());
+                    let session_id = params
+                        .get("sessionId")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default();
+                    let thread_id = {
+                        let store = session_clone.thread_store.lock().await;
+                        store
+                            .by_session_id(session_id)
+                            .map(|entry| entry.thread_id)
+                            .unwrap_or_default()
                     };
-                    event_sink_clone.emit_app_server_event(payload);
+                    let title = params
+                        .get("toolCall")
+                        .and_then(|v| v.get("title"))
+                        .and_then(Value::as_str)
+                        .unwrap_or("Approve action")
+                        .to_string();
+                    let _ = event_tx.send(AppServerEvent {
+                        workspace_id: workspace_id.clone(),
+                        message: json!({
+                            "id": request_id,
+                            "method": "item/tool/requestApproval",
+                            "params": {
+                                "threadId": thread_id,
+                                "command": [title]
+                            }
+                        }),
+                    });
+                    continue;
                 }
+
+                let _ = event_tx.send(AppServerEvent {
+                    workspace_id: workspace_id.clone(),
+                    message: value,
+                });
             }
         }
     });
@@ -334,21 +916,20 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
             if line.trim().is_empty() {
                 continue;
             }
-            let payload = AppServerEvent {
+            event_sink_clone.emit_app_server_event(AppServerEvent {
                 workspace_id: workspace_id.clone(),
                 message: json!({
                     "method": "codex/stderr",
                     "params": { "message": line },
                 }),
-            };
-            event_sink_clone.emit_app_server_event(payload);
+            });
         }
     });
 
     let init_params = build_initialize_params(&client_version);
     let init_result = timeout(
         Duration::from_secs(15),
-        session.send_request("initialize", init_params),
+        session.send_acp_request("initialize", init_params),
     )
     .await;
     let init_response = match init_result {
@@ -357,22 +938,23 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
             let mut child = session.child.lock().await;
             let _ = child.kill().await;
             return Err(
-                "Codex app-server did not respond to initialize. Check that `codex app-server` works in Terminal."
+                "MiCode ACP did not respond to initialize. Check that `micode --experimental-acp` works in Terminal."
                     .to_string(),
             );
         }
     };
-    init_response?;
-    session.send_notification("initialized", None).await?;
+    let init_response = init_response?;
+    if init_response.get("error").is_some() {
+        return Err(format!("ACP initialize failed: {init_response}"));
+    }
 
-    let payload = AppServerEvent {
+    event_sink.emit_app_server_event(AppServerEvent {
         workspace_id: entry.id.clone(),
         message: json!({
             "method": "codex/connected",
             "params": { "workspaceId": entry.id.clone() }
         }),
-    };
-    event_sink.emit_app_server_event(payload);
+    });
 
     Ok(session)
 }
@@ -401,14 +983,13 @@ mod tests {
     }
 
     #[test]
-    fn build_initialize_params_enables_experimental_api() {
+    fn build_initialize_params_sets_protocol_version() {
         let params = build_initialize_params("1.2.3");
         assert_eq!(
             params
-                .get("capabilities")
-                .and_then(|caps| caps.get("experimentalApi"))
-                .and_then(|value| value.as_bool()),
-            Some(true)
+                .get("protocolVersion")
+                .and_then(|value| value.as_u64()),
+            Some(1)
         );
     }
 }

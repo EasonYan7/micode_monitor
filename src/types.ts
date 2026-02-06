@@ -3,6 +3,8 @@ export type WorkspaceSettings = {
   sortOrder?: number | null;
   groupId?: string | null;
   gitRoot?: string | null;
+  agentHome?: string | null;
+  agentArgs?: string | null;
   codexHome?: string | null;
   codexArgs?: string | null;
   launchScript?: string | null;
@@ -52,6 +54,7 @@ export type WorkspaceInfo = {
   name: string;
   path: string;
   connected: boolean;
+  agent_bin?: string | null;
   codex_bin?: string | null;
   kind?: WorkspaceKind;
   parentId?: string | null;
@@ -140,6 +143,9 @@ export type OpenAppTarget = {
 };
 
 export type AppSettings = {
+  agentProvider: "micode-acp";
+  agentBin: string | null;
+  agentArgs: string | null;
   codexBin: string | null;
   codexArgs: string | null;
   backendMode: BackendMode;

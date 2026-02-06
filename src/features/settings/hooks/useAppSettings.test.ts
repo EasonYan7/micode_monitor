@@ -81,6 +81,7 @@ describe("useAppSettings", () => {
 
     const next: AppSettings = {
       ...result.current.settings,
+      agentArgs: "--profile dev",
       codexArgs: "--profile dev",
       theme: "nope" as unknown as AppSettings["theme"],
       uiScale: 0.04,
@@ -91,6 +92,7 @@ describe("useAppSettings", () => {
     };
     const saved: AppSettings = {
       ...result.current.settings,
+      agentArgs: "--profile dev",
       codexArgs: "--profile dev",
       theme: "dark",
       uiScale: 2.4,

@@ -47,8 +47,7 @@ mod tests {
 
     #[test]
     fn write_read_workspaces_persists_sort_and_group() {
-        let temp_dir =
-            std::env::temp_dir().join(format!("codex-monitor-test-{}", Uuid::new_v4()));
+        let temp_dir = std::env::temp_dir().join(format!("codex-monitor-test-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&temp_dir).expect("create temp dir");
         let path = temp_dir.join("workspaces.json");
 
@@ -57,13 +56,13 @@ mod tests {
         settings.group_id = Some("group-42".to_string());
         settings.sidebar_collapsed = true;
         settings.git_root = Some("/tmp".to_string());
-        settings.codex_args = Some("--profile personal".to_string());
+        settings.agent_args = Some("--profile personal".to_string());
 
         let entry = WorkspaceEntry {
             id: "w1".to_string(),
             name: "Workspace".to_string(),
             path: "/tmp".to_string(),
-            codex_bin: None,
+            agent_bin: None,
             kind: WorkspaceKind::Main,
             parent_id: None,
             worktree: None,
@@ -78,7 +77,7 @@ mod tests {
         assert!(stored.settings.sidebar_collapsed);
         assert_eq!(stored.settings.git_root.as_deref(), Some("/tmp"));
         assert_eq!(
-            stored.settings.codex_args.as_deref(),
+            stored.settings.agent_args.as_deref(),
             Some("--profile personal")
         );
     }

@@ -284,10 +284,11 @@ fn scan_file(
                 continue;
             }
 
-            let info = payload.and_then(|payload| payload.get("info")).and_then(|v| v.as_object());
+            let info = payload
+                .and_then(|payload| payload.get("info"))
+                .and_then(|v| v.as_object());
             let (input, cached, output, used_total) = if let Some(info) = info {
-                if let Some(total) =
-                    find_usage_map(info, &["total_token_usage", "totalTokenUsage"])
+                if let Some(total) = find_usage_map(info, &["total_token_usage", "totalTokenUsage"])
                 {
                     (
                         read_i64(total, &["input_tokens", "inputTokens"]),
@@ -340,7 +341,11 @@ fn scan_file(
                     cached: (cached - prev.cached).max(0),
                     output: (output - prev.output).max(0),
                 };
-                previous_totals = Some(UsageTotals { input, cached, output });
+                previous_totals = Some(UsageTotals {
+                    input,
+                    cached,
+                    output,
+                });
             } else {
                 // Some streams emit `last_token_usage` deltas between `total_token_usage` snapshots.
                 // Treat those as already-counted to avoid double-counting when the next total arrives.
@@ -445,7 +450,11 @@ fn find_usage_map<'a>(
 fn read_i64(map: &serde_json::Map<String, Value>, keys: &[&str]) -> i64 {
     keys.iter()
         .find_map(|key| map.get(*key))
-        .and_then(|value| value.as_i64().or_else(|| value.as_f64().map(|value| value as i64)))
+        .and_then(|value| {
+            value
+                .as_i64()
+                .or_else(|| value.as_f64().map(|value| value as i64))
+        })
         .unwrap_or(0)
 }
 
@@ -525,7 +534,9 @@ fn resolve_sessions_roots(
     if let Some(workspace_path) = workspace_path {
         let codex_home_override =
             resolve_workspace_codex_home_for_path(workspaces, Some(workspace_path));
-        return resolve_codex_sessions_root(codex_home_override).into_iter().collect();
+        return resolve_codex_sessions_root(codex_home_override)
+            .into_iter()
+            .collect();
     }
 
     let mut roots = Vec::new();
@@ -542,10 +553,10 @@ fn resolve_sessions_roots(
             .parent_id
             .as_ref()
             .and_then(|parent_id| workspaces.get(parent_id));
-        let Some(codex_home) = resolve_workspace_codex_home(entry, parent_entry) else {
+        let Some(agent_home) = resolve_workspace_codex_home(entry, parent_entry) else {
             continue;
         };
-        if let Some(root) = resolve_codex_sessions_root(Some(codex_home)) {
+        if let Some(root) = resolve_codex_sessions_root(Some(agent_home)) {
             if seen.insert(root.clone()) {
                 roots.push(root);
             }
@@ -609,10 +620,7 @@ mod tests {
 
     fn make_temp_sessions_root() -> PathBuf {
         let mut root = std::env::temp_dir();
-        root.push(format!(
-            "codexmonitor-local-usage-root-{}",
-            Uuid::new_v4()
-        ));
+        root.push(format!("codexmonitor-local-usage-root-{}", Uuid::new_v4()));
         fs::create_dir_all(&root).expect("create temp root");
         root
     }
@@ -767,11 +775,9 @@ mod tests {
             .last()
             .cloned()
             .unwrap_or_else(|| Local::now().format("%Y-%m-%d").to_string());
-        let naive = NaiveDateTime::parse_from_str(
-            &format!("{day_key} 12:00:00"),
-            "%Y-%m-%d %H:%M:%S",
-        )
-        .expect("timestamp");
+        let naive =
+            NaiveDateTime::parse_from_str(&format!("{day_key} 12:00:00"), "%Y-%m-%d %H:%M:%S")
+                .expect("timestamp");
         let timestamp_ms = Local
             .from_local_datetime(&naive)
             .single()
@@ -807,7 +813,7 @@ mod tests {
     fn resolve_sessions_roots_includes_workspace_overrides() {
         let mut workspaces = HashMap::new();
         let mut settings_a = WorkspaceSettings::default();
-        settings_a.codex_home = Some(
+        settings_a.agent_home = Some(
             std::env::temp_dir()
                 .join(format!("codex-home-a-{}", Uuid::new_v4()))
                 .to_string_lossy()
@@ -817,14 +823,14 @@ mod tests {
             id: "a".to_string(),
             name: "A".to_string(),
             path: "/tmp/project-a".to_string(),
-            codex_bin: None,
+            agent_bin: None,
             kind: WorkspaceKind::Main,
             parent_id: None,
             worktree: None,
             settings: settings_a,
         };
         let mut settings_b = WorkspaceSettings::default();
-        settings_b.codex_home = Some(
+        settings_b.agent_home = Some(
             std::env::temp_dir()
                 .join(format!("codex-home-b-{}", Uuid::new_v4()))
                 .to_string_lossy()
@@ -834,7 +840,7 @@ mod tests {
             id: "b".to_string(),
             name: "B".to_string(),
             path: "/tmp/project-b".to_string(),
-            codex_bin: None,
+            agent_bin: None,
             kind: WorkspaceKind::Main,
             parent_id: None,
             worktree: None,
@@ -844,8 +850,8 @@ mod tests {
         workspaces.insert(entry_b.id.clone(), entry_b.clone());
 
         let roots = resolve_sessions_roots(&workspaces, None);
-        let expected_a = PathBuf::from(entry_a.settings.codex_home.unwrap()).join("sessions");
-        let expected_b = PathBuf::from(entry_b.settings.codex_home.unwrap()).join("sessions");
+        let expected_a = PathBuf::from(entry_a.settings.agent_home.unwrap()).join("sessions");
+        let expected_b = PathBuf::from(entry_b.settings.agent_home.unwrap()).join("sessions");
 
         assert!(roots.iter().any(|root| root == &expected_a));
         assert!(roots.iter().any(|root| root == &expected_b));

@@ -21,6 +21,9 @@ const allowedThemes = new Set(["system", "light", "dark", "dim"]);
 const allowedPersonality = new Set(["friendly", "pragmatic"]);
 
 const defaultSettings: AppSettings = {
+  agentProvider: "micode-acp",
+  agentBin: null,
+  agentArgs: null,
   codexBin: null,
   codexArgs: null,
   backendMode: "local",
@@ -105,8 +108,19 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
       : normalizedTargets[0]?.id ?? DEFAULT_OPEN_APP_ID;
   return {
     ...settings,
-    codexBin: settings.codexBin?.trim() ? settings.codexBin.trim() : null,
-    codexArgs: settings.codexArgs?.trim() ? settings.codexArgs.trim() : null,
+    agentProvider: "micode-acp",
+    agentBin: settings.agentBin?.trim()
+      ? settings.agentBin.trim()
+      : (settings.codexBin?.trim() ? settings.codexBin.trim() : null),
+    agentArgs: settings.agentArgs?.trim()
+      ? settings.agentArgs.trim()
+      : (settings.codexArgs?.trim() ? settings.codexArgs.trim() : null),
+    codexBin: settings.codexBin?.trim()
+      ? settings.codexBin.trim()
+      : (settings.agentBin?.trim() ? settings.agentBin.trim() : null),
+    codexArgs: settings.codexArgs?.trim()
+      ? settings.codexArgs.trim()
+      : (settings.agentArgs?.trim() ? settings.agentArgs.trim() : null),
     uiScale: clampUiScale(settings.uiScale),
     theme: allowedThemes.has(settings.theme) ? settings.theme : "system",
     uiFontFamily: normalizeFontFamily(

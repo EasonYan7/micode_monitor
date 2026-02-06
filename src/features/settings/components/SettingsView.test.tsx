@@ -18,6 +18,9 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 }));
 
 const baseSettings: AppSettings = {
+  agentProvider: "micode-acp",
+  agentBin: null,
+  agentArgs: null,
   codexBin: null,
   codexArgs: null,
   backendMode: "local",
@@ -204,7 +207,8 @@ const workspace = (
   name: overrides.name,
   path: overrides.path ?? `/tmp/${overrides.id}`,
   connected: overrides.connected ?? false,
-  codex_bin: overrides.codex_bin ?? null,
+  agent_bin: overrides.agent_bin ?? overrides.codex_bin ?? null,
+  codex_bin: overrides.codex_bin ?? overrides.agent_bin ?? null,
   kind: overrides.kind ?? "main",
   parentId: overrides.parentId ?? null,
   worktree: overrides.worktree ?? null,
@@ -213,6 +217,8 @@ const workspace = (
     sortOrder: null,
     groupId: null,
     gitRoot: null,
+    agentHome: null,
+    agentArgs: null,
     codexHome: null,
     codexArgs: null,
     launchScript: null,

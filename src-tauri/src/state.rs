@@ -12,8 +12,7 @@ use crate::types::{AppSettings, WorkspaceEntry};
 pub(crate) struct AppState {
     pub(crate) workspaces: Mutex<HashMap<String, WorkspaceEntry>>,
     pub(crate) sessions: Mutex<HashMap<String, Arc<crate::codex::WorkspaceSession>>>,
-    pub(crate) terminal_sessions:
-        Mutex<HashMap<String, Arc<crate::terminal::TerminalSession>>>,
+    pub(crate) terminal_sessions: Mutex<HashMap<String, Arc<crate::terminal::TerminalSession>>>,
     pub(crate) remote_backend: Mutex<Option<crate::remote_backend::RemoteBackend>>,
     pub(crate) storage_path: PathBuf,
     pub(crate) settings_path: PathBuf,

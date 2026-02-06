@@ -13,33 +13,32 @@ pub(crate) mod config;
 pub(crate) mod home;
 
 pub(crate) use crate::backend::app_server::WorkspaceSession;
-use crate::backend::events::AppServerEvent;
 use crate::backend::app_server::{
-    build_codex_command_with_bin, build_codex_path_env, check_codex_installation,
+    build_codex_path_env, check_acp_handshake, check_codex_installation,
     spawn_workspace_session as spawn_workspace_session_inner,
 };
-use crate::shared::process_core::tokio_command;
+use crate::backend::events::AppServerEvent;
 use crate::event_sink::TauriEventSink;
 use crate::remote_backend;
 use crate::shared::codex_core;
+use crate::shared::process_core::tokio_command;
 use crate::state::AppState;
 use crate::types::WorkspaceEntry;
-use self::args::apply_codex_args;
 
 pub(crate) async fn spawn_workspace_session(
     entry: WorkspaceEntry,
     default_codex_bin: Option<String>,
-    codex_args: Option<String>,
+    agent_args: Option<String>,
     app_handle: AppHandle,
-    codex_home: Option<PathBuf>,
+    agent_home: Option<PathBuf>,
 ) -> Result<Arc<WorkspaceSession>, String> {
     let client_version = app_handle.package_info().version.to_string();
     let event_sink = TauriEventSink::new(app_handle);
     spawn_workspace_session_inner(
         entry,
         default_codex_bin,
-        codex_args,
-        codex_home,
+        agent_args,
+        agent_home,
         client_version,
         event_sink,
     )
@@ -54,7 +53,7 @@ pub(crate) async fn codex_doctor(
 ) -> Result<Value, String> {
     let (default_bin, default_args) = {
         let settings = state.app_settings.lock().await;
-        (settings.codex_bin.clone(), settings.codex_args.clone())
+        (settings.agent_bin.clone(), settings.agent_args.clone())
     };
     let resolved = codex_bin
         .clone()
@@ -66,16 +65,7 @@ pub(crate) async fn codex_doctor(
         .or(default_args);
     let path_env = build_codex_path_env(resolved.as_deref());
     let version = check_codex_installation(resolved.clone()).await?;
-    let mut command = build_codex_command_with_bin(resolved.clone());
-    apply_codex_args(&mut command, resolved_args.as_deref())?;
-    command.arg("app-server");
-    command.arg("--help");
-    command.stdout(std::process::Stdio::piped());
-    command.stderr(std::process::Stdio::piped());
-    let app_server_ok = match timeout(Duration::from_secs(5), command.output()).await {
-        Ok(result) => result.map(|output| output.status.success()).unwrap_or(false),
-        Err(_) => false,
-    };
+    let app_server_ok = check_acp_handshake(resolved.clone(), resolved_args.clone()).await?;
     let (node_ok, node_version, node_details) = {
         let mut node_command = tokio_command("node");
         if let Some(ref path_env) = path_env {
@@ -88,12 +78,14 @@ pub(crate) async fn codex_doctor(
             Ok(result) => match result {
                 Ok(output) => {
                     if output.status.success() {
-                        let version = String::from_utf8_lossy(&output.stdout)
-                            .trim()
-                            .to_string();
+                        let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
                         (
                             !version.is_empty(),
-                            if version.is_empty() { None } else { Some(version) },
+                            if version.is_empty() {
+                                None
+                            } else {
+                                Some(version)
+                            },
                             None,
                         )
                     } else {
@@ -123,16 +115,21 @@ pub(crate) async fn codex_doctor(
                     }
                 }
             },
-            Err(_) => (false, None, Some("Timed out while checking Node.".to_string())),
+            Err(_) => (
+                false,
+                None,
+                Some("Timed out while checking Node.".to_string()),
+            ),
         }
     };
     let details = if app_server_ok {
         None
     } else {
-        Some("Failed to run `codex app-server --help`.".to_string())
+        Some("Failed ACP initialize handshake (`micode --experimental-acp`).".to_string())
     };
     Ok(json!({
         "ok": version.is_some() && app_server_ok,
+        "agentBin": resolved,
         "codexBin": resolved,
         "version": version,
         "appServerOk": app_server_ok,
@@ -502,12 +499,7 @@ pub(crate) async fn codex_login(
         .await;
     }
 
-    codex_core::codex_login_core(
-        &state.sessions,
-        &state.codex_login_cancels,
-        workspace_id,
-    )
-    .await
+    codex_core::codex_login_core(&state.sessions, &state.codex_login_cancels, workspace_id).await
 }
 
 #[tauri::command]
@@ -694,11 +686,21 @@ pub(crate) async fn generate_commit_message(
     let thread_id = thread_result
         .get("result")
         .and_then(|r| r.get("threadId"))
-        .or_else(|| thread_result.get("result").and_then(|r| r.get("thread")).and_then(|t| t.get("id")))
+        .or_else(|| {
+            thread_result
+                .get("result")
+                .and_then(|r| r.get("thread"))
+                .and_then(|t| t.get("id"))
+        })
         .or_else(|| thread_result.get("threadId"))
         .or_else(|| thread_result.get("thread").and_then(|t| t.get("id")))
         .and_then(|t| t.as_str())
-        .ok_or_else(|| format!("Failed to get threadId from thread/start response: {:?}", thread_result))?
+        .ok_or_else(|| {
+            format!(
+                "Failed to get threadId from thread/start response: {:?}",
+                thread_result
+            )
+        })?
         .to_string();
 
     // Hide background helper threads from the sidebar, even if a thread/started event leaked.
@@ -892,11 +894,21 @@ Task:\n{cleaned_prompt}"
     let thread_id = thread_result
         .get("result")
         .and_then(|r| r.get("threadId"))
-        .or_else(|| thread_result.get("result").and_then(|r| r.get("thread")).and_then(|t| t.get("id")))
+        .or_else(|| {
+            thread_result
+                .get("result")
+                .and_then(|r| r.get("thread"))
+                .and_then(|t| t.get("id"))
+        })
         .or_else(|| thread_result.get("threadId"))
         .or_else(|| thread_result.get("thread").and_then(|t| t.get("id")))
         .and_then(|t| t.as_str())
-        .ok_or_else(|| format!("Failed to get threadId from thread/start response: {:?}", thread_result))?
+        .ok_or_else(|| {
+            format!(
+                "Failed to get threadId from thread/start response: {:?}",
+                thread_result
+            )
+        })?
         .to_string();
 
     // Hide background helper threads from the sidebar, even if a thread/started event leaked.
@@ -1003,8 +1015,8 @@ Task:\n{cleaned_prompt}"
         return Err("No metadata was generated".to_string());
     }
 
-    let json_value = extract_json_value(trimmed)
-        .ok_or_else(|| "Failed to parse metadata JSON".to_string())?;
+    let json_value =
+        extract_json_value(trimmed).ok_or_else(|| "Failed to parse metadata JSON".to_string())?;
     let title = json_value
         .get("title")
         .and_then(|v| v.as_str())
@@ -1060,10 +1072,21 @@ fn sanitize_run_worktree_name(value: &str) -> String {
         cleaned.pop();
     }
     let allowed_prefixes = [
-        "feat/", "fix/", "chore/", "test/", "docs/", "refactor/", "perf/",
-        "build/", "ci/", "style/",
+        "feat/",
+        "fix/",
+        "chore/",
+        "test/",
+        "docs/",
+        "refactor/",
+        "perf/",
+        "build/",
+        "ci/",
+        "style/",
     ];
-    if allowed_prefixes.iter().any(|prefix| cleaned.starts_with(prefix)) {
+    if allowed_prefixes
+        .iter()
+        .any(|prefix| cleaned.starts_with(prefix))
+    {
         return cleaned;
     }
     for prefix in allowed_prefixes.iter() {

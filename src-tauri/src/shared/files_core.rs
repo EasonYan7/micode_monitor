@@ -3,14 +3,14 @@ use std::path::PathBuf;
 
 use tokio::sync::Mutex;
 
-use crate::codex::home as codex_home;
+use crate::codex::home as agent_home;
 use crate::files::io::TextFileResponse;
 use crate::files::ops::{read_with_policy, write_with_policy};
 use crate::files::policy::{policy_for, FileKind, FileScope};
 use crate::types::WorkspaceEntry;
 
 fn resolve_default_codex_home() -> Result<PathBuf, String> {
-    codex_home::resolve_default_codex_home()
+    agent_home::resolve_default_codex_home()
         .ok_or_else(|| "Unable to resolve CODEX_HOME".to_string())
 }
 
@@ -33,8 +33,7 @@ pub(crate) async fn resolve_root_core(
     match scope {
         FileScope::Global => resolve_default_codex_home(),
         FileScope::Workspace => {
-            let workspace_id =
-                workspace_id.ok_or_else(|| "workspaceId is required".to_string())?;
+            let workspace_id = workspace_id.ok_or_else(|| "workspaceId is required".to_string())?;
             resolve_workspace_root(workspaces, workspace_id).await
         }
     }

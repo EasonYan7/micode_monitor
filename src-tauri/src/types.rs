@@ -198,7 +198,8 @@ pub(crate) struct WorkspaceEntry {
     pub(crate) id: String,
     pub(crate) name: String,
     pub(crate) path: String,
-    pub(crate) codex_bin: Option<String>,
+    #[serde(default, rename = "agentBin", alias = "codexBin")]
+    pub(crate) agent_bin: Option<String>,
     #[serde(default)]
     pub(crate) kind: WorkspaceKind,
     #[serde(default, rename = "parentId")]
@@ -215,7 +216,8 @@ pub(crate) struct WorkspaceInfo {
     pub(crate) name: String,
     pub(crate) path: String,
     pub(crate) connected: bool,
-    pub(crate) codex_bin: Option<String>,
+    #[serde(default, rename = "agentBin", alias = "codexBin")]
+    pub(crate) agent_bin: Option<String>,
     #[serde(default)]
     pub(crate) kind: WorkspaceKind,
     #[serde(default, rename = "parentId")]
@@ -270,10 +272,10 @@ pub(crate) struct WorkspaceSettings {
     pub(crate) group_id: Option<String>,
     #[serde(default, rename = "gitRoot")]
     pub(crate) git_root: Option<String>,
-    #[serde(default, rename = "codexHome")]
-    pub(crate) codex_home: Option<String>,
-    #[serde(default, rename = "codexArgs")]
-    pub(crate) codex_args: Option<String>,
+    #[serde(default, rename = "agentHome", alias = "codexHome")]
+    pub(crate) agent_home: Option<String>,
+    #[serde(default, rename = "agentArgs", alias = "codexArgs")]
+    pub(crate) agent_args: Option<String>,
     #[serde(default, rename = "launchScript")]
     pub(crate) launch_script: Option<String>,
     #[serde(default, rename = "launchScripts")]
@@ -313,10 +315,16 @@ pub(crate) struct OpenAppTarget {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct AppSettings {
-    #[serde(default, rename = "codexBin")]
-    pub(crate) codex_bin: Option<String>,
-    #[serde(default, rename = "codexArgs")]
-    pub(crate) codex_args: Option<String>,
+    #[serde(
+        default = "default_agent_provider",
+        rename = "agentProvider",
+        alias = "codexProvider"
+    )]
+    pub(crate) agent_provider: String,
+    #[serde(default, rename = "agentBin", alias = "codexBin")]
+    pub(crate) agent_bin: Option<String>,
+    #[serde(default, rename = "agentArgs", alias = "codexArgs")]
+    pub(crate) agent_args: Option<String>,
     #[serde(default, rename = "backendMode")]
     pub(crate) backend_mode: BackendMode,
     #[serde(default = "default_remote_backend_host", rename = "remoteBackendHost")]
@@ -325,7 +333,10 @@ pub(crate) struct AppSettings {
     pub(crate) remote_backend_token: Option<String>,
     #[serde(default = "default_access_mode", rename = "defaultAccessMode")]
     pub(crate) default_access_mode: String,
-    #[serde(default = "default_review_delivery_mode", rename = "reviewDeliveryMode")]
+    #[serde(
+        default = "default_review_delivery_mode",
+        rename = "reviewDeliveryMode"
+    )]
     pub(crate) review_delivery_mode: String,
     #[serde(
         default = "default_composer_model_shortcut",
@@ -414,7 +425,10 @@ pub(crate) struct AppSettings {
     pub(crate) ui_scale: f64,
     #[serde(default = "default_theme", rename = "theme")]
     pub(crate) theme: String,
-    #[serde(default = "default_usage_show_remaining", rename = "usageShowRemaining")]
+    #[serde(
+        default = "default_usage_show_remaining",
+        rename = "usageShowRemaining"
+    )]
     pub(crate) usage_show_remaining: bool,
     #[serde(default = "default_ui_font_family", rename = "uiFontFamily")]
     pub(crate) ui_font_family: String,
@@ -466,40 +480,55 @@ pub(crate) struct AppSettings {
         rename = "experimentalAppsEnabled"
     )]
     pub(crate) experimental_apps_enabled: bool,
-    #[serde(
-        default = "default_personality",
-        rename = "personality"
-    )]
+    #[serde(default = "default_personality", rename = "personality")]
     pub(crate) personality: String,
     #[serde(default = "default_dictation_enabled", rename = "dictationEnabled")]
     pub(crate) dictation_enabled: bool,
-    #[serde(
-        default = "default_dictation_model_id",
-        rename = "dictationModelId"
-    )]
+    #[serde(default = "default_dictation_model_id", rename = "dictationModelId")]
     pub(crate) dictation_model_id: String,
     #[serde(default, rename = "dictationPreferredLanguage")]
     pub(crate) dictation_preferred_language: Option<String>,
-    #[serde(
-        default = "default_dictation_hold_key",
-        rename = "dictationHoldKey"
-    )]
+    #[serde(default = "default_dictation_hold_key", rename = "dictationHoldKey")]
     pub(crate) dictation_hold_key: String,
-    #[serde(default = "default_composer_editor_preset", rename = "composerEditorPreset")]
+    #[serde(
+        default = "default_composer_editor_preset",
+        rename = "composerEditorPreset"
+    )]
     pub(crate) composer_editor_preset: String,
-    #[serde(default = "default_composer_fence_expand_on_space", rename = "composerFenceExpandOnSpace")]
+    #[serde(
+        default = "default_composer_fence_expand_on_space",
+        rename = "composerFenceExpandOnSpace"
+    )]
     pub(crate) composer_fence_expand_on_space: bool,
-    #[serde(default = "default_composer_fence_expand_on_enter", rename = "composerFenceExpandOnEnter")]
+    #[serde(
+        default = "default_composer_fence_expand_on_enter",
+        rename = "composerFenceExpandOnEnter"
+    )]
     pub(crate) composer_fence_expand_on_enter: bool,
-    #[serde(default = "default_composer_fence_language_tags", rename = "composerFenceLanguageTags")]
+    #[serde(
+        default = "default_composer_fence_language_tags",
+        rename = "composerFenceLanguageTags"
+    )]
     pub(crate) composer_fence_language_tags: bool,
-    #[serde(default = "default_composer_fence_wrap_selection", rename = "composerFenceWrapSelection")]
+    #[serde(
+        default = "default_composer_fence_wrap_selection",
+        rename = "composerFenceWrapSelection"
+    )]
     pub(crate) composer_fence_wrap_selection: bool,
-    #[serde(default = "default_composer_fence_auto_wrap_paste_multiline", rename = "composerFenceAutoWrapPasteMultiline")]
+    #[serde(
+        default = "default_composer_fence_auto_wrap_paste_multiline",
+        rename = "composerFenceAutoWrapPasteMultiline"
+    )]
     pub(crate) composer_fence_auto_wrap_paste_multiline: bool,
-    #[serde(default = "default_composer_fence_auto_wrap_paste_code_like", rename = "composerFenceAutoWrapPasteCodeLike")]
+    #[serde(
+        default = "default_composer_fence_auto_wrap_paste_code_like",
+        rename = "composerFenceAutoWrapPasteCodeLike"
+    )]
     pub(crate) composer_fence_auto_wrap_paste_code_like: bool,
-    #[serde(default = "default_composer_list_continuation", rename = "composerListContinuation")]
+    #[serde(
+        default = "default_composer_list_continuation",
+        rename = "composerListContinuation"
+    )]
     pub(crate) composer_list_continuation: bool,
     #[serde(
         default = "default_composer_code_block_copy_use_modifier",
@@ -531,6 +560,10 @@ fn default_access_mode() -> String {
     "current".to_string()
 }
 
+fn default_agent_provider() -> String {
+    "micode-acp".to_string()
+}
+
 fn default_review_delivery_mode() -> String {
     "inline".to_string()
 }
@@ -552,8 +585,7 @@ fn default_usage_show_remaining() -> bool {
 }
 
 fn default_ui_font_family() -> String {
-    "\"SF Pro Text\", \"SF Pro Display\", -apple-system, \"Helvetica Neue\", sans-serif"
-        .to_string()
+    "\"SF Pro Text\", \"SF Pro Display\", -apple-system, \"Helvetica Neue\", sans-serif".to_string()
 }
 
 fn default_code_font_family() -> String {
@@ -789,8 +821,9 @@ fn default_selected_open_app_id() -> String {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            codex_bin: None,
-            codex_args: None,
+            agent_provider: default_agent_provider(),
+            agent_bin: None,
+            agent_args: None,
             backend_mode: BackendMode::Local,
             remote_backend_host: default_remote_backend_host(),
             remote_backend_token: None,
@@ -840,8 +873,10 @@ impl Default for AppSettings {
             composer_fence_expand_on_enter: default_composer_fence_expand_on_enter(),
             composer_fence_language_tags: default_composer_fence_language_tags(),
             composer_fence_wrap_selection: default_composer_fence_wrap_selection(),
-            composer_fence_auto_wrap_paste_multiline: default_composer_fence_auto_wrap_paste_multiline(),
-            composer_fence_auto_wrap_paste_code_like: default_composer_fence_auto_wrap_paste_code_like(),
+            composer_fence_auto_wrap_paste_multiline:
+                default_composer_fence_auto_wrap_paste_multiline(),
+            composer_fence_auto_wrap_paste_code_like:
+                default_composer_fence_auto_wrap_paste_code_like(),
             composer_list_continuation: default_composer_list_continuation(),
             composer_code_block_copy_use_modifier: default_composer_code_block_copy_use_modifier(),
             workspace_groups: default_workspace_groups(),
@@ -860,7 +895,7 @@ mod tests {
     #[test]
     fn app_settings_defaults_from_empty_json() {
         let settings: AppSettings = serde_json::from_str("{}").expect("settings deserialize");
-        assert!(settings.codex_bin.is_none());
+        assert!(settings.agent_bin.is_none());
         assert!(matches!(settings.backend_mode, BackendMode::Local));
         assert_eq!(settings.remote_backend_host, "127.0.0.1:4732");
         assert!(settings.remote_backend_token.is_none());
@@ -887,7 +922,10 @@ mod tests {
         } else {
             "ctrl+shift+c"
         };
-        assert_eq!(settings.interrupt_shortcut.as_deref(), Some(expected_interrupt));
+        assert_eq!(
+            settings.interrupt_shortcut.as_deref(),
+            Some(expected_interrupt)
+        );
         assert_eq!(
             settings.archive_thread_shortcut.as_deref(),
             Some("cmd+ctrl+a")
@@ -981,10 +1019,9 @@ mod tests {
 
     #[test]
     fn workspace_entry_defaults_from_minimal_json() {
-        let entry: WorkspaceEntry = serde_json::from_str(
-            r#"{"id":"1","name":"Test","path":"/tmp","codexBin":null}"#,
-        )
-        .expect("workspace deserialize");
+        let entry: WorkspaceEntry =
+            serde_json::from_str(r#"{"id":"1","name":"Test","path":"/tmp","codexBin":null}"#)
+                .expect("workspace deserialize");
         assert!(matches!(entry.kind, WorkspaceKind::Main));
         assert!(entry.parent_id.is_none());
         assert!(entry.worktree.is_none());
