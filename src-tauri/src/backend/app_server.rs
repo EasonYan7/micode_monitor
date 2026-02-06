@@ -714,16 +714,12 @@ fn session_id_from_notification(value: &Value) -> Option<String> {
 
 fn translate_acp_update(
     thread_id: &str,
-    turn_index: i64,
+    turn_index: u64,
     update: &Value,
     workspace_id: &str,
 ) -> Vec<AppServerEvent> {
     let mut events = Vec::new();
-    let turn_seq = if turn_index < 0 {
-        0
-    } else {
-        turn_index as u64 + 1
-    };
+    let turn_seq = turn_index.saturating_add(1);
     let kind = update
         .get("sessionUpdate")
         .and_then(Value::as_str)

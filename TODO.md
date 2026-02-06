@@ -19,3 +19,4 @@
   - `npm test -- src/features/settings/components/SettingsView.test.tsx src/features/home/components/Home.test.tsx src/features/settings/hooks/useAppSettings.test.ts`
 - New reliability fix: auto-recreate ACP session and retry on `Session not found` during `turn/start`, and recreate session on `thread/resume`.
 - ACP compatibility fix: keep required `mcpServers` in `session/new` and stabilize streaming item IDs per turn to avoid fragmented/missing UI replies.
+- Build fix: align ACP update adapter turn index type with `message_index: u64` to restore successful Rust compile.
