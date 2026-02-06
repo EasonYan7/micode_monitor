@@ -19,6 +19,7 @@
 - [x] Treat user-triggered abort as cancelled turn (not fatal start error)
 - [x] Normalize `turn/interrupt` when backend reports `Not currently generating`
 - [x] Clear stale queued interrupt flags on non-retry turn errors
+- [x] Guard against stale processing-without-turn blocking new sends
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -47,3 +48,4 @@
 - Abort flow: map `Request was aborted` to cancelled turn completion so UI does not surface false fatal `turn/start` errors.
 - Interrupt flow: convert `Not currently generating` into benign interrupt success; avoid noisy debug/user errors.
 - State hygiene: clear pending queued-interrupt flag on non-retry turn errors to prevent accidental cancel of next prompt.
+- Composer send guard: treat `isProcessing=true` without `activeTurnId` for >15s as stale, so new input is sent instead of silently queued.

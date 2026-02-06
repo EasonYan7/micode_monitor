@@ -650,6 +650,7 @@ function MainApp() {
     threadListLoadingByWorkspace,
     threadListPagingByWorkspace,
     threadListCursorByWorkspace,
+    activeTurnIdByThread,
     tokenUsageByThread,
     rateLimitsByWorkspace,
     accountByWorkspace,
@@ -1122,14 +1123,28 @@ function MainApp() {
     error: localUsageError,
     refresh: refreshLocalUsage,
   } = useLocalUsage(showHome, usageWorkspacePath);
-  const canInterrupt = activeThreadId
-    ? threadStatusById[activeThreadId]?.isProcessing ?? false
-    : false;
+  const STALE_PROCESSING_WITHOUT_TURN_MS = 15_000;
+  const activeThreadStatus = activeThreadId
+    ? threadStatusById[activeThreadId] ?? null
+    : null;
+  const activeTurnId = activeThreadId
+    ? activeTurnIdByThread[activeThreadId] ?? null
+    : null;
+  const processingStartedAt = activeThreadStatus?.processingStartedAt ?? null;
+  const isStaleProcessingWithoutTurn = Boolean(
+    activeThreadStatus?.isProcessing &&
+      !activeTurnId &&
+      processingStartedAt &&
+      Date.now() - processingStartedAt > STALE_PROCESSING_WITHOUT_TURN_MS,
+  );
+  const effectiveThreadProcessing = Boolean(
+    activeThreadStatus?.isProcessing && !isStaleProcessingWithoutTurn,
+  );
+  const canInterrupt = Boolean(effectiveThreadProcessing && activeTurnId);
   const isStartingDraftThread =
     Boolean(activeWorkspaceId) && startingDraftThreadWorkspaceId === activeWorkspaceId;
   const isProcessing =
-    (activeThreadId ? threadStatusById[activeThreadId]?.isProcessing ?? false : false) ||
-    isStartingDraftThread;
+    effectiveThreadProcessing || isStartingDraftThread;
   const isReviewing = activeThreadId
     ? threadStatusById[activeThreadId]?.isReviewing ?? false
     : false;
