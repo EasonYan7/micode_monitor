@@ -1,3 +1,5 @@
+import type { UiLanguage } from "../../../types";
+
 type SidebarFooterProps = {
   sessionPercent: number | null;
   weeklyPercent: number | null;
@@ -7,6 +9,7 @@ type SidebarFooterProps = {
   weeklyResetLabel: string | null;
   creditsLabel: string | null;
   showWeekly: boolean;
+  language?: UiLanguage;
 };
 
 export function SidebarFooter({
@@ -18,14 +21,16 @@ export function SidebarFooter({
   weeklyResetLabel,
   creditsLabel,
   showWeekly,
+  language = "en",
 }: SidebarFooterProps) {
+  const isZh = language === "zh";
   return (
     <div className="sidebar-footer">
       <div className="usage-bars">
         <div className="usage-block">
           <div className="usage-label">
             <span className="usage-title">
-              <span>Session</span>
+              <span>{isZh ? "会话" : "Session"}</span>
               {sessionResetLabel && (
                 <span className="usage-reset">· {sessionResetLabel}</span>
               )}
@@ -47,7 +52,7 @@ export function SidebarFooter({
           <div className="usage-block">
             <div className="usage-label">
               <span className="usage-title">
-                <span>Weekly</span>
+                <span>{isZh ? "每周" : "Weekly"}</span>
                 {weeklyResetLabel && (
                   <span className="usage-reset">· {weeklyResetLabel}</span>
                 )}

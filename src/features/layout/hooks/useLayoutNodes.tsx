@@ -49,6 +49,7 @@ import type {
   ThreadSummary,
   ThreadTokenUsage,
   TurnPlan,
+  UiLanguage,
   WorkspaceInfo,
 } from "../../../types";
 import type { UpdateState } from "../../update/hooks/useUpdater";
@@ -118,6 +119,7 @@ type LayoutNodesOptions = {
   activeRateLimits: RateLimitSnapshot | null;
   activeTokenUsage: ThreadTokenUsage | null;
   usageShowRemaining: boolean;
+  language?: UiLanguage;
   accountInfo: AccountSnapshot | null;
   onSwitchAccount: () => void;
   onCancelSwitchAccount: () => void;
@@ -491,10 +493,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       accountRateLimits={options.activeRateLimits}
       activeTokenUsage={options.activeTokenUsage}
       usageShowRemaining={options.usageShowRemaining}
-      accountInfo={options.accountInfo}
-      onSwitchAccount={options.onSwitchAccount}
-      onCancelSwitchAccount={options.onCancelSwitchAccount}
-      accountSwitching={options.accountSwitching}
+      language={options.language ?? "en"}
       onOpenSettings={options.onOpenSettings}
       onOpenDebug={options.onOpenDebug}
       showDebugButton={options.showDebugButton}
@@ -672,6 +671,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       usageWorkspaceOptions={options.usageWorkspaceOptions}
       onUsageWorkspaceChange={options.onUsageWorkspaceChange}
       onSelectThread={options.onSelectHomeThread}
+      language={options.language}
     />
   );
 

@@ -1,8 +1,8 @@
 import type {
-  AccountSnapshot,
   RateLimitSnapshot,
   ThreadSummary,
   ThreadTokenUsage,
+  UiLanguage,
   WorkspaceInfo,
 } from "../../../types";
 import { createPortal } from "react-dom";
@@ -58,10 +58,7 @@ type SidebarProps = {
   accountRateLimits: RateLimitSnapshot | null;
   activeTokenUsage?: ThreadTokenUsage | null;
   usageShowRemaining: boolean;
-  accountInfo: AccountSnapshot | null;
-  onSwitchAccount: () => void;
-  onCancelSwitchAccount: () => void;
-  accountSwitching: boolean;
+  language?: UiLanguage;
   onOpenSettings: () => void;
   onOpenDebug: () => void;
   showDebugButton: boolean;
@@ -112,10 +109,7 @@ export function Sidebar({
   accountRateLimits,
   activeTokenUsage = null,
   usageShowRemaining,
-  accountInfo,
-  onSwitchAccount,
-  onCancelSwitchAccount,
-  accountSwitching,
+  language = "en",
   onOpenSettings,
   onOpenDebug,
   showDebugButton,
@@ -184,7 +178,7 @@ export function Sidebar({
     weeklyResetLabel,
     creditsLabel,
     showWeekly,
-  } = getUsageLabels(accountRateLimits, usageShowRemaining, activeTokenUsage);
+  } = getUsageLabels(accountRateLimits, usageShowRemaining, activeTokenUsage, language);
   const debouncedQuery = useDebouncedValue(searchQuery, 150);
   const normalizedQuery = debouncedQuery.trim().toLowerCase();
 
@@ -229,17 +223,6 @@ export function Sidebar({
     },
     [normalizedQuery],
   );
-
-  const accountEmail = accountInfo?.email?.trim() ?? "";
-  const accountButtonLabel = accountEmail
-    ? accountEmail
-    : accountInfo?.type === "apikey"
-      ? "API key"
-      : "Sign in to MiCode";
-  const accountActionLabel = accountEmail ? "Switch account" : "Sign in";
-  const showAccountSwitcher = Boolean(activeWorkspaceId);
-  const accountSwitchDisabled = accountSwitching || !activeWorkspaceId;
-  const accountCancelDisabled = !accountSwitching || !activeWorkspaceId;
 
   const pinnedThreadRows = useMemo(() => {
     type ThreadRow = { thread: ThreadSummary; depth: number };
@@ -672,19 +655,12 @@ export function Sidebar({
         weeklyResetLabel={weeklyResetLabel}
         creditsLabel={creditsLabel}
         showWeekly={showWeekly}
+        language={language}
       />
       <SidebarCornerActions
         onOpenSettings={onOpenSettings}
         onOpenDebug={onOpenDebug}
         showDebugButton={showDebugButton}
-        showAccountSwitcher={showAccountSwitcher}
-        accountLabel={accountButtonLabel}
-        accountActionLabel={accountActionLabel}
-        accountDisabled={accountSwitchDisabled}
-        accountSwitching={accountSwitching}
-        accountCancelDisabled={accountCancelDisabled}
-        onSwitchAccount={onSwitchAccount}
-        onCancelSwitchAccount={onCancelSwitchAccount}
       />
     </aside>
   );

@@ -1,4 +1,4 @@
-import type { RateLimitSnapshot, ThreadTokenUsage } from "../../../types";
+import type { RateLimitSnapshot, ThreadTokenUsage, UiLanguage } from "../../../types";
 import { formatRelativeTime } from "../../../utils/time";
 
 type UsageLabels = {
@@ -15,22 +15,22 @@ type UsageLabels = {
 const clampPercent = (value: number) =>
   Math.min(Math.max(Math.round(value), 0), 100);
 
-function formatResetLabel(resetsAt?: number | null) {
+function formatResetLabel(resetsAt: number | null | undefined, language: UiLanguage) {
   if (typeof resetsAt !== "number" || !Number.isFinite(resetsAt)) {
     return null;
   }
   const resetMs = resetsAt > 1_000_000_000_000 ? resetsAt : resetsAt * 1000;
   const relative = formatRelativeTime(resetMs).replace(/^in\s+/i, "");
-  return `Resets ${relative}`;
+  return language === "zh" ? `重置于 ${relative}` : `Resets ${relative}`;
 }
 
-function formatCreditsLabel(accountRateLimits: RateLimitSnapshot | null) {
+function formatCreditsLabel(accountRateLimits: RateLimitSnapshot | null, language: UiLanguage) {
   const credits = accountRateLimits?.credits ?? null;
   if (!credits?.hasCredits) {
     return null;
   }
   if (credits.unlimited) {
-    return "Credits: Unlimited";
+    return language === "zh" ? "额度：无限制" : "Credits: Unlimited";
   }
   const balance = credits.balance?.trim() ?? "";
   if (!balance) {
@@ -38,12 +38,19 @@ function formatCreditsLabel(accountRateLimits: RateLimitSnapshot | null) {
   }
   const intValue = Number.parseInt(balance, 10);
   if (Number.isFinite(intValue) && intValue > 0) {
-    return `Credits: ${intValue} credits`;
+    return language === "zh"
+      ? `额度：${intValue} 点`
+      : `Credits: ${intValue} credits`;
   }
   const floatValue = Number.parseFloat(balance);
   if (Number.isFinite(floatValue) && floatValue > 0) {
     const rounded = Math.round(floatValue);
-    return rounded > 0 ? `Credits: ${rounded} credits` : null;
+    if (rounded <= 0) {
+      return null;
+    }
+    return language === "zh"
+      ? `额度：${rounded} 点`
+      : `Credits: ${rounded} credits`;
   }
   return null;
 }
@@ -65,6 +72,7 @@ export function getUsageLabels(
   accountRateLimits: RateLimitSnapshot | null,
   showRemaining: boolean,
   tokenUsage: ThreadTokenUsage | null = null,
+  language: UiLanguage = "en",
 ): UsageLabels {
   const usagePercent = accountRateLimits?.primary?.usedPercent;
   const globalUsagePercent = accountRateLimits?.secondary?.usedPercent;
@@ -85,11 +93,13 @@ export function getUsageLabels(
   const sessionValueLabel =
     sessionPercent === null ? formatTokenCount(sessionTokens) : null;
   const weeklyValueLabel = weeklyPercent === null ? null : null;
-  const creditsLabel = formatCreditsLabel(accountRateLimits);
+  const creditsLabel = formatCreditsLabel(accountRateLimits, language);
   const fallbackCredits =
     creditsLabel ??
     (totalTokens && totalTokens > 0
-      ? `Tokens: ${formatTokenCount(totalTokens)}`
+      ? language === "zh"
+        ? `Token：${formatTokenCount(totalTokens)}`
+        : `Tokens: ${formatTokenCount(totalTokens)}`
       : null);
 
   return {
@@ -97,8 +107,8 @@ export function getUsageLabels(
     weeklyPercent,
     sessionValueLabel,
     weeklyValueLabel,
-    sessionResetLabel: formatResetLabel(accountRateLimits?.primary?.resetsAt),
-    weeklyResetLabel: formatResetLabel(accountRateLimits?.secondary?.resetsAt),
+    sessionResetLabel: formatResetLabel(accountRateLimits?.primary?.resetsAt, language),
+    weeklyResetLabel: formatResetLabel(accountRateLimits?.secondary?.resetsAt, language),
     creditsLabel: fallbackCredits,
     showWeekly: Boolean(accountRateLimits?.secondary),
   };
