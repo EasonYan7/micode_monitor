@@ -60,6 +60,8 @@
 - [x] Fix MCP tool detail visibility: parse ACP `tool_call` `rawInput` and `tool_call_update` `content[]` into tool arguments/result
 - [x] Route exact `/mcp list` as deterministic local command (other `/mcp ...` remains passthrough)
 - [x] Fallback MCP status source: when ACP returns empty/error, read configured servers from `settings.json` for `/mcp` display
+- [x] Resolve MiCode home with global default (`~/.micode|~/.codex`) for all workspaces; only use workspace `.micodemonitor` as legacy fallback
+- [x] Add startup doctor hint for missing MiCode CLI (show localized toast instead of silent failure)
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

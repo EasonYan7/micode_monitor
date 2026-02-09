@@ -114,6 +114,7 @@ import { useCodeCssVars } from "./features/app/hooks/useCodeCssVars";
 import { useAccountSwitching } from "./features/app/hooks/useAccountSwitching";
 import { useNewAgentDraft } from "./features/app/hooks/useNewAgentDraft";
 import { useSystemNotificationThreadLinks } from "./features/app/hooks/useSystemNotificationThreadLinks";
+import { pushErrorToast } from "./services/toasts";
 
 const AboutView = lazy(() =>
   import("./features/about/components/AboutView").then((module) => ({
@@ -273,6 +274,17 @@ function buildSyntheticUsageSnapshot(
   };
 }
 
+function isMiCodeMissingError(error: unknown): boolean {
+  const message =
+    error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("micode cli not found") ||
+    normalized.includes("install micode") ||
+    (normalized.includes("micode") && normalized.includes("not found"))
+  );
+}
+
 const SettingsView = lazy(() =>
   import("./features/settings/components/SettingsView").then((module) => ({
     default: module.SettingsView,
@@ -298,6 +310,7 @@ function MainApp() {
     scaleShortcutText,
     queueSaveSettings,
   } = useAppSettingsController();
+  const missingMiCodeHintShownRef = useRef(false);
   useCodeCssVars(appSettings);
   const {
     dictationModel,
@@ -312,6 +325,43 @@ function MainApp() {
     clearDictationError,
     clearDictationHint,
   } = useDictationController(appSettings);
+
+  useEffect(() => {
+    if (appSettingsLoading || missingMiCodeHintShownRef.current) {
+      return;
+    }
+    let canceled = false;
+    const micodeBin = appSettings.agentBin ?? appSettings.micodeBin ?? null;
+    const micodeArgs = appSettings.agentArgs ?? appSettings.micodeArgs ?? null;
+    void doctor(micodeBin, micodeArgs).catch((error) => {
+      if (canceled || !isMiCodeMissingError(error)) {
+        return;
+      }
+      missingMiCodeHintShownRef.current = true;
+      pushErrorToast({
+        title:
+          appSettings.language === "zh"
+            ? "未检测到 MiCode CLI"
+            : "MiCode CLI not found",
+        message:
+          appSettings.language === "zh"
+            ? "请先安装 MiCode CLI，并在终端确认 `micode --version` 可用。可在 设置 > MiCode 里运行诊断。"
+            : "Install MiCode CLI first and verify `micode --version` in Terminal. You can run Doctor in Settings > MiCode.",
+        durationMs: 12000,
+      });
+    });
+    return () => {
+      canceled = true;
+    };
+  }, [
+    appSettings.agentArgs,
+    appSettings.agentBin,
+    appSettings.language,
+    appSettings.micodeArgs,
+    appSettings.micodeBin,
+    appSettingsLoading,
+    doctor,
+  ]);
   const {
     debugOpen,
     setDebugOpen,

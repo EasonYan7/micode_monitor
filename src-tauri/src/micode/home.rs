@@ -21,17 +21,28 @@ pub(crate) fn resolve_workspace_micode_home(
                     return Some(path);
                 }
             }
+        }
+    }
+
+    // Default behavior should match CLI: prefer global home (~/.micode, ~/.codex).
+    if let Some(default_home) = resolve_default_micode_home() {
+        return Some(default_home);
+    }
+
+    // Backward-compatible fallback only when global home cannot be resolved.
+    if entry.kind.is_worktree() {
+        if let Some(parent) = parent_entry {
             let legacy_home = PathBuf::from(&parent.path).join(".micodemonitor");
-            if legacy_home.is_dir() {
+            if legacy_home.join("settings.json").is_file() {
                 return Some(legacy_home);
             }
         }
     }
     let legacy_home = PathBuf::from(&entry.path).join(".micodemonitor");
-    if legacy_home.is_dir() {
+    if legacy_home.join("settings.json").is_file() {
         return Some(legacy_home);
     }
-    resolve_default_micode_home()
+    None
 }
 
 pub(crate) fn resolve_default_micode_home() -> Option<PathBuf> {
@@ -40,7 +51,22 @@ pub(crate) fn resolve_default_micode_home() -> Option<PathBuf> {
             return Some(path);
         }
     }
-    resolve_home_dir().map(|home| home.join(".micode"))
+    if let Ok(value) = env::var("MICODE_HOME") {
+        if let Some(path) = normalize_micode_home(&value) {
+            return Some(path);
+        }
+    }
+    resolve_home_dir().map(|home| {
+        let micode_home = home.join(".micode");
+        if micode_home.is_dir() {
+            return micode_home;
+        }
+        let codex_home = home.join(".codex");
+        if codex_home.is_dir() {
+            return codex_home;
+        }
+        micode_home
+    })
 }
 
 fn normalize_micode_home(value: &str) -> Option<PathBuf> {
@@ -287,5 +313,59 @@ mod tests {
             Some(value) => std::env::set_var("APPDATA", value),
             None => std::env::remove_var("APPDATA"),
         }
+    }
+
+    #[test]
+    fn prefers_global_home_over_workspace_legacy_home() {
+        let _guard = ENV_LOCK.lock().expect("lock env");
+        let root = std::env::temp_dir().join("micode-home-priority-test");
+        let home_root = root.join("home");
+        let global = home_root.join(".micode");
+        let repo = root.join("repo");
+        let legacy = repo.join(".micodemonitor");
+        let _ = std::fs::create_dir_all(&global);
+        let _ = std::fs::create_dir_all(&legacy);
+        let _ = std::fs::write(legacy.join("settings.json"), "{}");
+
+        let prev_home = std::env::var("HOME").ok();
+        std::env::set_var("HOME", home_root.to_string_lossy().to_string());
+
+        let entry = workspace_entry(WorkspaceKind::Main, &repo.to_string_lossy(), None);
+        let resolved = resolve_workspace_micode_home(&entry, None);
+        assert_eq!(resolved, Some(global));
+
+        match prev_home {
+            Some(value) => std::env::set_var("HOME", value),
+            None => std::env::remove_var("HOME"),
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn defaults_to_global_path_even_when_global_dir_missing() {
+        let _guard = ENV_LOCK.lock().expect("lock env");
+        let root = std::env::temp_dir().join("micode-home-legacy-fallback-test");
+        let home_root = root.join("home");
+        let global = home_root.join(".micode");
+        let repo = root.join("repo");
+        let legacy = repo.join(".micodemonitor");
+        let _ = std::fs::create_dir_all(&legacy);
+        let _ = std::fs::write(legacy.join("settings.json"), "{}");
+        let _ = std::fs::create_dir_all(&home_root);
+        let _ = std::fs::remove_dir_all(&global);
+        let _ = std::fs::remove_file(&global);
+
+        let prev_home = std::env::var("HOME").ok();
+        std::env::set_var("HOME", home_root.to_string_lossy().to_string());
+
+        let entry = workspace_entry(WorkspaceKind::Main, &repo.to_string_lossy(), None);
+        let resolved = resolve_workspace_micode_home(&entry, None);
+        assert_eq!(resolved, Some(global));
+
+        match prev_home {
+            Some(value) => std::env::set_var("HOME", value),
+            None => std::env::remove_var("HOME"),
+        }
+        let _ = std::fs::remove_dir_all(root);
     }
 }
