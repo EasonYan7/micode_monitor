@@ -28,6 +28,7 @@
 - [x] Emit per-turn token usage (`thread/tokenUsage/updated`) from MiCode session chat logs
 - [x] Restore thread list visibility after restart by returning Codex-compatible `thread/list` payload shape
 - [x] Auto-reconnect workspace session on `workspace not connected` and retry first command
+- [x] Isolate background metadata/commit threads from foreground chat event stream
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -70,3 +71,5 @@
 - Thread list compatibility fix: ACP `thread/list` now returns both `result.data` and `result.threads`, with `cwd/preview/updatedAt` fields so existing frontend filtering and sorting can render persisted threads after app restart.
 - First-send reliability fix: command handlers now detect `workspace not connected`, reconnect session automatically, and retry (`start_thread`, `send_user_message`, `resume/list/archive/compact/set_name/interrupt`).
 - UX diagnostics fix: frontend now logs `thread/ensure error` to debug instead of silently dropping first message when thread bootstrap fails.
+- Background-thread isolation fix: metadata/commit helper flows now start with `_background` and no longer emit foreground `thread/started`/`turn/*` events; ACP delta routing sends helper output only to callback collectors.
+- Message-visibility safeguard: if internal-JSON stripping would hide an assistant message entirely, UI falls back to raw text so users never see a blank response row.

@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::mpsc;
-use tokio::time::timeout;
+use tokio::time::{timeout, Instant};
 
 pub(crate) mod args;
 pub(crate) mod config;
@@ -49,6 +49,45 @@ fn is_workspace_not_connected_error(error: &str) -> bool {
     error
         .to_ascii_lowercase()
         .contains("workspace not connected")
+}
+
+async fn collect_background_agent_text(
+    rx: &mut mpsc::UnboundedReceiver<Value>,
+    idle_timeout: Duration,
+    max_wait: Duration,
+) -> Result<String, String> {
+    let started_at = Instant::now();
+    let mut output = String::new();
+    while started_at.elapsed() < max_wait {
+        match timeout(idle_timeout, rx.recv()).await {
+            Ok(Some(event)) => {
+                let method = event.get("method").and_then(|m| m.as_str()).unwrap_or("");
+                match method {
+                    "item/agentMessage/delta" => {
+                        if let Some(delta) = event
+                            .get("params")
+                            .and_then(|params| params.get("delta"))
+                            .and_then(|d| d.as_str())
+                        {
+                            output.push_str(delta);
+                        }
+                    }
+                    "turn/error" => {
+                        let error_msg = event
+                            .get("params")
+                            .and_then(|p| p.get("error"))
+                            .and_then(|e| e.as_str())
+                            .unwrap_or("Unknown background generation error");
+                        return Err(error_msg.to_string());
+                    }
+                    _ => {}
+                }
+            }
+            Ok(None) => break,
+            Err(_) => break,
+        }
+    }
+    Ok(output)
 }
 
 async fn ensure_workspace_session_connected(
@@ -858,7 +897,8 @@ pub(crate) async fn generate_commit_message(
     // Create a background thread
     let thread_params = json!({
         "cwd": session.entry.path,
-        "approvalPolicy": "never"  // Never ask for approval in background
+        "approvalPolicy": "never",  // Never ask for approval in background
+        "_background": true
     });
     let thread_result = session.send_request("thread/start", thread_params).await?;
 
@@ -923,6 +963,7 @@ pub(crate) async fn generate_commit_message(
         "cwd": session.entry.path,
         "approvalPolicy": "never",
         "sandboxPolicy": { "type": "readOnly" },
+        "_background": true
     });
     let turn_result = session.send_request("turn/start", turn_params).await;
     let turn_result = match turn_result {
@@ -953,43 +994,12 @@ pub(crate) async fn generate_commit_message(
         return Err(error_msg.to_string());
     }
 
-    // Collect assistant text from events
-    let mut commit_message = String::new();
-    let timeout_duration = Duration::from_secs(60);
-    let collect_result = timeout(timeout_duration, async {
-        while let Some(event) = rx.recv().await {
-            let method = event.get("method").and_then(|m| m.as_str()).unwrap_or("");
-
-            match method {
-                "item/agentMessage/delta" => {
-                    // Extract text delta from agent messages
-                    if let Some(params) = event.get("params") {
-                        if let Some(delta) = params.get("delta").and_then(|d| d.as_str()) {
-                            commit_message.push_str(delta);
-                        }
-                    }
-                }
-                "turn/completed" => {
-                    // Turn completed, we can stop listening
-                    break;
-                }
-                "turn/error" => {
-                    // Error occurred
-                    let error_msg = event
-                        .get("params")
-                        .and_then(|p| p.get("error"))
-                        .and_then(|e| e.as_str())
-                        .unwrap_or("Unknown error during commit message generation");
-                    return Err(error_msg.to_string());
-                }
-                _ => {
-                    // Ignore other events (turn/started, item/started, item/completed, reasoning events, etc.)
-                }
-            }
-        }
-        Ok(())
-    })
-    .await;
+    let commit_message = collect_background_agent_text(
+        &mut rx,
+        Duration::from_millis(200),
+        Duration::from_secs(3),
+    )
+    .await?;
 
     // Unregister callback
     {
@@ -1000,13 +1010,6 @@ pub(crate) async fn generate_commit_message(
     // Archive the thread to clean up
     let archive_params = json!({ "threadId": thread_id });
     let _ = session.send_request("thread/archive", archive_params).await;
-
-    // Handle timeout or collection error
-    match collect_result {
-        Ok(Ok(())) => {}
-        Ok(Err(e)) => return Err(e),
-        Err(_) => return Err("Timeout waiting for commit message generation".to_string()),
-    }
 
     let trimmed = commit_message.trim().to_string();
     if trimmed.is_empty() {
@@ -1068,7 +1071,8 @@ Task:\n{cleaned_prompt}"
 
     let thread_params = json!({
         "cwd": session.entry.path,
-        "approvalPolicy": "never"
+        "approvalPolicy": "never",
+        "_background": true
     });
     let thread_result = session.send_request("thread/start", thread_params).await?;
 
@@ -1127,6 +1131,7 @@ Task:\n{cleaned_prompt}"
         "cwd": session.entry.path,
         "approvalPolicy": "never",
         "sandboxPolicy": { "type": "readOnly" },
+        "_background": true
     });
     let turn_result = session.send_request("turn/start", turn_params).await;
     let turn_result = match turn_result {
@@ -1156,34 +1161,12 @@ Task:\n{cleaned_prompt}"
         return Err(error_msg.to_string());
     }
 
-    let mut response_text = String::new();
-    let timeout_duration = Duration::from_secs(60);
-    let collect_result = timeout(timeout_duration, async {
-        while let Some(event) = rx.recv().await {
-            let method = event.get("method").and_then(|m| m.as_str()).unwrap_or("");
-            match method {
-                "item/agentMessage/delta" => {
-                    if let Some(params) = event.get("params") {
-                        if let Some(delta) = params.get("delta").and_then(|d| d.as_str()) {
-                            response_text.push_str(delta);
-                        }
-                    }
-                }
-                "turn/completed" => break,
-                "turn/error" => {
-                    let error_msg = event
-                        .get("params")
-                        .and_then(|p| p.get("error"))
-                        .and_then(|e| e.as_str())
-                        .unwrap_or("Unknown error during metadata generation");
-                    return Err(error_msg.to_string());
-                }
-                _ => {}
-            }
-        }
-        Ok(())
-    })
-    .await;
+    let response_text = collect_background_agent_text(
+        &mut rx,
+        Duration::from_millis(200),
+        Duration::from_secs(3),
+    )
+    .await?;
 
     {
         let mut callbacks = session.background_thread_callbacks.lock().await;
@@ -1192,12 +1175,6 @@ Task:\n{cleaned_prompt}"
 
     let archive_params = json!({ "threadId": thread_id });
     let _ = session.send_request("thread/archive", archive_params).await;
-
-    match collect_result {
-        Ok(Ok(())) => {}
-        Ok(Err(e)) => return Err(e),
-        Err(_) => return Err("Timeout waiting for metadata generation".to_string()),
-    }
 
     let trimmed = response_text.trim();
     if trimmed.is_empty() {

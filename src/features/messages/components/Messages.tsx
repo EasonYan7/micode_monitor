@@ -728,8 +728,14 @@ const MessageRow = memo(function MessageRow({
   onOpenThreadLink,
 }: MessageRowProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const displayText =
+  const strippedAssistantText =
     item.role === "assistant" ? stripInternalJsonPreamble(item.text) : item.text;
+  const displayText =
+    item.role === "assistant" &&
+    strippedAssistantText.trim().length === 0 &&
+    item.text.trim().length > 0
+      ? item.text
+      : strippedAssistantText;
   const hasText = displayText.trim().length > 0;
   const imageItems = useMemo(() => {
     if (!item.images || item.images.length === 0) {

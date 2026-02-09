@@ -952,6 +952,10 @@ impl WorkspaceSession {
     pub(crate) async fn send_request(&self, method: &str, params: Value) -> Result<Value, String> {
         match method {
             "thread/start" => {
+                let is_background = params
+                    .get("_background")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
                 let cwd = params
                     .get("cwd")
                     .and_then(Value::as_str)
@@ -959,15 +963,17 @@ impl WorkspaceSession {
                     .to_string();
                 let session_id = self.create_session_for_cwd(cwd).await?;
                 let thread = self.create_local_thread(session_id).await;
-                self.emit_event(
-                    "thread/started",
-                    json!({
-                        "thread": {
-                            "id": thread.thread_id,
-                            "name": thread.title
-                        }
-                    }),
-                );
+                if !is_background {
+                    self.emit_event(
+                        "thread/started",
+                        json!({
+                            "thread": {
+                                "id": thread.thread_id,
+                                "name": thread.title
+                            }
+                        }),
+                    );
+                }
                 Ok(json!({
                     "result": {
                         "thread": {
@@ -1065,6 +1071,11 @@ impl WorkspaceSession {
                     .and_then(Value::as_str)
                     .ok_or_else(|| "missing threadId".to_string())?
                     .to_string();
+                let is_background_thread = self
+                    .background_thread_callbacks
+                    .lock()
+                    .await
+                    .contains_key(&thread_id);
                 let thread = self.get_thread_by_id(&thread_id).await?;
                 let prompt_text = Self::parse_prompt_from_turn_start(&params);
                 if prompt_text.is_empty() {
@@ -1101,13 +1112,15 @@ impl WorkspaceSession {
                     session_id = fresh_session;
                 }
                 let turn_id = Uuid::new_v4().to_string();
-                self.emit_event(
-                    "turn/started",
-                    json!({
-                        "threadId": thread_id,
-                        "turn": { "id": turn_id, "threadId": thread.thread_id }
-                    }),
-                );
+                if !is_background_thread {
+                    self.emit_event(
+                        "turn/started",
+                        json!({
+                            "threadId": thread_id,
+                            "turn": { "id": turn_id, "threadId": thread.thread_id }
+                        }),
+                    );
+                }
                 let mut tracked_session_id = session_id.clone();
                 self.begin_prompt_tracking(&tracked_session_id).await;
                 self.register_active_prompt(&tracked_session_id, &thread_id, &turn_id)
@@ -1131,20 +1144,24 @@ impl WorkspaceSession {
                     Err(_) => {
                         let had_streaming = self.finish_prompt_lifecycle(&tracked_session_id).await;
                         if had_streaming {
-                            self.thread_store.lock().await.touch_message(&thread_id);
-                            self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
-                                .await;
+                            if !is_background_thread {
+                                self.thread_store.lock().await.touch_message(&thread_id);
+                                self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
+                                    .await;
+                            }
                             let normalized_turn = json!({
                                 "id": turn_id,
                                 "threadId": thread.thread_id
                             });
-                            self.emit_event(
-                                "turn/completed",
-                                json!({
-                                    "threadId": thread_id,
-                                    "turn": normalized_turn
-                                }),
-                            );
+                            if !is_background_thread {
+                                self.emit_event(
+                                    "turn/completed",
+                                    json!({
+                                        "threadId": thread_id,
+                                        "turn": normalized_turn
+                                    }),
+                                );
+                            }
                             return Ok(json!({
                                 "result": {
                                     "stopReason": "end_turn",
@@ -1186,20 +1203,24 @@ impl WorkspaceSession {
                             let had_streaming =
                                 self.finish_prompt_lifecycle(&tracked_session_id).await;
                             if had_streaming {
-                                self.thread_store.lock().await.touch_message(&thread_id);
-                                self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
-                                    .await;
+                                if !is_background_thread {
+                                    self.thread_store.lock().await.touch_message(&thread_id);
+                                    self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
+                                        .await;
+                                }
                                 let normalized_turn = json!({
                                     "id": turn_id,
                                     "threadId": thread.thread_id
                                 });
-                                self.emit_event(
-                                    "turn/completed",
-                                    json!({
-                                        "threadId": thread_id,
-                                        "turn": normalized_turn
-                                    }),
-                                );
+                                if !is_background_thread {
+                                    self.emit_event(
+                                        "turn/completed",
+                                        json!({
+                                            "threadId": thread_id,
+                                            "turn": normalized_turn
+                                        }),
+                                    );
+                                }
                                 return Ok(json!({
                                     "result": {
                                         "stopReason": "end_turn",
@@ -1218,20 +1239,24 @@ impl WorkspaceSession {
                 };
                 if let Some(error) = acp_error_message(&response) {
                     if is_request_aborted_message(&error) {
-                        self.thread_store.lock().await.touch_message(&thread_id);
-                        self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
-                            .await;
+                        if !is_background_thread {
+                            self.thread_store.lock().await.touch_message(&thread_id);
+                            self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
+                                .await;
+                        }
                         let normalized_turn = json!({
                             "id": turn_id,
                             "threadId": thread.thread_id
                         });
-                        self.emit_event(
-                            "turn/completed",
-                            json!({
-                                "threadId": thread_id,
-                                "turn": normalized_turn
-                            }),
-                        );
+                        if !is_background_thread {
+                            self.emit_event(
+                                "turn/completed",
+                                json!({
+                                    "threadId": thread_id,
+                                    "turn": normalized_turn
+                                }),
+                            );
+                        }
                         return Ok(json!({
                             "result": {
                                 "stopReason": "cancelled",
@@ -1241,9 +1266,11 @@ impl WorkspaceSession {
                     }
                     return Err(format!("turn/start failed: {error}"));
                 }
-                self.thread_store.lock().await.touch_message(&thread_id);
-                self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
-                    .await;
+                if !is_background_thread {
+                    self.thread_store.lock().await.touch_message(&thread_id);
+                    self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
+                        .await;
+                }
                 let mut normalized_response = response.clone();
                 let normalized_turn = json!({
                     "id": turn_id,
@@ -1263,13 +1290,15 @@ impl WorkspaceSession {
                         }
                     });
                 }
-                self.emit_event(
-                    "turn/completed",
-                    json!({
-                        "threadId": thread_id,
-                        "turn": normalized_turn
-                    }),
-                );
+                if !is_background_thread {
+                    self.emit_event(
+                        "turn/completed",
+                        json!({
+                            "threadId": thread_id,
+                            "turn": normalized_turn
+                        }),
+                    );
+                }
                 Ok(normalized_response)
             }
             "turn/interrupt" => {
@@ -1856,8 +1885,19 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                             session_clone.mark_prompt_streaming(&session_id).await;
                         }
                         if let Some(context) = context {
-                            for event in translate_acp_update(&context, update, &workspace_id) {
-                                let _ = event_tx.send(event);
+                            let translated = translate_acp_update(&context, update, &workspace_id);
+                            let background_callback = {
+                                let callbacks = session_clone.background_thread_callbacks.lock().await;
+                                callbacks.get(&context.thread_id).cloned()
+                            };
+                            if let Some(callback) = background_callback {
+                                for event in translated {
+                                    let _ = callback.send(event.message);
+                                }
+                            } else {
+                                for event in translated {
+                                    let _ = event_tx.send(event);
+                                }
                             }
                         }
                     }
