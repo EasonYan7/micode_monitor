@@ -106,6 +106,7 @@ import { pickWorkspacePath } from "./services/tauri";
 import type {
   AccessMode,
   ComposerEditorSettings,
+  LocalUsageSnapshot,
   ThreadTokenUsage,
   WorkspaceInfo,
 } from "./types";
@@ -162,6 +163,116 @@ function mergeTokenUsage(
   });
 
   return hasUsage ? merged : null;
+}
+
+function formatLocalDayKey(timestampMs: number): string {
+  const date = new Date(timestampMs);
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function buildSyntheticUsageSnapshot(
+  threads: Array<{ updatedAt: number; usage: ThreadTokenUsage }>,
+  days = 30,
+): LocalUsageSnapshot | null {
+  if (!threads.length) {
+    return null;
+  }
+  const clampedDays = Math.min(Math.max(days, 1), 90);
+  const now = Date.now();
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const dailyKeys: string[] = [];
+  const buckets = new Map<
+    string,
+    {
+      inputTokens: number;
+      cachedInputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      agentTimeMs: number;
+      agentRuns: number;
+    }
+  >();
+  for (let i = clampedDays - 1; i >= 0; i -= 1) {
+    const ms = dayStart.getTime() - i * 24 * 60 * 60 * 1000;
+    const key = formatLocalDayKey(ms);
+    dailyKeys.push(key);
+    buckets.set(key, {
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      agentTimeMs: 0,
+      agentRuns: 0,
+    });
+  }
+
+  threads.forEach(({ updatedAt, usage }) => {
+    const timestampMs = updatedAt > 1_000_000_000_000 ? updatedAt : updatedAt * 1000;
+    const key = formatLocalDayKey(timestampMs);
+    const bucket = buckets.get(key);
+    if (!bucket) {
+      return;
+    }
+    bucket.inputTokens += usage.total.inputTokens;
+    bucket.cachedInputTokens += usage.total.cachedInputTokens;
+    bucket.outputTokens += usage.total.outputTokens;
+    bucket.totalTokens += usage.total.totalTokens;
+    bucket.agentRuns += 1;
+  });
+
+  const daysData = dailyKeys.map((key) => ({
+    day: key,
+    ...(buckets.get(key) ?? {
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      agentTimeMs: 0,
+      agentRuns: 0,
+    }),
+  }));
+
+  const last7 = daysData.slice(-7);
+  const last7DaysTokens = last7.reduce((sum, day) => sum + day.totalTokens, 0);
+  const last30DaysTokens = daysData.reduce((sum, day) => sum + day.totalTokens, 0);
+  if (last30DaysTokens <= 0) {
+    return null;
+  }
+  const averageDailyTokens =
+    last7.length > 0 ? Math.round(last7DaysTokens / last7.length) : 0;
+  const last7InputTokens = last7.reduce((sum, day) => sum + day.inputTokens, 0);
+  const last7CachedTokens = last7.reduce((sum, day) => sum + day.cachedInputTokens, 0);
+  const cacheHitRatePercent =
+    last7InputTokens > 0
+      ? Math.round((last7CachedTokens / last7InputTokens) * 1000) / 10
+      : 0;
+  const peak = daysData.reduce<{ day: string; totalTokens: number } | null>((best, day) => {
+    if (day.totalTokens <= 0) {
+      return best;
+    }
+    if (!best || day.totalTokens > best.totalTokens) {
+      return { day: day.day, totalTokens: day.totalTokens };
+    }
+    return best;
+  }, null);
+
+  return {
+    updatedAt: now,
+    days: daysData,
+    totals: {
+      last7DaysTokens,
+      last30DaysTokens,
+      averageDailyTokens,
+      cacheHitRatePercent,
+      peakDay: peak?.day ?? null,
+      peakDayTokens: peak?.totalTokens ?? 0,
+    },
+    topModels: [],
+  };
 }
 
 const SettingsView = lazy(() =>
@@ -1176,6 +1287,32 @@ function MainApp() {
     error: localUsageError,
     refresh: refreshLocalUsage,
   } = useLocalUsage(showHome, usageWorkspacePath);
+  const localUsageSnapshotFallback = useMemo(() => {
+    const scopedThreads = usageWorkspaceId
+      ? threadsByWorkspace[usageWorkspaceId] ?? []
+      : Object.values(threadsByWorkspace).flat();
+    const usageThreads = scopedThreads
+      .map((thread) => {
+        const usage = tokenUsageByThread[thread.id];
+        if (!usage) {
+          return null;
+        }
+        return {
+          updatedAt: thread.updatedAt,
+          usage,
+        };
+      })
+      .filter((entry): entry is { updatedAt: number; usage: ThreadTokenUsage } => Boolean(entry));
+    return buildSyntheticUsageSnapshot(usageThreads);
+  }, [threadsByWorkspace, tokenUsageByThread, usageWorkspaceId]);
+  const localUsageSnapshotForHome = useMemo(() => {
+    if (localUsageSnapshot && localUsageSnapshot.totals.last30DaysTokens > 0) {
+      return localUsageSnapshot;
+    }
+    return localUsageSnapshotFallback ?? localUsageSnapshot;
+  }, [localUsageSnapshot, localUsageSnapshotFallback]);
+  const isLoadingLocalUsageForHome = isLoadingLocalUsage && !localUsageSnapshotForHome;
+  const localUsageErrorForHome = localUsageSnapshotForHome ? null : localUsageError;
   const STALE_PROCESSING_WITHOUT_TURN_MS = 15_000;
   const activeThreadStatus = activeThreadId
     ? threadStatusById[activeThreadId] ?? null
@@ -1941,9 +2078,9 @@ function MainApp() {
     onDismissErrorToast: dismissErrorToast,
     latestAgentRuns,
     isLoadingLatestAgents,
-    localUsageSnapshot,
-    isLoadingLocalUsage,
-    localUsageError,
+    localUsageSnapshot: localUsageSnapshotForHome,
+    isLoadingLocalUsage: isLoadingLocalUsageForHome,
+    localUsageError: localUsageErrorForHome,
     onRefreshLocalUsage: () => {
       refreshLocalUsage()?.catch(() => {});
     },

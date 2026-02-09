@@ -318,6 +318,9 @@ fn build_tool_thread_item(
         "server": presentation.server,
         "tool": presentation.tool,
         "title": tool_call_display_title(presentation),
+        "arguments": presentation.arguments,
+        "result": presentation.result,
+        "error": presentation.error,
         "status": status,
         "threadId": thread_id
     })
@@ -873,6 +876,9 @@ struct ToolCallPresentation {
     server: Option<String>,
     tool: Option<String>,
     title: Option<String>,
+    arguments: Option<Value>,
+    result: Option<String>,
+    error: Option<String>,
 }
 
 fn sanitize_tool_title(raw: Option<&str>) -> Option<String> {
@@ -952,6 +958,20 @@ fn extract_tool_presentation_from_update(update: &Value) -> ToolCallPresentation
         server,
         tool,
         title,
+        arguments: update.get("arguments").cloned().or_else(|| {
+            update
+                .get("content")
+                .and_then(Value::as_object)
+                .map(|content| Value::Object(content.clone()))
+        }),
+        result: update
+            .get("result")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
+        error: update
+            .get("error")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
     }
 }
 
@@ -977,6 +997,22 @@ fn extract_tool_presentation_from_permission(params: &Value) -> Option<(String, 
             server,
             tool,
             title,
+            arguments: tool_call.get("arguments").cloned().or_else(|| {
+                let command = extract_approval_command(params);
+                if command.is_empty() {
+                    None
+                } else {
+                    Some(json!({ "command": command }))
+                }
+            }),
+            result: tool_call
+                .get("result")
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
+            error: tool_call
+                .get("error")
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
         },
     ))
 }
@@ -994,6 +1030,15 @@ fn merge_tool_presentation(
     }
     if merged.title.is_none() {
         merged.title = incoming.title;
+    }
+    if merged.arguments.is_none() {
+        merged.arguments = incoming.arguments;
+    }
+    if merged.result.is_none() {
+        merged.result = incoming.result;
+    }
+    if merged.error.is_none() {
+        merged.error = incoming.error;
     }
     if merged.server.is_none() && merged.tool.is_some() {
         merged.server = Some("micode".to_string());
@@ -2191,6 +2236,7 @@ fn translate_acp_update(
                             "title": title,
                             "server": presentation.server,
                             "tool": presentation.tool,
+                            "arguments": presentation.arguments,
                             "status": "in_progress"
                         }
                     }
@@ -2220,6 +2266,9 @@ fn translate_acp_update(
                             "title": title,
                             "server": presentation.server,
                             "tool": presentation.tool,
+                            "arguments": presentation.arguments,
+                            "result": presentation.result,
+                            "error": presentation.error,
                             "status": "completed"
                         }
                     }
@@ -2513,6 +2562,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                                             "title": tool_call_display_title(&merged),
                                             "server": merged.server,
                                             "tool": merged.tool,
+                                            "arguments": merged.arguments,
                                             "status": "in_progress"
                                         }
                                     }
@@ -2699,6 +2749,9 @@ mod tests {
             server: Some("micode".to_string()),
             tool: Some("edit".to_string()),
             title: Some("abc.md: foo => bar".to_string()),
+            arguments: None,
+            result: None,
+            error: None,
         };
         let events = translate_acp_update(&context, &update, "ws-5", None, Some(&cached));
         assert_eq!(events.len(), 1);

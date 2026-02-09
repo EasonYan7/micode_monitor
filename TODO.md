@@ -100,6 +100,8 @@
 - Streaming UX fix: adapter now rotates assistant `itemId` segment after `tool_call`, so post-tool response starts a new assistant bubble instead of appending to pre-tool text.
 - Thread delete semantics fix: context menu now includes `Delete Conversation`; removing a thread no longer drops accumulated `tokenUsageByThread`.
 - Tool bubble split fix v2: trigger assistant segment split on first `session/request_permission` tool presentation as well (not only `session/update.tool_call`), with de-dup guard to avoid double-split.
+- Home usage fallback fix: when local usage snapshot is empty, synthesize usage cards/charts from persisted `tokenUsageByThread` (workspace/all-workspace scope).
+- Tool detail fix: preserve `mcpToolCall` `arguments/result/error` in adapter cache, realtime events, and persisted thread items so expand details shows meaningful content.
 - Re-validated after fix:
   - `npm run typecheck`
   - `cargo check --manifest-path src-tauri/Cargo.toml`
