@@ -54,7 +54,7 @@ export function useQueuedSend({
   startResume,
   startCompact,
   startApps,
-  startMcp,
+  startMcp: _startMcp,
   startStatus,
   clearActiveImages,
 }: UseQueuedSendOptions): UseQueuedSendResult {
@@ -138,9 +138,6 @@ export function useQueuedSend({
               return;
             }
             break;
-          case "mcp":
-            await startMcp(trimmed);
-            return;
           case "status":
             await startStatus(trimmed);
             return;
@@ -162,7 +159,6 @@ export function useQueuedSend({
       startApps,
       startCompact,
       startFork,
-      startMcp,
       startResume,
       startReview,
       startStatus,

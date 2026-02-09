@@ -295,19 +295,17 @@ describe("useQueuedSend", () => {
     expect(options.startReview).not.toHaveBeenCalled();
   });
 
-  it("routes /mcp to the MCP handler", async () => {
-    const startMcp = vi.fn().mockResolvedValue(undefined);
-    const options = makeOptions({ startMcp });
+  it("treats /mcp list as plain text", async () => {
+    const options = makeOptions();
     const { result } = renderHook((props) => useQueuedSend(props), {
       initialProps: options,
     });
 
     await act(async () => {
-      await result.current.handleSend("/mcp now", ["img-1"]);
+      await result.current.handleSend("/mcp list", ["img-1"]);
     });
 
-    expect(startMcp).toHaveBeenCalledWith("/mcp now");
-    expect(options.sendUserMessage).not.toHaveBeenCalled();
+    expect(options.sendUserMessage).toHaveBeenCalledWith("/mcp list", ["img-1"]);
     expect(options.startReview).not.toHaveBeenCalled();
   });
 
