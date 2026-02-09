@@ -103,6 +103,7 @@ import { useWorkspaceAgentMd } from "./features/workspaces/hooks/useWorkspaceAge
 import { pickWorkspacePath } from "./services/tauri";
 import type {
   AccessMode,
+  AppSettings,
   ComposerEditorSettings,
   LocalUsageSnapshot,
   ThreadTokenUsage,
@@ -878,7 +879,6 @@ function MainApp() {
     startResume,
     startCompact,
     startApps,
-    startSkills,
     startMcp,
     startStatus,
     reviewPrompt,

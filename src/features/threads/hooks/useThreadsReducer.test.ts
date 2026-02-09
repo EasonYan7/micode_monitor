@@ -474,8 +474,13 @@ describe("threadReducer", () => {
     });
 
     const messages = (withPostToolDelta.itemsByThread["thread-1"] ?? []).filter(
-      (item): item is Extract<ConversationItem, { kind: "message"; role: "assistant" }> =>
-        item.kind === "message" && item.role === "assistant",
+      (
+        item,
+      ): item is ConversationItem & {
+        kind: "message";
+        role: "assistant";
+        text: string;
+      } => item.kind === "message" && item.role === "assistant",
     );
     expect(messages).toHaveLength(2);
     expect(messages[0].id).toBe("agent-1");

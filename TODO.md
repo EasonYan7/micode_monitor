@@ -69,6 +69,7 @@
 - [x] Fix usage root resolution: scan MiCode `tmp/<hash>/chats` directories (keep legacy `sessions` fallback) so Home model usage refreshes correctly
 - [x] Fix workspace-scoped usage filtering for `tmp/<hash>/chats` by matching `projectHash` to selected workspace path hash
 - [x] Fix locale leakage in English UI time labels: force relative/day formatting by app language (`en-US`/`zh-CN`) instead of system locale
+- [x] Resolve frontend TypeScript baseline errors so `npm run typecheck` passes again
 - [x] Add sidebar workspace action: clear project conversation history with confirm dialog, and wipe local history cache (`.micodemonitor` + global `~/.micode|~/.codex/tmp`)
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.

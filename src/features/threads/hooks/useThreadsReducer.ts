@@ -42,6 +42,12 @@ function extractRenameText(text: string) {
   return withoutSkills.replace(/\s+/g, " ").trim();
 }
 
+function isMessageItem(
+  item: ConversationItem,
+): item is Extract<ConversationItem, { kind: "message" }> {
+  return item.kind === "message";
+}
+
 function getAssistantTextForRename(
   items: ConversationItem[],
   itemId?: string,
@@ -674,12 +680,19 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
           .some((entry) => isAssistantConversationBoundary(entry));
         if (hasBoundaryAfter) {
           const splitPrefix = `${action.itemId}-split-`;
-          const tailIndex = list.findLastIndex(
-            (entry) =>
+          let tailIndex = -1;
+          for (let i = list.length - 1; i >= 0; i -= 1) {
+            const entry = list[i];
+            if (
+              entry &&
               entry.kind === "message" &&
               entry.role === "assistant" &&
-              entry.id.startsWith(splitPrefix),
-          );
+              entry.id.startsWith(splitPrefix)
+            ) {
+              tailIndex = i;
+              break;
+            }
+          }
           const hasBoundaryAfterTail =
             tailIndex >= 0
               ? list
@@ -707,11 +720,11 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
           }
         }
       }
-      if (index >= 0 && list[index].kind === "message") {
-        const existing = list[index];
+      const existingItem = index >= 0 ? list[index] : undefined;
+      if (existingItem && isMessageItem(existingItem)) {
         list[index] = {
-          ...existing,
-          text: mergeStreamingText(existing.text, action.delta),
+          ...existingItem,
+          text: mergeStreamingText(existingItem.text, action.delta),
         };
       } else {
         list.push({
@@ -742,11 +755,11 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
     case "completeAgentMessage": {
       const list = [...(state.itemsByThread[action.threadId] ?? [])];
       const index = list.findIndex((msg) => msg.id === action.itemId);
-      if (index >= 0 && list[index].kind === "message") {
-        const existing = list[index];
+      const existingItem = index >= 0 ? list[index] : undefined;
+      if (existingItem && isMessageItem(existingItem)) {
         list[index] = {
-          ...existing,
-          text: action.text || existing.text,
+          ...existingItem,
+          text: action.text || existingItem.text,
         };
       } else {
         list.push({
