@@ -3,11 +3,12 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 
 use crate::backend::app_server::WorkspaceSession;
 use crate::micode::args::resolve_workspace_micode_args;
-use crate::micode::home::resolve_workspace_micode_home;
+use crate::micode::home::{resolve_default_micode_home, resolve_workspace_micode_home};
 use crate::storage::write_workspaces;
 use crate::types::{
     AppSettings, WorkspaceEntry, WorkspaceInfo, WorkspaceKind, WorkspaceSettings, WorktreeInfo,
@@ -272,6 +273,76 @@ where
         run_git_command(repo_path, args_owned)
             .await
             .map(|_output| ())
+    }
+}
+
+pub(crate) async fn clear_workspace_history_core(
+    workspace_id: &str,
+    workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
+) -> Result<(), String> {
+    let (_target_ids, target_paths) =
+        resolve_workspace_history_targets_core(workspace_id, workspaces).await?;
+
+    for path in &target_paths {
+        let local_root = PathBuf::from(path).join(".micodemonitor");
+        let _ = std::fs::remove_file(local_root.join("sessions.json"));
+        let _ = std::fs::remove_dir_all(local_root.join("thread-items"));
+    }
+
+    let mut homes = Vec::new();
+    if let Some(home) = resolve_default_micode_home() {
+        homes.push(home.clone());
+        if let Some(parent) = home.parent() {
+            if home.file_name().and_then(|value| value.to_str()) == Some(".micode") {
+                homes.push(parent.join(".codex"));
+            } else if home.file_name().and_then(|value| value.to_str()) == Some(".codex") {
+                homes.push(parent.join(".micode"));
+            }
+        }
+    }
+
+    for path in &target_paths {
+        let hash = format!("{:x}", Sha256::digest(path.as_bytes()));
+        for home in &homes {
+            let _ = std::fs::remove_dir_all(home.join("tmp").join(&hash));
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) async fn resolve_workspace_history_targets_core(
+    workspace_id: &str,
+    workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
+) -> Result<(Vec<String>, Vec<String>), String> {
+    let map = workspaces.lock().await;
+    let entry = map
+        .get(workspace_id)
+        .cloned()
+        .ok_or_else(|| "workspace not found".to_string())?;
+
+    let mut ids = vec![entry.id.clone()];
+    let mut paths = vec![entry.path.clone()];
+
+    if !entry.kind.is_worktree() {
+        for child in map
+            .values()
+            .filter(|workspace| workspace.parent_id.as_deref() == Some(&entry.id))
+        {
+            ids.push(child.id.clone());
+            paths.push(child.path.clone());
+        }
+    }
+
+    Ok((ids, paths))
+}
+
+pub(crate) async fn kill_sessions_core(
+    sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
+    workspace_ids: &[String],
+) {
+    for workspace_id in workspace_ids {
+        kill_session_by_id(sessions, workspace_id).await;
     }
 }
 

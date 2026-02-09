@@ -15,7 +15,9 @@ type SidebarMenuHandlers = {
   onRenameThread: (workspaceId: string, threadId: string) => void;
   onReloadWorkspaceThreads: (workspaceId: string) => void;
   onDeleteWorkspace: (workspaceId: string) => void;
+  onClearWorkspaceHistory: (workspaceId: string) => void;
   onDeleteWorktree: (workspaceId: string) => void;
+  language?: "en" | "zh";
 };
 
 export function useSidebarMenus({
@@ -27,7 +29,9 @@ export function useSidebarMenus({
   onRenameThread,
   onReloadWorkspaceThreads,
   onDeleteWorkspace,
+  onClearWorkspaceHistory,
   onDeleteWorktree,
+  language = "en",
 }: SidebarMenuHandlers) {
   const showThreadMenu = useCallback(
     async (
@@ -105,15 +109,19 @@ export function useSidebarMenus({
         action: () => onReloadWorkspaceThreads(workspaceId),
       });
       const deleteItem = await MenuItem.new({
-        text: "Delete",
+        text: language === "zh" ? "删除项目" : "Delete",
         action: () => onDeleteWorkspace(workspaceId),
       });
-      const menu = await Menu.new({ items: [reloadItem, deleteItem] });
+      const clearHistoryItem = await MenuItem.new({
+        text: language === "zh" ? "清空项目对话记录" : "Clear conversation history",
+        action: () => onClearWorkspaceHistory(workspaceId),
+      });
+      const menu = await Menu.new({ items: [reloadItem, clearHistoryItem, deleteItem] });
       const window = getCurrentWindow();
       const position = new LogicalPosition(event.clientX, event.clientY);
       await menu.popup(position, window);
     },
-    [onReloadWorkspaceThreads, onDeleteWorkspace],
+    [language, onClearWorkspaceHistory, onReloadWorkspaceThreads, onDeleteWorkspace],
   );
 
   const showWorktreeMenu = useCallback(
@@ -150,15 +158,21 @@ export function useSidebarMenus({
         },
       });
       const deleteItem = await MenuItem.new({
-        text: "Delete worktree",
+        text: language === "zh" ? "删除工作树" : "Delete worktree",
         action: () => onDeleteWorktree(worktree.id),
       });
-      const menu = await Menu.new({ items: [reloadItem, revealItem, deleteItem] });
+      const clearHistoryItem = await MenuItem.new({
+        text: language === "zh" ? "清空对话记录" : "Clear conversation history",
+        action: () => onClearWorkspaceHistory(worktree.id),
+      });
+      const menu = await Menu.new({
+        items: [reloadItem, revealItem, clearHistoryItem, deleteItem],
+      });
       const window = getCurrentWindow();
       const position = new LogicalPosition(event.clientX, event.clientY);
       await menu.popup(position, window);
     },
-    [onReloadWorkspaceThreads, onDeleteWorktree],
+    [language, onClearWorkspaceHistory, onReloadWorkspaceThreads, onDeleteWorktree],
   );
 
   return { showThreadMenu, showWorkspaceMenu, showWorktreeMenu };

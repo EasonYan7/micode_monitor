@@ -51,6 +51,7 @@ describe("useSidebarMenus", () => {
     const onRenameThread = vi.fn();
     const onReloadWorkspaceThreads = vi.fn();
     const onDeleteWorkspace = vi.fn();
+    const onClearWorkspaceHistory = vi.fn();
     const onDeleteWorktree = vi.fn();
 
     const { result } = renderHook(() =>
@@ -63,6 +64,7 @@ describe("useSidebarMenus", () => {
         onRenameThread,
         onReloadWorkspaceThreads,
         onDeleteWorkspace,
+        onClearWorkspaceHistory,
         onDeleteWorktree,
       }),
     );

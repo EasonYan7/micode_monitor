@@ -22,10 +22,10 @@ use super::worktree::{
 };
 
 use crate::backend::app_server::WorkspaceSession;
+use crate::git_utils::resolve_git_root;
 use crate::micode::args::resolve_workspace_micode_args;
 use crate::micode::home::resolve_workspace_micode_home;
 use crate::micode::spawn_workspace_session;
-use crate::git_utils::resolve_git_root;
 use crate::remote_backend;
 use crate::shared::process_core::tokio_command;
 use crate::shared::workspaces_core;
@@ -445,6 +445,30 @@ pub(crate) async fn remove_worktree(
         },
     )
     .await
+}
+
+#[tauri::command]
+pub(crate) async fn clear_workspace_history(
+    id: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        remote_backend::call_remote(
+            &*state,
+            app,
+            "clear_workspace_history",
+            json!({ "id": id }),
+        )
+        .await?;
+        return Ok(());
+    }
+
+    let (workspace_ids, _paths) =
+        workspaces_core::resolve_workspace_history_targets_core(&id, &state.workspaces).await?;
+    workspaces_core::clear_workspace_history_core(&id, &state.workspaces).await?;
+    workspaces_core::kill_sessions_core(&state.sessions, &workspace_ids).await;
+    Ok(())
 }
 
 #[tauri::command]

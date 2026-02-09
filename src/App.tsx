@@ -399,6 +399,7 @@ function MainApp() {
     deleteWorkspaceGroup,
     assignWorkspaceGroup,
     removeWorkspace,
+    clearWorkspaceHistory,
     removeWorktree,
     renameWorktree,
     renameWorktreeUpstream,
@@ -2066,6 +2067,29 @@ function MainApp() {
     },
     onDeleteWorkspace: (workspaceId) => {
       void removeWorkspace(workspaceId);
+    },
+    onClearWorkspaceHistory: (workspaceId) => {
+      void (async () => {
+        const cleared = await clearWorkspaceHistory(workspaceId);
+        if (!cleared) {
+          return;
+        }
+        const targetIds = new Set<string>([workspaceId]);
+        const target = workspacesById.get(workspaceId);
+        if (target && (target.kind ?? "main") !== "worktree") {
+          workspaces.forEach((workspace) => {
+            if (workspace.parentId === workspaceId) {
+              targetIds.add(workspace.id);
+            }
+          });
+        }
+        targetIds.forEach((id) => {
+          resetWorkspaceThreads(id);
+          if (activeWorkspaceId === id) {
+            setActiveThreadId(null, id);
+          }
+        });
+      })();
     },
     onDeleteWorktree: (workspaceId) => {
       void removeWorktree(workspaceId);

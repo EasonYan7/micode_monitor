@@ -199,6 +199,10 @@ export async function removeWorktree(id: string): Promise<void> {
   return invoke("remove_worktree", { id });
 }
 
+export async function clearWorkspaceHistory(id: string): Promise<void> {
+  return invoke("clear_workspace_history", { id });
+}
+
 export async function renameWorktree(
   id: string,
   branch: string,

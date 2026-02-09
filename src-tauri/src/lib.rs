@@ -3,7 +3,6 @@ use tauri::Manager;
 use tauri::{RunEvent, WindowEvent};
 
 mod backend;
-mod micode;
 mod dictation;
 mod event_sink;
 mod files;
@@ -11,6 +10,7 @@ mod git;
 mod git_utils;
 mod local_usage;
 mod menu;
+mod micode;
 mod notifications;
 mod prompts;
 mod remote_backend;
@@ -88,6 +88,7 @@ pub fn run() {
             workspaces::worktree_setup_mark_ran,
             workspaces::remove_workspace,
             workspaces::remove_worktree,
+            workspaces::clear_workspace_history,
             workspaces::rename_worktree,
             workspaces::rename_worktree_upstream,
             workspaces::apply_worktree_changes,

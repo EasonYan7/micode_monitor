@@ -78,6 +78,7 @@ type SidebarProps = {
   getPinTimestamp: (workspaceId: string, threadId: string) => number | null;
   onRenameThread: (workspaceId: string, threadId: string) => void;
   onDeleteWorkspace: (workspaceId: string) => void;
+  onClearWorkspaceHistory: (workspaceId: string) => void;
   onDeleteWorktree: (workspaceId: string) => void;
   onLoadOlderThreads: (workspaceId: string) => void;
   onReloadWorkspaceThreads: (workspaceId: string) => void;
@@ -128,6 +129,7 @@ export function Sidebar({
   getPinTimestamp,
   onRenameThread,
   onDeleteWorkspace,
+  onClearWorkspaceHistory,
   onDeleteWorktree,
   onLoadOlderThreads,
   onReloadWorkspaceThreads,
@@ -165,7 +167,9 @@ export function Sidebar({
       onRenameThread,
       onReloadWorkspaceThreads,
       onDeleteWorkspace,
+      onClearWorkspaceHistory,
       onDeleteWorktree,
+      language,
     });
   const {
     sessionPercent,

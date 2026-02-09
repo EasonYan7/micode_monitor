@@ -46,6 +46,7 @@ const baseProps = {
   getPinTimestamp: vi.fn(() => null),
   onRenameThread: vi.fn(),
   onDeleteWorkspace: vi.fn(),
+  onClearWorkspaceHistory: vi.fn(),
   onDeleteWorktree: vi.fn(),
   onLoadOlderThreads: vi.fn(),
   onReloadWorkspaceThreads: vi.fn(),

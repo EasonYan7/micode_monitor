@@ -312,6 +312,14 @@ impl DaemonState {
         .await
     }
 
+    async fn clear_workspace_history(&self, id: String) -> Result<(), String> {
+        let (workspace_ids, _paths) =
+            workspaces_core::resolve_workspace_history_targets_core(&id, &self.workspaces).await?;
+        workspaces_core::clear_workspace_history_core(&id, &self.workspaces).await?;
+        workspaces_core::kill_sessions_core(&self.sessions, &workspace_ids).await;
+        Ok(())
+    }
+
     async fn rename_worktree(
         &self,
         id: String,
@@ -1094,6 +1102,11 @@ async fn handle_rpc_request(
         "remove_worktree" => {
             let id = parse_string(&params, "id")?;
             state.remove_worktree(id).await?;
+            Ok(json!({ "ok": true }))
+        }
+        "clear_workspace_history" => {
+            let id = parse_string(&params, "id")?;
+            state.clear_workspace_history(id).await?;
             Ok(json!({ "ok": true }))
         }
         "rename_worktree" => {

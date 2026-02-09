@@ -12,6 +12,7 @@ import {
   addWorkspace as addWorkspaceService,
   addWorktree as addWorktreeService,
   connectWorkspace as connectWorkspaceService,
+  clearWorkspaceHistory as clearWorkspaceHistoryService,
   isWorkspacePathDir as isWorkspacePathDirService,
   listWorkspaces,
   pickWorkspacePath,
@@ -706,6 +707,62 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
     }
   }
 
+  async function clearWorkspaceHistory(workspaceId: string): Promise<boolean> {
+    const workspace = workspaces.find((entry) => entry.id === workspaceId);
+    if (!workspace) {
+      return false;
+    }
+    const isZh = (appSettings?.language ?? "en") === "zh";
+    const confirmed = await ask(
+      isZh
+        ? `确认清空「${workspace.name}」的对话历史？\n\n这会永久删除该项目在本机的会话记录与历史对话缓存，无法恢复。`
+        : `Clear conversation history for "${workspace.name}"?\n\nThis permanently deletes local session records and cached conversation history for this project.`,
+      {
+        title: isZh ? "清空项目对话记录" : "Clear Project Conversation History",
+        kind: "warning",
+        okLabel: isZh ? "确认清空" : "Clear",
+        cancelLabel: isZh ? "取消" : "Cancel",
+      },
+    );
+    if (!confirmed) {
+      return false;
+    }
+    onDebug?.({
+      id: `${Date.now()}-client-clear-workspace-history`,
+      timestamp: Date.now(),
+      source: "client",
+      label: "workspace/clear_history",
+      payload: { workspaceId },
+    });
+    try {
+      await clearWorkspaceHistoryService(workspaceId);
+      void message(
+        isZh
+          ? "已清空该项目的本地历史记录。"
+          : "Project local conversation history has been cleared.",
+        {
+          title: isZh ? "清空完成" : "History Cleared",
+          kind: "info",
+        },
+      );
+      return true;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      onDebug?.({
+        id: `${Date.now()}-client-clear-workspace-history-error`,
+        timestamp: Date.now(),
+        source: "error",
+        label: "workspace/clear_history error",
+        payload: errorMessage,
+      });
+      void message(errorMessage, {
+        title: isZh ? "清空失败" : "Clear history failed",
+        kind: "error",
+      });
+      return false;
+    }
+  }
+
   async function removeWorktree(workspaceId: string) {
     const workspace = workspaces.find((entry) => entry.id === workspaceId);
     const workspaceName = workspace?.name || "this worktree";
@@ -861,6 +918,7 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
     deleteWorkspaceGroup,
     assignWorkspaceGroup,
     removeWorkspace,
+    clearWorkspaceHistory,
     removeWorktree,
     renameWorktree,
     renameWorktreeUpstream,
