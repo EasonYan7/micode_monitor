@@ -49,6 +49,7 @@
 - [x] Prevent settings UI flashback on save errors (keep optimistic state; log save failure to Debug panel)
 - [x] Remove Features experimental toggles (Multi-agent/Apps) from Settings UI
 - [x] Remove MiCode remote backend host/token inputs from Settings UI
+- [x] Expand Chinese UI localization: SettingsView major sections/controls + sidebar core labels/search/thread list actions
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

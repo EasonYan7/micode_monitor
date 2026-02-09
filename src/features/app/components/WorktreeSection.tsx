@@ -1,7 +1,7 @@
 import Layers from "lucide-react/dist/esm/icons/layers";
 import type { MouseEvent } from "react";
 
-import type { ThreadSummary, WorkspaceInfo } from "../../../types";
+import type { ThreadSummary, UiLanguage, WorkspaceInfo } from "../../../types";
 import { ThreadList } from "./ThreadList";
 import { ThreadLoading } from "./ThreadLoading";
 import { WorktreeCard } from "./WorktreeCard";
@@ -51,6 +51,7 @@ type WorktreeSectionProps = {
   onShowWorktreeMenu: (event: MouseEvent, worktree: WorkspaceInfo) => void;
   onToggleExpanded: (workspaceId: string) => void;
   onLoadOlderThreads: (workspaceId: string) => void;
+  language?: UiLanguage;
 };
 
 export function WorktreeSection({
@@ -76,6 +77,7 @@ export function WorktreeSection({
   onShowWorktreeMenu,
   onToggleExpanded,
   onLoadOlderThreads,
+  language = "en",
 }: WorktreeSectionProps) {
   if (!worktrees.length) {
     return null;
@@ -85,7 +87,7 @@ export function WorktreeSection({
     <div className="worktree-section">
       <div className="worktree-header">
         <Layers className="worktree-header-icon" aria-hidden />
-        Worktrees
+        {language === "zh" ? "工作树" : "Worktrees"}
       </div>
       <div className="worktree-list">
         {worktrees.map((worktree) => {
@@ -142,6 +144,7 @@ export function WorktreeSection({
                   onLoadOlderThreads={onLoadOlderThreads}
                   onSelectThread={onSelectThread}
                   onShowThreadMenu={onShowThreadMenu}
+                  language={language}
                 />
               )}
               {showWorktreeLoader && <ThreadLoading nested />}

@@ -1,6 +1,6 @@
 import type { CSSProperties, MouseEvent } from "react";
 
-import type { ThreadSummary } from "../../../types";
+import type { ThreadSummary, UiLanguage } from "../../../types";
 
 type ThreadStatusMap = Record<
   string,
@@ -36,6 +36,7 @@ type ThreadListProps = {
     threadId: string,
     canPin: boolean,
   ) => void;
+  language?: UiLanguage;
 };
 
 export function ThreadList({
@@ -57,7 +58,9 @@ export function ThreadList({
   onLoadOlderThreads,
   onSelectThread,
   onShowThreadMenu,
+  language = "en",
 }: ThreadListProps) {
+  const isZh = language === "zh";
   const indentUnit = nested ? 10 : 14;
   const renderThreadRow = ({ thread, depth }: ThreadRow) => {
     const relativeTime = getThreadTime(thread);
@@ -99,7 +102,11 @@ export function ThreadList({
         }}
       >
         <span className={`thread-status ${statusClass}`} aria-hidden />
-        {isPinned && <span className="thread-pin-icon" aria-label="Pinned">📌</span>}
+        {isPinned && (
+          <span className="thread-pin-icon" aria-label={isZh ? "已置顶" : "Pinned"}>
+            📌
+          </span>
+        )}
         <span className="thread-name">{thread.name}</span>
         <div className="thread-meta">
           {relativeTime && <span className="thread-time">{relativeTime}</span>}
@@ -123,10 +130,10 @@ export function ThreadList({
           className="thread-more"
           onClick={(event) => {
             event.stopPropagation();
-            onToggleExpanded(workspaceId);
-          }}
-        >
-          {isExpanded ? "Show less" : "More..."}
+          onToggleExpanded(workspaceId);
+        }}
+      >
+          {isExpanded ? (isZh ? "收起" : "Show less") : isZh ? "更多..." : "More..."}
         </button>
       )}
       {showLoadOlder && nextCursor && (isExpanded || totalThreadRoots <= 3) && (
@@ -139,10 +146,16 @@ export function ThreadList({
           disabled={isPaging}
         >
           {isPaging
-            ? "Loading..."
+            ? isZh
+              ? "加载中..."
+              : "Loading..."
             : totalThreadRoots === 0
-              ? "Search older..."
-              : "Load older..."}
+              ? isZh
+                ? "搜索更早会话..."
+                : "Search older..."
+              : isZh
+                ? "加载更早..."
+                : "Load older..."}
         </button>
       )}
     </div>

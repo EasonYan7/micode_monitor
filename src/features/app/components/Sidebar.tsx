@@ -388,6 +388,7 @@ export function Sidebar({
         onAddWorkspace={onAddWorkspace}
         onToggleSearch={() => setIsSearchOpen((prev) => !prev)}
         isSearchOpen={isSearchOpen}
+        language={language}
       />
       <div className={`sidebar-search${isSearchOpen ? " is-open" : ""}`}>
         {isSearchOpen && (
@@ -395,8 +396,8 @@ export function Sidebar({
             className="sidebar-search-input"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search projects"
-            aria-label="Search projects"
+            placeholder={language === "zh" ? "搜索项目" : "Search projects"}
+            aria-label={language === "zh" ? "搜索项目" : "Search projects"}
             data-tauri-drag-region="false"
             autoFocus
           />
@@ -406,7 +407,7 @@ export function Sidebar({
             type="button"
             className="sidebar-search-clear"
             onClick={() => setSearchQuery("")}
-            aria-label="Clear search"
+            aria-label={language === "zh" ? "清空搜索" : "Clear search"}
             data-tauri-drag-region="false"
           >
             <X size={12} aria-hidden />
@@ -441,7 +442,9 @@ export function Sidebar({
           {pinnedThreadRows.length > 0 && (
             <div className="pinned-section">
               <div className="workspace-group-header">
-                <div className="workspace-group-label">Pinned</div>
+                <div className="workspace-group-label">
+                  {language === "zh" ? "置顶" : "Pinned"}
+                </div>
               </div>
               <PinnedThreadList
                 rows={pinnedThreadRows}
@@ -540,7 +543,7 @@ export function Sidebar({
                                 onAddAgent(entry);
                               }}
                             >
-                              New agent
+                              {language === "zh" ? "新建 Agent" : "New agent"}
                             </button>
                             <button
                               className="workspace-add-option"
@@ -550,7 +553,7 @@ export function Sidebar({
                                 onAddWorktreeAgent(entry);
                               }}
                             >
-                              New worktree agent
+                              {language === "zh" ? "新建工作树 Agent" : "New worktree agent"}
                             </button>
                             <button
                               className="workspace-add-option"
@@ -560,7 +563,7 @@ export function Sidebar({
                                 onAddCloneAgent(entry);
                               }}
                             >
-                              New clone agent
+                              {language === "zh" ? "新建克隆 Agent" : "New clone agent"}
                             </button>
                           </div>,
                           document.body,
@@ -581,7 +584,9 @@ export function Sidebar({
                           }}
                         >
                           <span className={`thread-status ${draftStatusClass}`} aria-hidden />
-                          <span className="thread-name">New Agent</span>
+                          <span className="thread-name">
+                            {language === "zh" ? "新建 Agent" : "New Agent"}
+                          </span>
                         </div>
                       )}
                       {worktrees.length > 0 && (
@@ -608,6 +613,7 @@ export function Sidebar({
                           onShowWorktreeMenu={showWorktreeMenu}
                           onToggleExpanded={handleToggleExpanded}
                           onLoadOlderThreads={onLoadOlderThreads}
+                          language={language}
                         />
                       )}
                       {showThreadList && (
@@ -628,6 +634,7 @@ export function Sidebar({
                           onLoadOlderThreads={onLoadOlderThreads}
                           onSelectThread={onSelectThread}
                           onShowThreadMenu={showThreadMenu}
+                          language={language}
                         />
                       )}
                       {showThreadLoader && <ThreadLoading />}
@@ -640,8 +647,12 @@ export function Sidebar({
           {!filteredGroupedWorkspaces.length && (
             <div className="empty">
               {isSearchActive
-                ? "No projects match your search."
-                : "Add a workspace to start."}
+                ? language === "zh"
+                  ? "没有匹配的项目。"
+                  : "No projects match your search."
+                : language === "zh"
+                  ? "请先添加一个工作区。"
+                  : "Add a workspace to start."}
             </div>
           )}
         </div>
