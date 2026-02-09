@@ -295,8 +295,9 @@ describe("useQueuedSend", () => {
     expect(options.startReview).not.toHaveBeenCalled();
   });
 
-  it("treats /mcp list as plain text", async () => {
-    const options = makeOptions();
+  it("routes /mcp list to the MCP handler", async () => {
+    const startMcp = vi.fn().mockResolvedValue(undefined);
+    const options = makeOptions({ startMcp });
     const { result } = renderHook((props) => useQueuedSend(props), {
       initialProps: options,
     });
@@ -305,7 +306,24 @@ describe("useQueuedSend", () => {
       await result.current.handleSend("/mcp list", ["img-1"]);
     });
 
-    expect(options.sendUserMessage).toHaveBeenCalledWith("/mcp list", ["img-1"]);
+    expect(startMcp).toHaveBeenCalledWith("/mcp list");
+    expect(options.sendUserMessage).not.toHaveBeenCalled();
+    expect(options.startReview).not.toHaveBeenCalled();
+  });
+
+  it("treats non-list /mcp subcommands as plain text", async () => {
+    const startMcp = vi.fn().mockResolvedValue(undefined);
+    const options = makeOptions({ startMcp });
+    const { result } = renderHook((props) => useQueuedSend(props), {
+      initialProps: options,
+    });
+
+    await act(async () => {
+      await result.current.handleSend("/mcp status", ["img-1"]);
+    });
+
+    expect(startMcp).not.toHaveBeenCalled();
+    expect(options.sendUserMessage).toHaveBeenCalledWith("/mcp status", ["img-1"]);
     expect(options.startReview).not.toHaveBeenCalled();
   });
 

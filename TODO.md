@@ -58,6 +58,7 @@
 - [x] Align slash UX with CLI capability: remove built-in `/skills` routing/autocomplete fallback
 - [x] Align MCP slash behavior with CLI: stop local `/mcp` interception and pass `/mcp list` through to MiCode
 - [x] Fix MCP tool detail visibility: parse ACP `tool_call` `rawInput` and `tool_call_update` `content[]` into tool arguments/result
+- [x] Route exact `/mcp list` as deterministic local command (other `/mcp ...` remains passthrough)
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
@@ -85,6 +86,7 @@
 - Slash capability alignment: keep `/skills` as plain text passthrough (not built-in command), because current CLI runtime may not expose `skills/list`.
 - MCP command alignment: keep `/mcp` as plain text passthrough so users can use CLI-native subcommands like `/mcp list`.
 - Tool detail fix: ACP adapter now extracts tool arguments from `rawInput` and output text from `content[]`, so `execute` tool cards are expandable with real details.
+- MCP UX tweak: detect exact `/mcp list` in composer and call local MCP status formatter directly to avoid conversational detours before listing servers.
 - Turn reliability: if ACP streamed chunks but `session/prompt` final response times out, synthesize `turn/completed` to prevent stuck "Working...".
 - UX polish: strip internal fenced JSON routing payloads (e.g. title/worktreeName blocks) from assistant message display.
 - UX tweak: keep Debug log entrypoint always visible (not only on warnings) for faster troubleshooting.

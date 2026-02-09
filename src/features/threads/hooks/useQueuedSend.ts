@@ -54,7 +54,7 @@ export function useQueuedSend({
   startResume,
   startCompact,
   startApps,
-  startMcp: _startMcp,
+  startMcp,
   startStatus,
   clearActiveImages,
 }: UseQueuedSendOptions): UseQueuedSendResult {
@@ -138,6 +138,15 @@ export function useQueuedSend({
               return;
             }
             break;
+          case "mcp": {
+            // Keep CLI parity for subcommands while making `/mcp list` deterministic.
+            const rest = trimmed.replace(/^\/mcp\b/i, "").trim().toLowerCase();
+            if (!rest || rest === "list") {
+              await startMcp(trimmed);
+              return;
+            }
+            break;
+          }
           case "status":
             await startStatus(trimmed);
             return;
@@ -159,6 +168,7 @@ export function useQueuedSend({
       startApps,
       startCompact,
       startFork,
+      startMcp,
       startResume,
       startReview,
       startStatus,
