@@ -1974,6 +1974,7 @@ function MainApp() {
     activeRateLimits,
     activeTokenUsage,
     usageShowRemaining: appSettings.usageShowRemaining,
+    language: appSettings.language ?? "en",
     accountInfo: activeAccount,
     onSwitchAccount: handleSwitchAccount,
     onCancelSwitchAccount: handleCancelSwitchAccount,
@@ -2561,7 +2562,14 @@ function MainApp() {
           appSettings,
           openAppIconById,
           onUpdateAppSettings: async (next) => {
-            await queueSaveSettings(next);
+            const previous = appSettings;
+            setAppSettings(next);
+            try {
+              await queueSaveSettings(next);
+            } catch (error) {
+              setAppSettings(previous);
+              throw error;
+            }
           },
           onRunDoctor: doctor,
           onUpdateWorkspaceMiCodeBin: async (id, micodeBin) => {

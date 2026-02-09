@@ -45,6 +45,7 @@
 - [x] Fix local usage session-root resolution (`.micodemonitor` fallback to global `~/.micode|~/.codex`) so homepage usage/TOP models can refresh
 - [x] Add Display language setting (`English` / `中文`) and wire core home-page copy switch
 - [x] Remove sidebar bottom-left Account button; localize sidebar usage labels (`Session/Weekly/Resets/Credits/Tokens`) for `中文`
+- [x] Make settings updates optimistic (including language switch) with save-failure rollback
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
