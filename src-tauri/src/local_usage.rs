@@ -662,7 +662,7 @@ fn make_day_keys(days: u32) -> Vec<String> {
         .collect()
 }
 
-fn resolve_micode_sessions_roots(micode_home_override: Option<PathBuf>) -> Vec<PathBuf> {
+fn resolve_micode_scan_roots(micode_home_override: Option<PathBuf>) -> Vec<PathBuf> {
     let mut roots = Vec::new();
     let mut seen = HashSet::new();
 
@@ -673,9 +673,38 @@ fn resolve_micode_sessions_roots(micode_home_override: Option<PathBuf>) -> Vec<P
     };
 
     let add_home = |home: PathBuf, roots: &mut Vec<PathBuf>, seen: &mut HashSet<PathBuf>| {
-        let sessions = home.join("sessions");
+        // New runtime layout: ~/.micode/tmp/<workspace-hash>/chats/session-*.json
+        let tmp_root = if home.file_name().and_then(|value| value.to_str()) == Some("tmp") {
+            home.clone()
+        } else if home.file_name().and_then(|value| value.to_str()) == Some("sessions") {
+            home.parent()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| home.clone())
+                .join("tmp")
+        } else {
+            home.join("tmp")
+        };
+        if tmp_root.is_dir() {
+            if let Ok(entries) = std::fs::read_dir(&tmp_root) {
+                for entry in entries.flatten() {
+                    let candidate = entry.path();
+                    if candidate.join("chats").is_dir() {
+                        push_candidate(candidate, roots, seen);
+                    }
+                }
+            }
+        }
+
+        // Legacy layout: ~/.micode/sessions/YYYY/MM/DD/*.jsonl
+        let sessions = if home.file_name().and_then(|value| value.to_str()) == Some("sessions") {
+            home.clone()
+        } else {
+            home.join("sessions")
+        };
         push_candidate(sessions, roots, seen);
-        if home.file_name().and_then(|value| value.to_str()) == Some("sessions") {
+
+        // Compatibility: if caller points directly at a hash dir that already has chats.
+        if home.join("chats").is_dir() {
             push_candidate(home, roots, seen);
         }
     };
@@ -705,18 +734,18 @@ fn resolve_sessions_roots(
     if let Some(workspace_path) = workspace_path {
         let micode_home_override =
             resolve_workspace_micode_home_for_path(workspaces, Some(workspace_path));
-        for root in resolve_micode_sessions_roots(micode_home_override) {
+        for root in resolve_micode_scan_roots(micode_home_override) {
             push_root(root);
         }
         // Keep global roots as fallback so workspace-local legacy metadata
         // does not hide actual chat logs under ~/.micode or ~/.codex.
-        for root in resolve_micode_sessions_roots(None) {
+        for root in resolve_micode_scan_roots(None) {
             push_root(root);
         }
         return roots;
     } 
 
-    for root in resolve_micode_sessions_roots(None) {
+    for root in resolve_micode_scan_roots(None) {
         push_root(root);
     }
     for entry in workspaces.values() {
@@ -727,7 +756,7 @@ fn resolve_sessions_roots(
         let Some(agent_home) = resolve_workspace_micode_home(entry, parent_entry) else {
             continue;
         };
-        for root in resolve_micode_sessions_roots(Some(agent_home)) {
+        for root in resolve_micode_scan_roots(Some(agent_home)) {
             push_root(root);
         }
     }
@@ -792,6 +821,14 @@ mod tests {
         root.push(format!("micodemonitor-local-usage-root-{}", Uuid::new_v4()));
         fs::create_dir_all(&root).expect("create temp root");
         root
+    }
+
+    fn make_temp_micode_home_with_tmp_hash() -> (PathBuf, PathBuf) {
+        let mut home = std::env::temp_dir();
+        home.push(format!("micodemonitor-micode-home-{}", Uuid::new_v4()));
+        let hash_dir = home.join("tmp").join(Uuid::new_v4().to_string());
+        fs::create_dir_all(hash_dir.join("chats")).expect("create chats dir");
+        (home, hash_dir)
     }
 
     fn write_session_file(root: &Path, day_key: &str, lines: &[String]) -> PathBuf {
@@ -1032,5 +1069,12 @@ mod tests {
 
         assert!(roots.iter().any(|root| root == &expected_a));
         assert!(roots.iter().any(|root| root == &expected_b));
+    }
+
+    #[test]
+    fn resolve_scan_roots_includes_tmp_hash_chat_dirs() {
+        let (home, hash_dir) = make_temp_micode_home_with_tmp_hash();
+        let roots = resolve_micode_scan_roots(Some(home));
+        assert!(roots.iter().any(|root| root == &hash_dir));
     }
 }
