@@ -63,6 +63,8 @@
 - [x] Resolve MiCode home with global default (`~/.micode|~/.codex`) for all workspaces; only use workspace `.micodemonitor` as legacy fallback
 - [x] Add startup doctor hint for missing MiCode CLI (show localized toast instead of silent failure)
 - [x] Enforce slash command-only send path: slash-prefixed input is never forwarded to AI text prompt; `/mcp *` always runs local MCP handler
+- [x] Keep Token terminology untranslated in Chinese UI (replace “代币” labels with “Token”)
+- [x] Hide composer "Default" controls: remove collaboration selector when only default mode exists and hide thinking selector when no reasoning options
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

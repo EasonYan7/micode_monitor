@@ -56,12 +56,16 @@ export function ComposerMetaBar({
     collaborationModes.every(
       (mode) => mode.id === "default" || mode.id === "plan",
     );
+  const hasCollaborationChoice =
+    collaborationModes.length > 1 ||
+    collaborationModes.some((mode) => mode.id.toLowerCase() !== "default");
+  const showReasoningControl = reasoningSupported && reasoningOptions.length > 0;
   const planSelected = selectedCollaborationModeId === (planMode?.id ?? "");
 
   return (
     <div className="composer-bar">
       <div className="composer-meta">
-        {collaborationModes.length > 0 && (
+        {collaborationModes.length > 0 && hasCollaborationChoice && (
           canUsePlanToggle ? (
             <div className="composer-select-wrap composer-plan-toggle-wrap">
               <label className="composer-plan-toggle" aria-label="Plan mode">
@@ -171,25 +175,26 @@ export function ComposerMetaBar({
             ))}
           </select>
         </div>
-        <div className="composer-select-wrap composer-select-wrap--effort">
-          <span className="composer-icon composer-icon--effort" aria-hidden>
-            <BrainCog size={14} strokeWidth={1.8} />
-          </span>
-          <select
-            className="composer-select composer-select--effort"
-            aria-label="Thinking mode"
-            value={selectedEffort ?? ""}
-            onChange={(event) => onSelectEffort(event.target.value)}
-            disabled={disabled || !reasoningSupported}
-          >
-            {reasoningOptions.length === 0 && <option value="">Default</option>}
-            {reasoningOptions.map((effort) => (
-              <option key={effort} value={effort}>
-                {effort}
-              </option>
-            ))}
-          </select>
-        </div>
+        {showReasoningControl && (
+          <div className="composer-select-wrap composer-select-wrap--effort">
+            <span className="composer-icon composer-icon--effort" aria-hidden>
+              <BrainCog size={14} strokeWidth={1.8} />
+            </span>
+            <select
+              className="composer-select composer-select--effort"
+              aria-label="Thinking mode"
+              value={selectedEffort ?? ""}
+              onChange={(event) => onSelectEffort(event.target.value)}
+              disabled={disabled}
+            >
+              {reasoningOptions.map((effort) => (
+                <option key={effort} value={effort}>
+                  {effort}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="composer-select-wrap">
           <span className="composer-icon" aria-hidden>
             <svg viewBox="0 0 24 24" fill="none">
