@@ -40,8 +40,10 @@
 - [x] Aggregate sidebar usage by workspace threads (not only active thread)
 - [x] Persist tool-call timeline and restore after restart
 - [x] Split assistant bubbles before/after tool calls (avoid mixed text block)
+- [x] Add frontend fallback split when backend reuses same assistant `itemId` across tool boundary
 - [x] Add thread context menu action: Delete Conversation (keep usage)
 - [ ] Final integration validation and documentation
+- [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
 ## Notes
 - Rust full `cargo check` is blocked locally by missing `cmake` (required by `whisper-rs` build script).
@@ -100,8 +102,10 @@
 - Streaming UX fix: adapter now rotates assistant `itemId` segment after `tool_call`, so post-tool response starts a new assistant bubble instead of appending to pre-tool text.
 - Thread delete semantics fix: context menu now includes `Delete Conversation`; removing a thread no longer drops accumulated `tokenUsageByThread`.
 - Tool bubble split fix v2: trigger assistant segment split on first `session/request_permission` tool presentation as well (not only `session/update.tool_call`), with de-dup guard to avoid double-split.
+- Tool bubble split fix v3: frontend reducer now auto-splits same-`itemId` assistant stream when a tool/reasoning/review item appears in between, preventing pre/post-tool text from merging into one bubble.
 - Home usage fallback fix: when local usage snapshot is empty, synthesize usage cards/charts from persisted `tokenUsageByThread` (workspace/all-workspace scope).
 - Tool detail fix: preserve `mcpToolCall` `arguments/result/error` in adapter cache, realtime events, and persisted thread items so expand details shows meaningful content.
+- ACP capability probe (2026-02-09): `session/load` / `session/resume` / `session/history` / `session/get` all return `Method not found`; initialize reports `agentCapabilities.loadSession=false`. Keep synthetic resume for now and revisit after MiCode ACP upgrade.
 - Re-validated after fix:
   - `npm run typecheck`
   - `cargo check --manifest-path src-tauri/Cargo.toml`

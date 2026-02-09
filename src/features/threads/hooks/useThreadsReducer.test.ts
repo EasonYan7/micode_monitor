@@ -430,4 +430,57 @@ describe("threadReducer", () => {
     expect(ids).toContain("thread-visible");
     expect(ids).not.toContain("thread-bg");
   });
+
+  it("splits assistant bubbles when tool items appear between same itemId deltas", () => {
+    const withInitialDelta = threadReducer(
+      {
+        ...initialState,
+        threadsByWorkspace: {
+          "ws-1": [{ id: "thread-1", name: "New Agent", updatedAt: 0 }],
+        },
+      },
+      {
+        type: "appendAgentDelta",
+        workspaceId: "ws-1",
+        threadId: "thread-1",
+        itemId: "agent-1",
+        delta: "先执行工具。",
+        hasCustomName: false,
+      },
+    );
+
+    const withTool = threadReducer(withInitialDelta, {
+      type: "upsertItem",
+      workspaceId: "ws-1",
+      threadId: "thread-1",
+      item: {
+        id: "tool-1",
+        kind: "tool",
+        toolType: "mcpToolCall",
+        title: "Tool: micode / fetch",
+        detail: "",
+        status: "completed",
+        output: "",
+      },
+    });
+
+    const withPostToolDelta = threadReducer(withTool, {
+      type: "appendAgentDelta",
+      workspaceId: "ws-1",
+      threadId: "thread-1",
+      itemId: "agent-1",
+      delta: "工具执行完成。",
+      hasCustomName: false,
+    });
+
+    const messages = (withPostToolDelta.itemsByThread["thread-1"] ?? []).filter(
+      (item): item is Extract<ConversationItem, { kind: "message"; role: "assistant" }> =>
+        item.kind === "message" && item.role === "assistant",
+    );
+    expect(messages).toHaveLength(2);
+    expect(messages[0].id).toBe("agent-1");
+    expect(messages[0].text).toContain("先执行工具");
+    expect(messages[1].id).toBe("agent-1-split-1");
+    expect(messages[1].text).toContain("工具执行完成");
+  });
 });

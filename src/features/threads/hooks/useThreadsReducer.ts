@@ -296,6 +296,10 @@ function mergeStreamingText(existing: string, delta: string) {
   return `${existing}${delta}`;
 }
 
+function isAssistantConversationBoundary(item: ConversationItem) {
+  return item.kind === "tool" || item.kind === "reasoning" || item.kind === "review";
+}
+
 function addSummaryBoundary(existing: string) {
   if (!existing) {
     return existing;
@@ -657,7 +661,46 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
     }
     case "appendAgentDelta": {
       const list = [...(state.itemsByThread[action.threadId] ?? [])];
-      const index = list.findIndex((msg) => msg.id === action.itemId);
+      let index = list.findIndex((msg) => msg.id === action.itemId);
+      if (index >= 0 && list[index].kind === "message") {
+        const hasBoundaryAfter = list
+          .slice(index + 1)
+          .some((entry) => isAssistantConversationBoundary(entry));
+        if (hasBoundaryAfter) {
+          const splitPrefix = `${action.itemId}-split-`;
+          const tailIndex = list.findLastIndex(
+            (entry) =>
+              entry.kind === "message" &&
+              entry.role === "assistant" &&
+              entry.id.startsWith(splitPrefix),
+          );
+          const hasBoundaryAfterTail =
+            tailIndex >= 0
+              ? list
+                  .slice(tailIndex + 1)
+                  .some((entry) => isAssistantConversationBoundary(entry))
+              : false;
+          if (tailIndex >= 0 && !hasBoundaryAfterTail) {
+            index = tailIndex;
+          } else {
+            const splitCount =
+              list.filter(
+                (entry) =>
+                  entry.kind === "message" &&
+                  entry.role === "assistant" &&
+                  entry.id.startsWith(splitPrefix),
+              ).length + 1;
+            const splitId = `${splitPrefix}${splitCount}`;
+            list.push({
+              id: splitId,
+              kind: "message",
+              role: "assistant",
+              text: "",
+            });
+            index = list.length - 1;
+          }
+        }
+      }
       if (index >= 0 && list[index].kind === "message") {
         const existing = list[index];
         list[index] = {
