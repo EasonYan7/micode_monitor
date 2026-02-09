@@ -29,6 +29,7 @@
 - [x] Restore thread list visibility after restart by returning Codex-compatible `thread/list` payload shape
 - [x] Auto-reconnect workspace session on `workspace not connected` and retry first command
 - [x] Isolate background metadata/commit threads from foreground chat event stream
+- [x] Disable local-run metadata helper call to prevent background-thread bleed into chat turns
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -73,3 +74,4 @@
 - UX diagnostics fix: frontend now logs `thread/ensure error` to debug instead of silently dropping first message when thread bootstrap fails.
 - Background-thread isolation fix: metadata/commit helper flows now start with `_background` and no longer emit foreground `thread/started`/`turn/*` events; ACP delta routing sends helper output only to callback collectors.
 - Message-visibility safeguard: if internal-JSON stripping would hide an assistant message entirely, UI falls back to raw text so users never see a blank response row.
+- Local-run stability fix: `useWorkspaceHome` no longer calls `generate_run_metadata` in `local` mode (keeps fallback title only), eliminating hidden background metadata turns that could leak JSON/title payloads into foreground chat.

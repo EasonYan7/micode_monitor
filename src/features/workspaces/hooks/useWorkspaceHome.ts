@@ -425,21 +425,7 @@ export function useWorkspaceHome({
     }));
 
     let worktreeBaseName: string | null = null;
-    if (runMode === "local") {
-      void generateRunMetadata(activeWorkspace.id, prompt)
-        .then((metadata) => {
-          if (!metadata?.title) {
-            return;
-          }
-          const nextTitle = metadata.title.trim();
-          if (nextTitle && nextTitle !== fallbackTitle) {
-            updateRunTitle(activeWorkspaceId, runId, nextTitle);
-          }
-        })
-        .catch(() => {
-          // Metadata is best-effort for local runs.
-        });
-    } else {
+    if (runMode !== "local") {
       try {
         const metadata = await generateRunMetadata(activeWorkspace.id, prompt);
         if (metadata?.title && metadata.title.trim() !== fallbackTitle) {

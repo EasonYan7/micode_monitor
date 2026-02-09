@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ModelOption, WorkspaceInfo } from "../../../types";
 import { generateRunMetadata } from "../../../services/tauri";
 import { useWorkspaceHome } from "./useWorkspaceHome";
@@ -46,6 +46,10 @@ const models: ModelOption[] = [
 ];
 
 describe("useWorkspaceHome", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("uses provider model name for worktree runs", async () => {
     const addWorktreeAgent = vi.fn().mockResolvedValue(worktreeWorkspace);
     const connectWorkspace = vi.fn().mockResolvedValue(undefined);
@@ -92,11 +96,6 @@ describe("useWorkspaceHome", () => {
     const connectWorkspace = vi.fn().mockResolvedValue(undefined);
     const startThreadForWorkspace = vi.fn().mockResolvedValue("thread-1");
     const sendUserMessageToThread = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(generateRunMetadata).mockResolvedValue({
-      title: "Image run",
-      worktreeName: "feat/image",
-    });
-
     const { result } = renderHook(() =>
       useWorkspaceHome({
         activeWorkspace: workspace,
@@ -121,6 +120,7 @@ describe("useWorkspaceHome", () => {
       ["img-1"],
       expect.objectContaining({ model: "gpt-5.1-max" }),
     );
+    expect(generateRunMetadata).not.toHaveBeenCalled();
   });
 
   it("blocks worktree runs without model selections", async () => {
@@ -202,18 +202,11 @@ describe("useWorkspaceHome", () => {
     expect(result.current.runs[0].instanceErrors.length).toBeGreaterThan(0);
   });
 
-  it("updates title after metadata resolves for local runs", async () => {
+  it("uses local fallback title without metadata request", async () => {
     const addWorktreeAgent = vi.fn();
     const connectWorkspace = vi.fn().mockResolvedValue(undefined);
     const startThreadForWorkspace = vi.fn().mockResolvedValue("thread-1");
     const sendUserMessageToThread = vi.fn().mockResolvedValue(undefined);
-    let resolveMetadata: (value: { title: string; worktreeName: string }) => void =
-      () => {};
-    vi.mocked(generateRunMetadata).mockReturnValue(
-      new Promise((resolve) => {
-        resolveMetadata = resolve;
-      }),
-    );
 
     const { result } = renderHook(() =>
       useWorkspaceHome({
@@ -236,13 +229,7 @@ describe("useWorkspaceHome", () => {
     });
 
     expect(result.current.runs[0].title).toBe("Local prompt");
-
-    await act(async () => {
-      resolveMetadata({ title: "Meta title", worktreeName: "feat/meta" });
-      await Promise.resolve();
-    });
-
-    expect(result.current.runs[0].title).toBe("Meta title");
+    expect(generateRunMetadata).not.toHaveBeenCalled();
   });
 
   it("keeps attachments when worktree selection is missing", async () => {
