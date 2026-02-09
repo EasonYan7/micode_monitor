@@ -2,6 +2,7 @@ import type {
   AccountSnapshot,
   RateLimitSnapshot,
   ThreadSummary,
+  ThreadTokenUsage,
   WorkspaceInfo,
 } from "../../../types";
 import { createPortal } from "react-dom";
@@ -55,6 +56,7 @@ type SidebarProps = {
   activeWorkspaceId: string | null;
   activeThreadId: string | null;
   accountRateLimits: RateLimitSnapshot | null;
+  activeTokenUsage?: ThreadTokenUsage | null;
   usageShowRemaining: boolean;
   accountInfo: AccountSnapshot | null;
   onSwitchAccount: () => void;
@@ -108,6 +110,7 @@ export function Sidebar({
   activeWorkspaceId,
   activeThreadId,
   accountRateLimits,
+  activeTokenUsage = null,
   usageShowRemaining,
   accountInfo,
   onSwitchAccount,
@@ -175,11 +178,13 @@ export function Sidebar({
   const {
     sessionPercent,
     weeklyPercent,
+    sessionValueLabel,
+    weeklyValueLabel,
     sessionResetLabel,
     weeklyResetLabel,
     creditsLabel,
     showWeekly,
-  } = getUsageLabels(accountRateLimits, usageShowRemaining);
+  } = getUsageLabels(accountRateLimits, usageShowRemaining, activeTokenUsage);
   const debouncedQuery = useDebouncedValue(searchQuery, 150);
   const normalizedQuery = debouncedQuery.trim().toLowerCase();
 
@@ -661,6 +666,8 @@ export function Sidebar({
       <SidebarFooter
         sessionPercent={sessionPercent}
         weeklyPercent={weeklyPercent}
+        sessionValueLabel={sessionValueLabel}
+        weeklyValueLabel={weeklyValueLabel}
         sessionResetLabel={sessionResetLabel}
         weeklyResetLabel={weeklyResetLabel}
         creditsLabel={creditsLabel}

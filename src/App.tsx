@@ -1524,9 +1524,14 @@ function MainApp() {
     if (!activeWorkspaceId || !activeThreadId) {
       return;
     }
-    removeThread(activeWorkspaceId, activeThreadId);
-    clearDraftForThread(activeThreadId);
-    removeImagesForThread(activeThreadId);
+    void (async () => {
+      const removed = await removeThread(activeWorkspaceId, activeThreadId);
+      if (!removed) {
+        return;
+      }
+      clearDraftForThread(activeThreadId);
+      removeImagesForThread(activeThreadId);
+    })();
   }, [
     activeThreadId,
     activeWorkspaceId,
@@ -1777,6 +1782,7 @@ function MainApp() {
     activeThreadId,
     activeItems,
     activeRateLimits,
+    activeTokenUsage,
     usageShowRemaining: appSettings.usageShowRemaining,
     accountInfo: activeAccount,
     onSwitchAccount: handleSwitchAccount,
@@ -1836,9 +1842,14 @@ function MainApp() {
     },
     onOpenThreadLink: handleOpenThreadLink,
     onDeleteThread: (workspaceId, threadId) => {
-      removeThread(workspaceId, threadId);
-      clearDraftForThread(threadId);
-      removeImagesForThread(threadId);
+      void (async () => {
+        const removed = await removeThread(workspaceId, threadId);
+        if (!removed) {
+          return;
+        }
+        clearDraftForThread(threadId);
+        removeImagesForThread(threadId);
+      })();
     },
     onSyncThread: (workspaceId, threadId) => {
       void refreshThread(workspaceId, threadId);
@@ -2076,7 +2087,6 @@ function MainApp() {
     onReviewPromptConfirmCommit: confirmCommit,
     onReviewPromptUpdateCustomInstructions: updateCustomInstructions,
     onReviewPromptConfirmCustom: confirmCustom,
-    activeTokenUsage,
     activeQueue,
     draftText: activeDraft,
     onDraftChange: handleDraftChange,

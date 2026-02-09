@@ -640,6 +640,7 @@ export function useThreadActions({
     async (workspaceId: string, threadId: string) => {
       try {
         await archiveThreadService(workspaceId, threadId);
+        return true;
       } catch (error) {
         onDebug?.({
           id: `${Date.now()}-client-thread-archive-error`,
@@ -648,6 +649,7 @@ export function useThreadActions({
           label: "thread/archive error",
           payload: error instanceof Error ? error.message : String(error),
         });
+        return false;
       }
     },
     [onDebug],

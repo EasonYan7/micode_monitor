@@ -31,6 +31,9 @@
 - [x] Isolate background metadata/commit threads from foreground chat event stream
 - [x] Disable local-run metadata helper call to prevent background-thread bleed into chat turns
 - [x] Keep background helper threads fully ephemeral (memory-only, excluded from thread list/store)
+- [x] Persist thread title from first user prompt (survives restart)
+- [x] Make thread delete remove local persisted thread records (not archive-only)
+- [x] Fallback sidebar usage display to token usage when rate-limit API is synthetic/empty
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -77,3 +80,10 @@
 - Message-visibility safeguard: if internal-JSON stripping would hide an assistant message entirely, UI falls back to raw text so users never see a blank response row.
 - Local-run stability fix: `useWorkspaceHome` no longer calls `generate_run_metadata` in `local` mode (keeps fallback title only), eliminating hidden background metadata turns that could leak JSON/title payloads into foreground chat.
 - Background thread isolation v2: `_background` `thread/start` now creates in-memory temporary threads (not persisted in `.micodemonitor/sessions.json`, not listed in `thread/list`), and `turn/start`/`turn/interrupt`/`thread/archive` now resolve these temporary sessions without touching foreground thread state.
+- UX persistence fix: auto-name new thread from first user prompt on `turn/start` and emit `thread/name/updated`; thread title now survives app restart via `.micodemonitor/sessions.json`.
+- Data deletion fix: `thread/archive` now hard-removes foreground thread records from local `sessions.json`; frontend waits for backend success before removing thread in UI.
+- Usage fallback fix: sidebar `Session`/`Credits` now falls back to `thread/tokenUsage/updated` values when `account/rateLimits/read` is synthetic or empty.
+- Re-validated after fix:
+  - `npm run typecheck`
+  - `cargo check --manifest-path src-tauri/Cargo.toml`
+  - `npm test -- src/features/settings/components/SettingsView.test.tsx src/features/home/components/Home.test.tsx src/features/settings/hooks/useAppSettings.test.ts`

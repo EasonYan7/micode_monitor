@@ -1,6 +1,8 @@
 type SidebarFooterProps = {
   sessionPercent: number | null;
   weeklyPercent: number | null;
+  sessionValueLabel: string | null;
+  weeklyValueLabel: string | null;
   sessionResetLabel: string | null;
   weeklyResetLabel: string | null;
   creditsLabel: string | null;
@@ -10,6 +12,8 @@ type SidebarFooterProps = {
 export function SidebarFooter({
   sessionPercent,
   weeklyPercent,
+  sessionValueLabel,
+  weeklyValueLabel,
   sessionResetLabel,
   weeklyResetLabel,
   creditsLabel,
@@ -27,7 +31,9 @@ export function SidebarFooter({
               )}
             </span>
             <span className="usage-value">
-              {sessionPercent === null ? "--" : `${sessionPercent}%`}
+              {sessionPercent === null
+                ? sessionValueLabel ?? "--"
+                : `${sessionPercent}%`}
             </span>
           </div>
           <div className="usage-bar">
@@ -47,7 +53,9 @@ export function SidebarFooter({
                 )}
               </span>
               <span className="usage-value">
-                {weeklyPercent === null ? "--" : `${weeklyPercent}%`}
+                {weeklyPercent === null
+                  ? weeklyValueLabel ?? "--"
+                  : `${weeklyPercent}%`}
               </span>
             </div>
             <div className="usage-bar">

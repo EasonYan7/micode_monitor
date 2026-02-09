@@ -110,16 +110,14 @@ impl LocalThreadStore {
             .collect()
     }
 
-    fn set_archived(&mut self, thread_id: &str, archived: bool) {
-        if let Some(entry) = self
-            .records
-            .iter_mut()
-            .find(|entry| entry.thread_id == thread_id)
-        {
-            entry.archived = archived;
-            entry.updated_at = now_ts();
+    fn delete(&mut self, thread_id: &str) -> bool {
+        let before = self.records.len();
+        self.records.retain(|entry| entry.thread_id != thread_id);
+        let changed = self.records.len() != before;
+        if changed {
             self.persist();
         }
+        changed
     }
 
     fn set_title(&mut self, thread_id: &str, title: String) {
@@ -220,6 +218,19 @@ fn now_ts() -> i64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs() as i64
+}
+
+fn derive_thread_title(prompt: &str) -> Option<String> {
+    let first_line = prompt.lines().next().unwrap_or_default().trim();
+    if first_line.is_empty() {
+        return None;
+    }
+    let compact = first_line.split_whitespace().collect::<Vec<_>>().join(" ");
+    if compact.is_empty() {
+        return None;
+    }
+    let title = compact.chars().take(38).collect::<String>();
+    Some(title)
 }
 
 fn acp_error_message(value: &Value) -> Option<String> {
@@ -1065,7 +1076,7 @@ impl WorkspaceSession {
                     .remove(thread_id)
                     .is_some();
                 if !removed_background {
-                    self.thread_store.lock().await.set_archived(thread_id, true);
+                    self.thread_store.lock().await.delete(thread_id);
                 }
                 Ok(json!({ "result": { "ok": true } }))
             }
@@ -1115,6 +1126,25 @@ impl WorkspaceSession {
                 let prompt_text = Self::parse_prompt_from_turn_start(&params);
                 if prompt_text.is_empty() {
                     return Err("empty user message".to_string());
+                }
+                if !is_background_thread {
+                    if let Some(thread_entry) = thread.as_ref() {
+                        if thread_entry.title.trim().eq_ignore_ascii_case("new thread") {
+                            if let Some(title) = derive_thread_title(&prompt_text) {
+                                self.thread_store
+                                    .lock()
+                                    .await
+                                    .set_title(&thread_id, title.clone());
+                                self.emit_event(
+                                    "thread/name/updated",
+                                    json!({
+                                        "threadId": thread_id,
+                                        "threadName": title
+                                    }),
+                                );
+                            }
+                        }
+                    }
                 }
                 let mut session_id = background_session
                     .clone()

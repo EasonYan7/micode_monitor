@@ -1,9 +1,11 @@
-import type { RateLimitSnapshot } from "../../../types";
+import type { RateLimitSnapshot, ThreadTokenUsage } from "../../../types";
 import { formatRelativeTime } from "../../../utils/time";
 
 type UsageLabels = {
   sessionPercent: number | null;
   weeklyPercent: number | null;
+  sessionValueLabel: string | null;
+  weeklyValueLabel: string | null;
   sessionResetLabel: string | null;
   weeklyResetLabel: string | null;
   creditsLabel: string | null;
@@ -46,9 +48,23 @@ function formatCreditsLabel(accountRateLimits: RateLimitSnapshot | null) {
   return null;
 }
 
+function formatTokenCount(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}M`;
+  }
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(1)}k`;
+  }
+  return `${Math.round(value)}`;
+}
+
 export function getUsageLabels(
   accountRateLimits: RateLimitSnapshot | null,
   showRemaining: boolean,
+  tokenUsage: ThreadTokenUsage | null = null,
 ): UsageLabels {
   const usagePercent = accountRateLimits?.primary?.usedPercent;
   const globalUsagePercent = accountRateLimits?.secondary?.usedPercent;
@@ -64,13 +80,26 @@ export function getUsageLabels(
         ? 100 - clampPercent(globalUsagePercent)
         : clampPercent(globalUsagePercent)
       : null;
+  const sessionTokens = tokenUsage?.last?.totalTokens ?? null;
+  const totalTokens = tokenUsage?.total?.totalTokens ?? null;
+  const sessionValueLabel =
+    sessionPercent === null ? formatTokenCount(sessionTokens) : null;
+  const weeklyValueLabel = weeklyPercent === null ? null : null;
+  const creditsLabel = formatCreditsLabel(accountRateLimits);
+  const fallbackCredits =
+    creditsLabel ??
+    (totalTokens && totalTokens > 0
+      ? `Tokens: ${formatTokenCount(totalTokens)}`
+      : null);
 
   return {
     sessionPercent,
     weeklyPercent,
+    sessionValueLabel,
+    weeklyValueLabel,
     sessionResetLabel: formatResetLabel(accountRateLimits?.primary?.resetsAt),
     weeklyResetLabel: formatResetLabel(accountRateLimits?.secondary?.resetsAt),
-    creditsLabel: formatCreditsLabel(accountRateLimits),
+    creditsLabel: fallbackCredits,
     showWeekly: Boolean(accountRateLimits?.secondary),
   };
 }

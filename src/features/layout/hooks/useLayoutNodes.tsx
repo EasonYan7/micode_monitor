@@ -116,6 +116,7 @@ type LayoutNodesOptions = {
   activeThreadId: string | null;
   activeItems: ConversationItem[];
   activeRateLimits: RateLimitSnapshot | null;
+  activeTokenUsage: ThreadTokenUsage | null;
   usageShowRemaining: boolean;
   accountInfo: AccountSnapshot | null;
   onSwitchAccount: () => void;
@@ -376,7 +377,6 @@ type LayoutNodesOptions = {
   onReviewPromptConfirmCommit: () => Promise<void>;
   onReviewPromptUpdateCustomInstructions: (value: string) => void;
   onReviewPromptConfirmCustom: () => Promise<void>;
-  activeTokenUsage: ThreadTokenUsage | null;
   activeQueue: QueuedMessage[];
   draftText: string;
   onDraftChange: (next: string) => void;
@@ -489,6 +489,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       activeWorkspaceId={options.activeWorkspaceId}
       activeThreadId={options.activeThreadId}
       accountRateLimits={options.activeRateLimits}
+      activeTokenUsage={options.activeTokenUsage}
       usageShowRemaining={options.usageShowRemaining}
       accountInfo={options.accountInfo}
       onSwitchAccount={options.onSwitchAccount}
