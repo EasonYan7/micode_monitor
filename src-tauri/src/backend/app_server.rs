@@ -2496,9 +2496,13 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                                     }
                                 }
                             }
-                            // Start a new assistant bubble only when we see a tool call for the first time.
-                            // Permission/update events can arrive in different orders, so we guard with cache existence.
+                            // Split assistant stream around tool boundaries.
+                            // `session/request_permission` and `session/update.tool_call` ordering is not stable,
+                            // so we segment on first-seen tool start and also on tool completion.
                             if update_kind == "tool_call" && !tool_presentation_was_existing {
+                                session_clone.bump_prompt_agent_segment(&session_id).await;
+                            }
+                            if update_kind == "tool_call_update" {
                                 session_clone.bump_prompt_agent_segment(&session_id).await;
                             }
                         }

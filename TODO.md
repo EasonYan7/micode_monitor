@@ -42,6 +42,8 @@
 - [x] Split assistant bubbles before/after tool calls (avoid mixed text block)
 - [x] Add frontend fallback split when backend reuses same assistant `itemId` across tool boundary
 - [x] Add thread context menu action: Delete Conversation (keep usage)
+- [x] Fix local usage session-root resolution (`.micodemonitor` fallback to global `~/.micode|~/.codex`) so homepage usage/TOP models can refresh
+- [x] Add Display language setting (`English` / `中文`) and wire core home-page copy switch
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
@@ -103,9 +105,11 @@
 - Thread delete semantics fix: context menu now includes `Delete Conversation`; removing a thread no longer drops accumulated `tokenUsageByThread`.
 - Tool bubble split fix v2: trigger assistant segment split on first `session/request_permission` tool presentation as well (not only `session/update.tool_call`), with de-dup guard to avoid double-split.
 - Tool bubble split fix v3: frontend reducer now auto-splits same-`itemId` assistant stream when a tool/reasoning/review item appears in between, preventing pre/post-tool text from merging into one bubble.
+- Tool bubble split fix v4: ACP adapter now also bumps assistant segment on `tool_call_update` (completion boundary), so post-tool text starts a fresh bubble even when permission/tool events arrive out of order.
 - Home usage fallback fix: when local usage snapshot is empty, synthesize usage cards/charts from persisted `tokenUsageByThread` (workspace/all-workspace scope).
 - Tool detail fix: preserve `mcpToolCall` `arguments/result/error` in adapter cache, realtime events, and persisted thread items so expand details shows meaningful content.
 - ACP capability probe (2026-02-09): `session/load` / `session/resume` / `session/history` / `session/get` all return `Method not found`; initialize reports `agentCapabilities.loadSession=false`. Keep synthetic resume for now and revisit after MiCode ACP upgrade.
+- i18n scope (phase 1): Display language switch is connected and homepage core copy is bilingual; full-app copy sweep remains for a future pass.
 - Re-validated after fix:
   - `npm run typecheck`
   - `cargo check --manifest-path src-tauri/Cargo.toml`
