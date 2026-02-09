@@ -20,7 +20,6 @@ export function useComposerController({
   startResume,
   startCompact,
   startApps,
-  startSkills,
   startMcp,
   startStatus,
 }: {
@@ -48,7 +47,6 @@ export function useComposerController({
   startResume: (text: string) => Promise<void>;
   startCompact: (text: string) => Promise<void>;
   startApps: (text: string) => Promise<void>;
-  startSkills: (text: string) => Promise<void>;
   startMcp: (text: string) => Promise<void>;
   startStatus: (text: string) => Promise<void>;
 }) {
@@ -91,7 +89,6 @@ export function useComposerController({
     startResume,
     startCompact,
     startApps,
-    startSkills,
     startMcp,
     startStatus,
     clearActiveImages,

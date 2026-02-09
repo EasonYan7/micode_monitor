@@ -25,7 +25,6 @@ type UseQueuedSendOptions = {
   startResume: (text: string) => Promise<void>;
   startCompact: (text: string) => Promise<void>;
   startApps: (text: string) => Promise<void>;
-  startSkills: (text: string) => Promise<void>;
   startMcp: (text: string) => Promise<void>;
   startStatus: (text: string) => Promise<void>;
   clearActiveImages: () => void;
@@ -55,7 +54,6 @@ export function useQueuedSend({
   startResume,
   startCompact,
   startApps,
-  startSkills,
   startMcp,
   startStatus,
   clearActiveImages,
@@ -143,9 +141,6 @@ export function useQueuedSend({
           case "mcp":
             await startMcp(trimmed);
             return;
-          case "skills":
-            await startSkills(trimmed);
-            return;
           case "status":
             await startStatus(trimmed);
             return;
@@ -170,7 +165,6 @@ export function useQueuedSend({
       startMcp,
       startResume,
       startReview,
-      startSkills,
       startStatus,
       startThreadForWorkspace,
     ],

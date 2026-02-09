@@ -879,12 +879,15 @@ export function useThreadMessaging({
           text: lines.join("\n"),
         });
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Failed to load skills.";
+        const message = error instanceof Error ? error.message : "Failed to load skills.";
+        const normalized = message.toLowerCase();
+        const fallback = normalized.includes("method not found")
+          ? "Skills:\n- Current MiCode ACP does not support skills/list in this environment."
+          : `Skills:\n- ${message}`;
         dispatch({
           type: "addAssistantMessage",
           threadId,
-          text: `Skills:\n- ${message}`,
+          text: fallback,
         });
       } finally {
         safeMessageActivity();

@@ -1343,7 +1343,6 @@ function MainApp() {
     startResume,
     startCompact,
     startApps,
-    startSkills,
     startMcp,
     startStatus,
   });

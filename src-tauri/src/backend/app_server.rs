@@ -451,22 +451,144 @@ fn resolve_micode_home_path() -> Option<PathBuf> {
     Some(PathBuf::from(home).join(".micode"))
 }
 
+fn normalize_mcp_server_env(value: Option<&Value>) -> Vec<Value> {
+    let mut env_entries: Vec<Value> = Vec::new();
+    match value {
+        Some(Value::Array(items)) => {
+            for item in items {
+                let Some(map) = item.as_object() else {
+                    continue;
+                };
+                let name = map
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty());
+                let val = map
+                    .get("value")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .unwrap_or_default();
+                if let Some(name) = name {
+                    env_entries.push(json!({ "name": name, "value": val }));
+                }
+            }
+        }
+        Some(Value::Object(map)) => {
+            for (key, raw) in map {
+                let name = key.trim();
+                if name.is_empty() {
+                    continue;
+                }
+                let value = raw
+                    .as_str()
+                    .map(str::trim)
+                    .unwrap_or_default()
+                    .to_string();
+                env_entries.push(json!({ "name": name, "value": value }));
+            }
+        }
+        _ => {}
+    }
+    env_entries
+}
+
 fn read_configured_mcp_servers() -> Value {
     let Some(settings_path) = micode_settings_path() else {
-        return json!({});
+        return json!([]);
     };
     let raw = match std::fs::read_to_string(settings_path) {
         Ok(value) => value,
-        Err(_) => return json!({}),
+        Err(_) => return json!([]),
     };
     let root: Value = match serde_json::from_str(&raw) {
         Ok(value) => value,
-        Err(_) => return json!({}),
+        Err(_) => return json!([]),
     };
+    let mut servers: Vec<Value> = Vec::new();
     match root.get("mcpServers") {
-        Some(Value::Object(map)) => Value::Object(map.clone()),
-        _ => json!({}),
+        Some(Value::Array(items)) => {
+            for item in items {
+                let Some(map) = item.as_object() else {
+                    continue;
+                };
+                let name = map
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty());
+                let command = map
+                    .get("command")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty());
+                let (Some(name), Some(command)) = (name, command) else {
+                    continue;
+                };
+                let args = map
+                    .get("args")
+                    .and_then(Value::as_array)
+                    .map(|items| {
+                        items
+                            .iter()
+                            .filter_map(Value::as_str)
+                            .map(str::trim)
+                            .filter(|value| !value.is_empty())
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                let env = normalize_mcp_server_env(map.get("env"));
+                servers.push(json!({
+                    "name": name,
+                    "command": command,
+                    "args": args,
+                    "env": env,
+                }));
+            }
+        }
+        Some(Value::Object(map)) => {
+            for (key, item) in map {
+                let name = key.trim();
+                if name.is_empty() {
+                    continue;
+                }
+                let Some(item_map) = item.as_object() else {
+                    continue;
+                };
+                let command = item_map
+                    .get("command")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty());
+                let Some(command) = command else {
+                    continue;
+                };
+                let args = item_map
+                    .get("args")
+                    .and_then(Value::as_array)
+                    .map(|items| {
+                        items
+                            .iter()
+                            .filter_map(Value::as_str)
+                            .map(str::trim)
+                            .filter(|value| !value.is_empty())
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                let env = normalize_mcp_server_env(item_map.get("env"));
+                servers.push(json!({
+                    "name": name,
+                    "command": command,
+                    "args": args,
+                    "env": env,
+                }));
+            }
+        }
+        _ => {}
     }
+    Value::Array(servers)
 }
 
 fn read_usage_number(value: Option<&Value>) -> i64 {

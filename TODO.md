@@ -54,6 +54,8 @@
 - [x] Remove New Clone Agent feature path (sidebar entry, menu event, accelerators, modal/hook/files, shortcuts UI)
 - [x] Restore app-level slash routing for built-in commands and add `/skills` list command (plus fallback slash autocomplete entries)
 - [x] Fix App MCP/skills visibility parity: pass configured `mcpServers` on ACP `session/new` and stop hardcoding empty `skills/list` response
+- [x] Fix ACP `session/new` param schema regression (`mcpServers` must be array) to restore thread start/resume
+- [x] Align slash UX with CLI capability: remove built-in `/skills` routing/autocomplete fallback
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
@@ -77,6 +79,8 @@
 - Slash UX parity: wire ACP `available_commands_update` into composer so `/` suggestions now come from MiCode runtime commands.
 - Slash command update: re-enable local routing for built-in commands (`/new`, `/review`, `/resume`, `/compact`, `/fork`, `/status`, `/mcp`, `/apps`, `/skills`) while still merging ACP-provided command suggestions.
 - MCP/skills parity fix: ACP `session/new` now reads `~/.micode/settings.json` `mcpServers` and forwards them instead of forcing an empty list; `skills/list` now forwards to ACP instead of synthetic empty response.
+- ACP compatibility fix: normalize `mcpServers` payload to protocol array shape (`name/command/args/env`) and skip unsupported config forms, preventing `Expected array, received object` startup failure.
+- Slash capability alignment: keep `/skills` as plain text passthrough (not built-in command), because current CLI runtime may not expose `skills/list`.
 - Turn reliability: if ACP streamed chunks but `session/prompt` final response times out, synthesize `turn/completed` to prevent stuck "Working...".
 - UX polish: strip internal fenced JSON routing payloads (e.g. title/worktreeName blocks) from assistant message display.
 - UX tweak: keep Debug log entrypoint always visible (not only on warnings) for faster troubleshooting.

@@ -23,7 +23,6 @@ import {
 const BUILTIN_SLASH_COMMANDS: { name: string; description?: string }[] = [
   { name: "status", description: "Show current session status." },
   { name: "mcp", description: "List available MCP servers and tools." },
-  { name: "skills", description: "List available local skills." },
   { name: "apps", description: "List connected or installable apps." },
   { name: "new", description: "Create a new conversation." },
   { name: "review", description: "Start review mode." },
