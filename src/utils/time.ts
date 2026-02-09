@@ -1,4 +1,10 @@
-export function formatRelativeTime(timestamp: number) {
+type RelativeLanguage = "en" | "zh";
+
+function resolveLocale(language: RelativeLanguage) {
+  return language === "zh" ? "zh-CN" : "en-US";
+}
+
+export function formatRelativeTime(timestamp: number, language: RelativeLanguage = "en") {
   const now = Date.now();
   const diffSeconds = Math.round((timestamp - now) / 1000);
   const absSeconds = Math.abs(diffSeconds);
@@ -29,7 +35,9 @@ export function formatRelativeTime(timestamp: number) {
     return "now";
   }
   const value = Math.round(diffSeconds / range.seconds);
-  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  const formatter = new Intl.RelativeTimeFormat(resolveLocale(language), {
+    numeric: "auto",
+  });
   return formatter.format(value, range.unit);
 }
 

@@ -15,6 +15,7 @@ import type {
   DictationTranscript,
   ModelOption,
   SkillOption,
+  UiLanguage,
   WorkspaceInfo,
 } from "../../../types";
 import { ComposerInput } from "../../composer/components/ComposerInput";
@@ -100,6 +101,7 @@ type WorkspaceHomeProps = {
   onAgentMdChange: (value: string) => void;
   onAgentMdRefresh: () => void;
   onAgentMdSave: () => void;
+  language?: UiLanguage;
 };
 
 const INSTANCE_OPTIONS = [1, 2, 3, 4];
@@ -180,6 +182,7 @@ export function WorkspaceHome({
   onAgentMdChange,
   onAgentMdRefresh,
   onAgentMdSave,
+  language = "en",
 }: WorkspaceHomeProps) {
   const [showIcon, setShowIcon] = useState(true);
   const [runModeOpen, setRunModeOpen] = useState(false);
@@ -849,7 +852,7 @@ export function WorkspaceHome({
                       </div>
                     </div>
                     <div className="workspace-home-run-time">
-                      {formatRelativeTime(run.createdAt)}
+                      {formatRelativeTime(run.createdAt, language)}
                     </div>
                   </div>
                   {run.error && (
@@ -911,7 +914,7 @@ export function WorkspaceHome({
                 </div>
                 {recentThreadsUpdatedAt ? (
                   <div className="workspace-home-run-time">
-                    {formatRelativeTime(recentThreadsUpdatedAt)}
+                    {formatRelativeTime(recentThreadsUpdatedAt, language)}
                   </div>
                 ) : null}
               </div>

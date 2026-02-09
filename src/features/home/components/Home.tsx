@@ -1,5 +1,5 @@
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
-import type { LocalUsageSnapshot } from "../../../types";
+import type { LocalUsageSnapshot, UiLanguage } from "../../../types";
 import { formatRelativeTime } from "../../../utils/time";
 
 type LatestAgentRun = {
@@ -34,6 +34,7 @@ type HomeProps = {
   usageWorkspaceOptions: UsageWorkspaceOption[];
   onUsageWorkspaceChange: (workspaceId: string | null) => void;
   onSelectThread: (workspaceId: string, threadId: string) => void;
+  language?: UiLanguage;
 };
 
 export function Home({
@@ -51,7 +52,9 @@ export function Home({
   usageWorkspaceOptions,
   onUsageWorkspaceChange,
   onSelectThread,
+  language = "en",
 }: HomeProps) {
+  const isZh = language === "zh";
   const formatCompactNumber = (value: number | null | undefined) => {
     if (value === null || value === undefined) {
       return "--";
@@ -123,7 +126,7 @@ export function Home({
     if (Number.isNaN(date.getTime())) {
       return value;
     }
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat(isZh ? "zh-CN" : "en-US", {
       month: "short",
       day: "numeric",
     }).format(date);
@@ -168,22 +171,32 @@ export function Home({
     ),
   );
   const updatedLabel = localUsageSnapshot
-    ? `Updated ${formatRelativeTime(localUsageSnapshot.updatedAt)}`
+    ? `Updated ${formatRelativeTime(localUsageSnapshot.updatedAt, language)}`
     : null;
   const showUsageSkeleton = isLoadingLocalUsage && !localUsageSnapshot;
   const showUsageEmpty = !isLoadingLocalUsage && !localUsageSnapshot;
+  const tokenLabel = isZh ? "Token" : "tokens";
+  const latestAgentsLabel = isZh ? "最新会话" : "Latest agents";
+  const noActivityTitle = isZh ? "暂无会话活动" : "No agent activity yet";
+  const noActivitySubtitle = isZh
+    ? "开始一个对话后，这里会显示最新回复。"
+    : "Start a thread to see the latest responses here.";
+  const topModelsLabel = isZh ? "热门模型" : "Top models";
+  const noModelsLabel = isZh ? "暂无模型数据" : "No models yet";
 
   return (
     <div className="home">
       <div className="home-hero">
-        <div className="home-title">Agent Monitor</div>
+        <div className="home-title">{isZh ? "智能体监控台" : "Agent Monitor"}</div>
         <div className="home-subtitle">
-          Orchestrate agents across your local projects.
+          {isZh
+            ? "在本地项目中统一编排智能体。"
+            : "Orchestrate agents across your local projects."}
         </div>
       </div>
       <div className="home-latest">
         <div className="home-latest-header">
-          <div className="home-latest-label">Latest agents</div>
+          <div className="home-latest-label">{latestAgentsLabel}</div>
         </div>
         {latestAgentRuns.length > 0 ? (
           <div className="home-latest-grid">
@@ -202,14 +215,14 @@ export function Home({
                     )}
                   </div>
                   <div className="home-latest-time">
-                    {formatRelativeTime(run.timestamp)}
+                    {formatRelativeTime(run.timestamp, language)}
                   </div>
                 </div>
                 <div className="home-latest-message">
-                  {run.message.trim() || "Agent replied."}
+                  {run.message.trim() || (isZh ? "智能体已回复。" : "Agent replied.")}
                 </div>
                 {run.isProcessing && (
-                  <div className="home-latest-status">Running</div>
+                  <div className="home-latest-status">{isZh ? "运行中" : "Running"}</div>
                 )}
               </button>
             ))}
@@ -229,10 +242,8 @@ export function Home({
           </div>
         ) : (
           <div className="home-latest-empty">
-            <div className="home-latest-empty-title">No agent activity yet</div>
-            <div className="home-latest-empty-subtitle">
-              Start a thread to see the latest responses here.
-            </div>
+            <div className="home-latest-empty-title">{noActivityTitle}</div>
+            <div className="home-latest-empty-subtitle">{noActivitySubtitle}</div>
           </div>
         )}
       </div>
@@ -245,7 +256,7 @@ export function Home({
           <span className="home-icon" aria-hidden>
             ⌘
           </span>
-          Open Project
+          {isZh ? "打开项目" : "Open Project"}
         </button>
         <button
           className="home-button secondary"
@@ -255,7 +266,7 @@ export function Home({
           <span className="home-icon" aria-hidden>
             +
           </span>
-          Add Workspace
+          {isZh ? "添加工作区" : "Add Workspace"}
         </button>
       </div>
       <div className="home-usage">
@@ -372,7 +383,7 @@ export function Home({
                       <span className="home-usage-number">
                         {formatCompactNumber(usageTotals?.last7DaysTokens)}
                       </span>
-                      <span className="home-usage-suffix">tokens</span>
+                      <span className="home-usage-suffix">{tokenLabel}</span>
                     </div>
                     <div className="home-usage-caption">
                       Avg {formatCompactNumber(usageTotals?.averageDailyTokens)} / day
@@ -384,7 +395,7 @@ export function Home({
                       <span className="home-usage-number">
                         {formatCompactNumber(usageTotals?.last30DaysTokens)}
                       </span>
-                      <span className="home-usage-suffix">tokens</span>
+                      <span className="home-usage-suffix">{tokenLabel}</span>
                     </div>
                     <div className="home-usage-caption">
                       Total {formatCount(usageTotals?.last30DaysTokens)}
@@ -409,7 +420,7 @@ export function Home({
                       </span>
                     </div>
                     <div className="home-usage-caption">
-                      {formatCompactNumber(usageTotals?.peakDayTokens)} tokens
+                      {formatCompactNumber(usageTotals?.peakDayTokens)} {tokenLabel}
                     </div>
                   </div>
                 </>
@@ -474,8 +485,8 @@ export function Home({
                   );
                   const tooltip =
                     usageMetric === "tokens"
-                      ? `${formatDayLabel(day.day)} · ${formatCount(day.totalTokens)} tokens`
-                      : `${formatDayLabel(day.day)} · ${formatDuration(day.agentTimeMs ?? 0)} agent time`;
+                      ? `${formatDayLabel(day.day)} · ${formatCount(day.totalTokens)} ${tokenLabel}`
+                      : `${formatDayLabel(day.day)} · ${formatDuration(day.agentTimeMs ?? 0)} ${isZh ? "运行时长" : "agent time"}`;
                   return (
                     <div
                       className="home-usage-bar"
@@ -496,9 +507,9 @@ export function Home({
             </div>
             <div className="home-usage-models">
               <div className="home-usage-models-label">
-                Top models
+                {topModelsLabel}
                 {usageMetric === "time" && (
-                  <span className="home-usage-models-hint">Tokens</span>
+                  <span className="home-usage-models-hint">{isZh ? "Token" : "Tokens"}</span>
                 )}
               </div>
               <div className="home-usage-models-list">
@@ -507,7 +518,7 @@ export function Home({
                     <span
                       className="home-usage-model-chip"
                       key={model.model}
-                      title={`${model.model}: ${formatCount(model.tokens)} tokens`}
+                      title={`${model.model}: ${formatCount(model.tokens)} ${tokenLabel}`}
                     >
                       {model.model}
                       <span className="home-usage-model-share">
@@ -516,7 +527,7 @@ export function Home({
                     </span>
                   ))
                 ) : (
-                  <span className="home-usage-model-empty">No models yet</span>
+                  <span className="home-usage-model-empty">{noModelsLabel}</span>
                 )}
               </div>
               {localUsageError && (

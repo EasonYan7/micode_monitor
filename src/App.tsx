@@ -2464,6 +2464,7 @@ function MainApp() {
       onAgentMdSave={() => {
         void saveAgentMd();
       }}
+      language={appSettings.language ?? "en"}
     />
   ) : null;
 
