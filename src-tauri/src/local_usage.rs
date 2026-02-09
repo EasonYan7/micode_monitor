@@ -80,6 +80,15 @@ fn scan_local_usage(
     }
 
     for root in sessions_roots {
+        // New MiCode runtime writes chat snapshots under `tmp/<hash>/chats/session-*.json`.
+        // Prefer this source for global usage to keep model totals and token stats up to date.
+        if workspace_path.is_none() {
+            let used_chat_source =
+                scan_chat_sessions(root, &mut daily, &mut model_totals, workspace_path)?;
+            if used_chat_source {
+                continue;
+            }
+        }
         for day_key in &day_keys {
             let day_dir = day_dir_for_key(root, day_key);
             if !day_dir.exists() {
@@ -100,6 +109,138 @@ fn scan_local_usage(
     }
 
     Ok(build_snapshot(updated_at, day_keys, daily, model_totals))
+}
+
+fn scan_chat_sessions(
+    root: &Path,
+    daily: &mut HashMap<String, DailyTotals>,
+    model_totals: &mut HashMap<String, i64>,
+    workspace_path: Option<&Path>,
+) -> Result<bool, String> {
+    if workspace_path.is_some() {
+        return Ok(false);
+    }
+    let chats_dir = root.join("chats");
+    if !chats_dir.is_dir() {
+        return Ok(false);
+    }
+    let entries = match std::fs::read_dir(&chats_dir) {
+        Ok(entries) => entries,
+        Err(_) => return Ok(false),
+    };
+    let mut used = false;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+        if !path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| name.starts_with("session-"))
+            .unwrap_or(false)
+        {
+            continue;
+        }
+        scan_chat_file(&path, daily, model_totals)?;
+        used = true;
+    }
+    Ok(used)
+}
+
+fn scan_chat_file(
+    path: &Path,
+    daily: &mut HashMap<String, DailyTotals>,
+    model_totals: &mut HashMap<String, i64>,
+) -> Result<(), String> {
+    let text = match std::fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(_) => return Ok(()),
+    };
+    if text.len() > 8_000_000 {
+        return Ok(());
+    }
+    let value = match serde_json::from_str::<Value>(&text) {
+        Ok(value) => value,
+        Err(_) => return Ok(()),
+    };
+    let messages = value
+        .get("messages")
+        .and_then(|messages| messages.as_array())
+        .cloned()
+        .unwrap_or_default();
+    if messages.is_empty() {
+        return Ok(());
+    }
+
+    let mut previous_totals: Option<UsageTotals> = None;
+    let mut last_activity_ms: Option<i64> = None;
+    let mut seen_runs: HashSet<i64> = HashSet::new();
+
+    for message in messages {
+        let timestamp_ms = read_timestamp_ms(&message);
+        if let Some(timestamp_ms) = timestamp_ms {
+            let message_type = message.get("type").and_then(|value| value.as_str()).unwrap_or("");
+            if !message_type.eq_ignore_ascii_case("user") && seen_runs.insert(timestamp_ms) {
+                if let Some(day_key) = day_key_for_timestamp_ms(timestamp_ms) {
+                    if let Some(entry) = daily.get_mut(&day_key) {
+                        entry.agent_runs += 1;
+                    }
+                }
+            }
+            track_activity(daily, &mut last_activity_ms, timestamp_ms);
+        }
+
+        let Some(tokens) = message.get("tokens").and_then(|tokens| tokens.as_object()) else {
+            continue;
+        };
+        let input = read_i64(tokens, &["input", "input_tokens", "inputTokens"]);
+        let cached = read_i64(
+            tokens,
+            &[
+                "cached",
+                "cached_input_tokens",
+                "cache_read_input_tokens",
+                "cachedInputTokens",
+                "cacheReadInputTokens",
+            ],
+        );
+        let output = read_i64(tokens, &["output", "output_tokens", "outputTokens"]);
+
+        let prev = previous_totals.unwrap_or_default();
+        let delta = UsageTotals {
+            input: (input - prev.input).max(0),
+            cached: (cached - prev.cached).max(0),
+            output: (output - prev.output).max(0),
+        };
+        previous_totals = Some(UsageTotals {
+            input,
+            cached,
+            output,
+        });
+
+        if delta.input == 0 && delta.cached == 0 && delta.output == 0 {
+            continue;
+        }
+
+        if let Some(day_key) = timestamp_ms.and_then(day_key_for_timestamp_ms) {
+            if let Some(entry) = daily.get_mut(&day_key) {
+                let capped_cached = delta.cached.min(delta.input);
+                entry.input += delta.input;
+                entry.cached += capped_cached;
+                entry.output += delta.output;
+
+                let model = message
+                    .get("model")
+                    .and_then(|value| value.as_str())
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+                *model_totals.entry(model).or_insert(0) += delta.input + delta.output;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn build_snapshot(
@@ -521,33 +662,63 @@ fn make_day_keys(days: u32) -> Vec<String> {
         .collect()
 }
 
-fn resolve_micode_sessions_root(micode_home_override: Option<PathBuf>) -> Option<PathBuf> {
-    micode_home_override
-        .or_else(resolve_default_micode_home)
-        .map(|home| home.join("sessions"))
+fn resolve_micode_sessions_roots(micode_home_override: Option<PathBuf>) -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    let mut seen = HashSet::new();
+
+    let push_candidate = |candidate: PathBuf, roots: &mut Vec<PathBuf>, seen: &mut HashSet<PathBuf>| {
+        if candidate.is_dir() && seen.insert(candidate.clone()) {
+            roots.push(candidate);
+        }
+    };
+
+    let add_home = |home: PathBuf, roots: &mut Vec<PathBuf>, seen: &mut HashSet<PathBuf>| {
+        let sessions = home.join("sessions");
+        push_candidate(sessions, roots, seen);
+        if home.file_name().and_then(|value| value.to_str()) == Some("sessions") {
+            push_candidate(home, roots, seen);
+        }
+    };
+
+    if let Some(home) = micode_home_override {
+        add_home(home, &mut roots, &mut seen);
+    } else if let Some(home) = resolve_default_micode_home() {
+        add_home(home, &mut roots, &mut seen);
+    }
+
+    roots
 }
 
 fn resolve_sessions_roots(
     workspaces: &HashMap<String, WorkspaceEntry>,
     workspace_path: Option<&Path>,
 ) -> Vec<PathBuf> {
-    if let Some(workspace_path) = workspace_path {
-        let micode_home_override =
-            resolve_workspace_micode_home_for_path(workspaces, Some(workspace_path));
-        return resolve_micode_sessions_root(micode_home_override)
-            .into_iter()
-            .collect();
-    }
-
     let mut roots = Vec::new();
     let mut seen = HashSet::new();
 
-    if let Some(root) = resolve_micode_sessions_root(None) {
+    let mut push_root = |root: PathBuf| {
         if seen.insert(root.clone()) {
             roots.push(root);
         }
-    }
+    };
 
+    if let Some(workspace_path) = workspace_path {
+        let micode_home_override =
+            resolve_workspace_micode_home_for_path(workspaces, Some(workspace_path));
+        for root in resolve_micode_sessions_roots(micode_home_override) {
+            push_root(root);
+        }
+        // Keep global roots as fallback so workspace-local legacy metadata
+        // does not hide actual chat logs under ~/.micode or ~/.codex.
+        for root in resolve_micode_sessions_roots(None) {
+            push_root(root);
+        }
+        return roots;
+    } 
+
+    for root in resolve_micode_sessions_roots(None) {
+        push_root(root);
+    }
     for entry in workspaces.values() {
         let parent_entry = entry
             .parent_id
@@ -556,10 +727,8 @@ fn resolve_sessions_roots(
         let Some(agent_home) = resolve_workspace_micode_home(entry, parent_entry) else {
             continue;
         };
-        if let Some(root) = resolve_micode_sessions_root(Some(agent_home)) {
-            if seen.insert(root.clone()) {
-                roots.push(root);
-            }
+        for root in resolve_micode_sessions_roots(Some(agent_home)) {
+            push_root(root);
         }
     }
 
@@ -819,6 +988,10 @@ mod tests {
                 .to_string_lossy()
                 .to_string(),
         );
+        fs::create_dir_all(
+            PathBuf::from(settings_a.agent_home.clone().expect("agent home a")).join("sessions"),
+        )
+        .expect("create sessions dir a");
         let entry_a = WorkspaceEntry {
             id: "a".to_string(),
             name: "A".to_string(),
@@ -836,6 +1009,10 @@ mod tests {
                 .to_string_lossy()
                 .to_string(),
         );
+        fs::create_dir_all(
+            PathBuf::from(settings_b.agent_home.clone().expect("agent home b")).join("sessions"),
+        )
+        .expect("create sessions dir b");
         let entry_b = WorkspaceEntry {
             id: "b".to_string(),
             name: "B".to_string(),

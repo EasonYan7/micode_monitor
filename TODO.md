@@ -65,6 +65,7 @@
 - [x] Enforce slash command-only send path: slash-prefixed input is never forwarded to AI text prompt; `/mcp *` always runs local MCP handler
 - [x] Keep Token terminology untranslated in Chinese UI (replace “代币” labels with “Token”)
 - [x] Hide composer "Default" controls: remove collaboration selector when only default mode exists and hide thinking selector when no reasoning options
+- [x] Restore Home top-model stats by parsing new MiCode `tmp/*/chats/session-*.json` usage source (not only legacy jsonl)
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
