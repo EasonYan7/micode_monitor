@@ -30,6 +30,7 @@
 - [x] Auto-reconnect workspace session on `workspace not connected` and retry first command
 - [x] Isolate background metadata/commit threads from foreground chat event stream
 - [x] Disable local-run metadata helper call to prevent background-thread bleed into chat turns
+- [x] Keep background helper threads fully ephemeral (memory-only, excluded from thread list/store)
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -75,3 +76,4 @@
 - Background-thread isolation fix: metadata/commit helper flows now start with `_background` and no longer emit foreground `thread/started`/`turn/*` events; ACP delta routing sends helper output only to callback collectors.
 - Message-visibility safeguard: if internal-JSON stripping would hide an assistant message entirely, UI falls back to raw text so users never see a blank response row.
 - Local-run stability fix: `useWorkspaceHome` no longer calls `generate_run_metadata` in `local` mode (keeps fallback title only), eliminating hidden background metadata turns that could leak JSON/title payloads into foreground chat.
+- Background thread isolation v2: `_background` `thread/start` now creates in-memory temporary threads (not persisted in `.micodemonitor/sessions.json`, not listed in `thread/list`), and `turn/start`/`turn/interrupt`/`thread/archive` now resolve these temporary sessions without touching foreground thread state.

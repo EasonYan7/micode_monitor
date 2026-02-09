@@ -776,11 +776,13 @@ pub(crate) struct WorkspaceSession {
     approval_requests: Mutex<HashMap<String, Value>>,
     pending_prompt_streaming: Mutex<HashMap<String, bool>>,
     active_prompts: Mutex<HashMap<String, ActivePromptContext>>,
+    background_threads: Mutex<HashMap<String, String>>,
 }
 
 impl WorkspaceSession {
     pub(crate) async fn invalidate_all_thread_sessions(&self) {
         self.thread_store.lock().await.clear_session_ids();
+        self.background_threads.lock().await.clear();
     }
 
     async fn begin_prompt_tracking(&self, session_id: &str) {
@@ -962,7 +964,23 @@ impl WorkspaceSession {
                     .unwrap_or(self.entry.path.as_str())
                     .to_string();
                 let session_id = self.create_session_for_cwd(cwd).await?;
-                let thread = self.create_local_thread(session_id).await;
+                let thread = if is_background {
+                    let thread_id = Uuid::new_v4().to_string();
+                    self.background_threads
+                        .lock()
+                        .await
+                        .insert(thread_id.clone(), session_id);
+                    LocalThreadRecord {
+                        thread_id,
+                        session_id: String::new(),
+                        title: "Background Thread".to_string(),
+                        archived: true,
+                        updated_at: now_ts(),
+                        message_index: 0,
+                    }
+                } else {
+                    self.create_local_thread(session_id).await
+                };
                 if !is_background {
                     self.emit_event(
                         "thread/started",
@@ -1040,7 +1058,15 @@ impl WorkspaceSession {
                     .get("threadId")
                     .and_then(Value::as_str)
                     .ok_or_else(|| "missing threadId".to_string())?;
-                self.thread_store.lock().await.set_archived(thread_id, true);
+                let removed_background = self
+                    .background_threads
+                    .lock()
+                    .await
+                    .remove(thread_id)
+                    .is_some();
+                if !removed_background {
+                    self.thread_store.lock().await.set_archived(thread_id, true);
+                }
                 Ok(json!({ "result": { "ok": true } }))
             }
             "thread/name/set" => {
@@ -1071,17 +1097,29 @@ impl WorkspaceSession {
                     .and_then(Value::as_str)
                     .ok_or_else(|| "missing threadId".to_string())?
                     .to_string();
+                let background_session = {
+                    let background_threads = self.background_threads.lock().await;
+                    background_threads.get(&thread_id).cloned()
+                };
                 let is_background_thread = self
                     .background_thread_callbacks
                     .lock()
                     .await
-                    .contains_key(&thread_id);
-                let thread = self.get_thread_by_id(&thread_id).await?;
+                    .contains_key(&thread_id)
+                    || background_session.is_some();
+                let thread = if background_session.is_none() {
+                    Some(self.get_thread_by_id(&thread_id).await?)
+                } else {
+                    None
+                };
                 let prompt_text = Self::parse_prompt_from_turn_start(&params);
                 if prompt_text.is_empty() {
                     return Err("empty user message".to_string());
                 }
-                let mut session_id = thread.session_id.clone();
+                let mut session_id = background_session
+                    .clone()
+                    .or_else(|| thread.as_ref().map(|entry| entry.session_id.clone()))
+                    .unwrap_or_default();
                 let requested_model = params
                     .get("model")
                     .and_then(Value::as_str)
@@ -1093,10 +1131,17 @@ impl WorkspaceSession {
                         if changed {
                             let fresh_session =
                                 self.create_session_for_cwd(self.entry.path.clone()).await?;
-                            self.thread_store
-                                .lock()
-                                .await
-                                .set_session_id(&thread_id, fresh_session.clone());
+                            if is_background_thread {
+                                self.background_threads
+                                    .lock()
+                                    .await
+                                    .insert(thread_id.clone(), fresh_session.clone());
+                            } else {
+                                self.thread_store
+                                    .lock()
+                                    .await
+                                    .set_session_id(&thread_id, fresh_session.clone());
+                            }
                             session_id = fresh_session;
                         }
                     }
@@ -1105,10 +1150,17 @@ impl WorkspaceSession {
                     // Some migrated/local records may have an empty session id.
                     // Recreate proactively to avoid one failed prompt + retry roundtrip.
                     let fresh_session = self.create_session_for_cwd(self.entry.path.clone()).await?;
-                    self.thread_store
-                        .lock()
-                        .await
-                        .set_session_id(&thread_id, fresh_session.clone());
+                    if is_background_thread {
+                        self.background_threads
+                            .lock()
+                            .await
+                            .insert(thread_id.clone(), fresh_session.clone());
+                    } else {
+                        self.thread_store
+                            .lock()
+                            .await
+                            .set_session_id(&thread_id, fresh_session.clone());
+                    }
                     session_id = fresh_session;
                 }
                 let turn_id = Uuid::new_v4().to_string();
@@ -1117,7 +1169,7 @@ impl WorkspaceSession {
                         "turn/started",
                         json!({
                             "threadId": thread_id,
-                            "turn": { "id": turn_id, "threadId": thread.thread_id }
+                            "turn": { "id": turn_id, "threadId": thread_id }
                         }),
                     );
                 }
@@ -1151,7 +1203,7 @@ impl WorkspaceSession {
                             }
                             let normalized_turn = json!({
                                 "id": turn_id,
-                                "threadId": thread.thread_id
+                                "threadId": thread_id
                             });
                             if !is_background_thread {
                                 self.emit_event(
@@ -1175,10 +1227,17 @@ impl WorkspaceSession {
                 let response = if is_session_not_found_error(&response) {
                     // Session ids are process-local. Recreate once and retry.
                     let new_session = self.create_session_for_cwd(self.entry.path.clone()).await?;
-                    self.thread_store
-                        .lock()
-                        .await
-                        .set_session_id(&thread_id, new_session.clone());
+                    if is_background_thread {
+                        self.background_threads
+                            .lock()
+                            .await
+                            .insert(thread_id.clone(), new_session.clone());
+                    } else {
+                        self.thread_store
+                            .lock()
+                            .await
+                            .set_session_id(&thread_id, new_session.clone());
+                    }
                     tracked_session_id = new_session.clone();
                     self.begin_prompt_tracking(&tracked_session_id).await;
                     self.register_active_prompt(&tracked_session_id, &thread_id, &turn_id)
@@ -1210,7 +1269,7 @@ impl WorkspaceSession {
                                 }
                                 let normalized_turn = json!({
                                     "id": turn_id,
-                                    "threadId": thread.thread_id
+                                    "threadId": thread_id
                                 });
                                 if !is_background_thread {
                                     self.emit_event(
@@ -1246,7 +1305,7 @@ impl WorkspaceSession {
                         }
                         let normalized_turn = json!({
                             "id": turn_id,
-                            "threadId": thread.thread_id
+                            "threadId": thread_id
                         });
                         if !is_background_thread {
                             self.emit_event(
@@ -1274,7 +1333,7 @@ impl WorkspaceSession {
                 let mut normalized_response = response.clone();
                 let normalized_turn = json!({
                     "id": turn_id,
-                    "threadId": thread.thread_id
+                    "threadId": thread_id
                 });
                 if let Some(result) = normalized_response
                     .get_mut("result")
@@ -1306,9 +1365,17 @@ impl WorkspaceSession {
                     .get("threadId")
                     .and_then(Value::as_str)
                     .ok_or_else(|| "missing threadId".to_string())?;
-                let thread = self.get_thread_by_id(thread_id).await?;
+                let background_session = {
+                    let background_threads = self.background_threads.lock().await;
+                    background_threads.get(thread_id).cloned()
+                };
+                let thread_session = if let Some(session_id) = background_session {
+                    session_id
+                } else {
+                    self.get_thread_by_id(thread_id).await?.session_id
+                };
                 let response = self
-                    .send_acp_request("session/cancel", json!({ "sessionId": thread.session_id }))
+                    .send_acp_request("session/cancel", json!({ "sessionId": thread_session }))
                     .await?;
                 if let Some(error) = acp_error_message(&response) {
                     if is_not_generating_message(&error) {
@@ -1812,6 +1879,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
         approval_requests: Mutex::new(HashMap::new()),
         pending_prompt_streaming: Mutex::new(HashMap::new()),
         active_prompts: Mutex::new(HashMap::new()),
+        background_threads: Mutex::new(HashMap::new()),
     });
 
     let session_clone = Arc::clone(&session);
