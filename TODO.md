@@ -62,6 +62,7 @@
 - [x] Fallback MCP status source: when ACP returns empty/error, read configured servers from `settings.json` for `/mcp` display
 - [x] Resolve MiCode home with global default (`~/.micode|~/.codex`) for all workspaces; only use workspace `.micodemonitor` as legacy fallback
 - [x] Add startup doctor hint for missing MiCode CLI (show localized toast instead of silent failure)
+- [x] Enforce slash command-only send path: slash-prefixed input is never forwarded to AI text prompt; `/mcp *` always runs local MCP handler
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

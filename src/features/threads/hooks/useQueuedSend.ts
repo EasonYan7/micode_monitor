@@ -102,8 +102,13 @@ export function useQueuedSend({
   const executeSlashOrSend = useCallback(
     async (trimmed: string, images: string[] = []) => {
       const nextImages = images;
+      const slashPrefixed = trimmed.startsWith("/");
       const slashMatch = trimmed.match(/^\/([a-z0-9_-]+)\b/i);
-      if (slashMatch) {
+      if (slashPrefixed) {
+        if (!slashMatch) {
+          // Slash-prefixed input is treated as command-only. Do not forward to AI.
+          return;
+        }
         const command = slashMatch[1].toLowerCase();
         switch (command) {
           case "new": {
@@ -135,23 +140,17 @@ export function useQueuedSend({
           case "apps":
             if (appsEnabled) {
               await startApps(trimmed);
-              return;
             }
-            break;
-          case "mcp": {
-            // Keep CLI parity for subcommands while making `/mcp list` deterministic.
-            const rest = trimmed.replace(/^\/mcp\b/i, "").trim().toLowerCase();
-            if (!rest || rest === "list") {
-              await startMcp(trimmed);
-              return;
-            }
-            break;
-          }
+            return;
+          case "mcp":
+            await startMcp(trimmed);
+            return;
           case "status":
             await startStatus(trimmed);
             return;
           default:
-            break;
+            // Unknown slash commands are command-only and should not become AI prompts.
+            return;
         }
       }
       if (activeWorkspace && !activeWorkspace.connected) {

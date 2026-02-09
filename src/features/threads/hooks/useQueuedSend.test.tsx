@@ -311,7 +311,7 @@ describe("useQueuedSend", () => {
     expect(options.startReview).not.toHaveBeenCalled();
   });
 
-  it("treats non-list /mcp subcommands as plain text", async () => {
+  it("routes non-list /mcp subcommands to the MCP handler", async () => {
     const startMcp = vi.fn().mockResolvedValue(undefined);
     const options = makeOptions({ startMcp });
     const { result } = renderHook((props) => useQueuedSend(props), {
@@ -322,12 +322,12 @@ describe("useQueuedSend", () => {
       await result.current.handleSend("/mcp status", ["img-1"]);
     });
 
-    expect(startMcp).not.toHaveBeenCalled();
-    expect(options.sendUserMessage).toHaveBeenCalledWith("/mcp status", ["img-1"]);
+    expect(startMcp).toHaveBeenCalledWith("/mcp status");
+    expect(options.sendUserMessage).not.toHaveBeenCalled();
     expect(options.startReview).not.toHaveBeenCalled();
   });
 
-  it("treats /skills as plain text", async () => {
+  it("does not forward unknown slash commands to AI", async () => {
     const options = makeOptions();
     const { result } = renderHook((props) => useQueuedSend(props), {
       initialProps: options,
@@ -337,8 +337,9 @@ describe("useQueuedSend", () => {
       await result.current.handleSend("/skills now", ["img-1"]);
     });
 
-    expect(options.sendUserMessage).toHaveBeenCalledWith("/skills now", ["img-1"]);
+    expect(options.sendUserMessage).not.toHaveBeenCalled();
     expect(options.startReview).not.toHaveBeenCalled();
+    expect(options.startMcp).not.toHaveBeenCalled();
   });
 
   it("routes /apps to the apps handler", async () => {
@@ -357,7 +358,7 @@ describe("useQueuedSend", () => {
     expect(options.startReview).not.toHaveBeenCalled();
   });
 
-  it("treats /apps as plain text when apps feature is disabled", async () => {
+  it("does not forward /apps to AI when apps feature is disabled", async () => {
     const startApps = vi.fn().mockResolvedValue(undefined);
     const options = makeOptions({ startApps, appsEnabled: false });
     const { result } = renderHook((props) => useQueuedSend(props), {
@@ -369,7 +370,7 @@ describe("useQueuedSend", () => {
     });
 
     expect(startApps).not.toHaveBeenCalled();
-    expect(options.sendUserMessage).toHaveBeenCalledWith("/apps now", ["img-1"]);
+    expect(options.sendUserMessage).not.toHaveBeenCalled();
   });
 
   it("routes /resume to the resume handler", async () => {
