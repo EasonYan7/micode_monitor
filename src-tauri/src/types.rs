@@ -368,11 +368,6 @@ pub(crate) struct AppSettings {
     )]
     pub(crate) new_worktree_agent_shortcut: Option<String>,
     #[serde(
-        default = "default_new_clone_agent_shortcut",
-        rename = "newCloneAgentShortcut"
-    )]
-    pub(crate) new_clone_agent_shortcut: Option<String>,
-    #[serde(
         default = "default_archive_thread_shortcut",
         rename = "archiveThreadShortcut"
     )]
@@ -425,6 +420,8 @@ pub(crate) struct AppSettings {
     pub(crate) ui_scale: f64,
     #[serde(default = "default_theme", rename = "theme")]
     pub(crate) theme: String,
+    #[serde(default = "default_language", rename = "language")]
+    pub(crate) language: String,
     #[serde(
         default = "default_usage_show_remaining",
         rename = "usageShowRemaining"
@@ -580,6 +577,10 @@ fn default_theme() -> String {
     "system".to_string()
 }
 
+fn default_language() -> String {
+    "en".to_string()
+}
+
 fn default_usage_show_remaining() -> bool {
     false
 }
@@ -627,10 +628,6 @@ fn default_new_agent_shortcut() -> Option<String> {
 
 fn default_new_worktree_agent_shortcut() -> Option<String> {
     Some("cmd+shift+n".to_string())
-}
-
-fn default_new_clone_agent_shortcut() -> Option<String> {
-    Some("cmd+alt+n".to_string())
 }
 
 fn default_archive_thread_shortcut() -> Option<String> {
@@ -836,7 +833,6 @@ impl Default for AppSettings {
             composer_collaboration_shortcut: default_composer_collaboration_shortcut(),
             new_agent_shortcut: default_new_agent_shortcut(),
             new_worktree_agent_shortcut: default_new_worktree_agent_shortcut(),
-            new_clone_agent_shortcut: default_new_clone_agent_shortcut(),
             archive_thread_shortcut: default_archive_thread_shortcut(),
             toggle_projects_sidebar_shortcut: default_toggle_projects_sidebar_shortcut(),
             toggle_git_sidebar_shortcut: default_toggle_git_sidebar_shortcut(),
@@ -850,6 +846,7 @@ impl Default for AppSettings {
             last_composer_reasoning_effort: None,
             ui_scale: 1.0,
             theme: default_theme(),
+            language: default_language(),
             usage_show_remaining: default_usage_show_remaining(),
             ui_font_family: default_ui_font_family(),
             code_font_family: default_code_font_family(),
@@ -958,6 +955,7 @@ mod tests {
         assert!(settings.last_composer_reasoning_effort.is_none());
         assert!((settings.ui_scale - 1.0).abs() < f64::EPSILON);
         assert_eq!(settings.theme, "system");
+        assert_eq!(settings.language, "en");
         assert!(!settings.usage_show_remaining);
         assert!(settings.ui_font_family.contains("SF Pro Text"));
         assert!(settings.code_font_family.contains("SF Mono"));

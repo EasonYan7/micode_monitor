@@ -118,6 +118,7 @@ export type AccessMode = "read-only" | "current" | "full-access";
 export type BackendMode = "local" | "remote";
 export type ThemePreference = "system" | "light" | "dark" | "dim";
 export type PersonalityPreference = "friendly" | "pragmatic";
+export type UiLanguage = "en" | "zh";
 
 
 export type ComposerEditorPreset = "default" | "helpful" | "smart";
@@ -160,7 +161,6 @@ export type AppSettings = {
   interruptShortcut: string | null;
   newAgentShortcut: string | null;
   newWorktreeAgentShortcut: string | null;
-  newCloneAgentShortcut: string | null;
   archiveThreadShortcut: string | null;
   toggleProjectsSidebarShortcut: string | null;
   toggleGitSidebarShortcut: string | null;
@@ -175,6 +175,7 @@ export type AppSettings = {
   lastComposerReasoningEffort: string | null;
   uiScale: number;
   theme: ThemePreference;
+  language?: UiLanguage;
   usageShowRemaining: boolean;
   uiFontFamily: string;
   codeFontFamily: string;

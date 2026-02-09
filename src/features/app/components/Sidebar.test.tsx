@@ -36,7 +36,6 @@ const baseProps = {
   onConnectWorkspace: vi.fn(),
   onAddAgent: vi.fn(),
   onAddWorktreeAgent: vi.fn(),
-  onAddCloneAgent: vi.fn(),
   onToggleWorkspaceCollapse: vi.fn(),
   onSelectThread: vi.fn(),
   onDeleteThread: vi.fn(),
@@ -93,7 +92,7 @@ describe("Sidebar", () => {
     expect(reopened.value).toBe("");
   });
 
-  it("shows a top New Agent draft row and selects workspace when clicked", () => {
+  it("shows a top New Conversation draft row and selects workspace when clicked", () => {
     const onSelectWorkspace = vi.fn();
     const props = {
       ...baseProps,
@@ -129,7 +128,7 @@ describe("Sidebar", () => {
 
     render(<Sidebar {...props} />);
 
-    const draftRow = screen.getByRole("button", { name: /new agent/i });
+    const draftRow = screen.getByRole("button", { name: /new conversation/i });
     expect(draftRow).toBeTruthy();
     expect(draftRow.className).toContain("thread-row-draft");
     expect(draftRow.className).toContain("active");

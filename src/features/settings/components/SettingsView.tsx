@@ -202,7 +202,6 @@ type ShortcutSettingKey =
   | "interruptShortcut"
   | "newAgentShortcut"
   | "newWorktreeAgentShortcut"
-  | "newCloneAgentShortcut"
   | "archiveThreadShortcut"
   | "toggleProjectsSidebarShortcut"
   | "toggleGitSidebarShortcut"
@@ -221,7 +220,6 @@ type ShortcutDraftKey =
   | "interrupt"
   | "newAgent"
   | "newWorktreeAgent"
-  | "newCloneAgent"
   | "archiveThread"
   | "projectsSidebar"
   | "gitSidebar"
@@ -243,7 +241,6 @@ const shortcutDraftKeyBySetting: Record<ShortcutSettingKey, ShortcutDraftKey> = 
   interruptShortcut: "interrupt",
   newAgentShortcut: "newAgent",
   newWorktreeAgentShortcut: "newWorktreeAgent",
-  newCloneAgentShortcut: "newCloneAgent",
   archiveThreadShortcut: "archiveThread",
   toggleProjectsSidebarShortcut: "projectsSidebar",
   toggleGitSidebarShortcut: "gitSidebar",
@@ -413,7 +410,6 @@ export function SettingsView({
     interrupt: appSettings.interruptShortcut ?? "",
     newAgent: appSettings.newAgentShortcut ?? "",
     newWorktreeAgent: appSettings.newWorktreeAgentShortcut ?? "",
-    newCloneAgent: appSettings.newCloneAgentShortcut ?? "",
     archiveThread: appSettings.archiveThreadShortcut ?? "",
     projectsSidebar: appSettings.toggleProjectsSidebarShortcut ?? "",
     gitSidebar: appSettings.toggleGitSidebarShortcut ?? "",
@@ -573,7 +569,6 @@ export function SettingsView({
       interrupt: appSettings.interruptShortcut ?? "",
       newAgent: appSettings.newAgentShortcut ?? "",
       newWorktreeAgent: appSettings.newWorktreeAgentShortcut ?? "",
-      newCloneAgent: appSettings.newCloneAgentShortcut ?? "",
       archiveThread: appSettings.archiveThreadShortcut ?? "",
       projectsSidebar: appSettings.toggleProjectsSidebarShortcut ?? "",
       gitSidebar: appSettings.toggleGitSidebarShortcut ?? "",
@@ -593,7 +588,6 @@ export function SettingsView({
     appSettings.interruptShortcut,
     appSettings.newAgentShortcut,
     appSettings.newWorktreeAgentShortcut,
-    appSettings.newCloneAgentShortcut,
     appSettings.archiveThreadShortcut,
     appSettings.toggleProjectsSidebarShortcut,
     appSettings.toggleGitSidebarShortcut,
@@ -2311,7 +2305,9 @@ export function SettingsView({
                   {t("Create agents and worktrees from the keyboard.", "通过键盘创建 Agent 和工作树。")}
                 </div>
                 <div className="settings-field">
-                  <div className="settings-field-label">{t("New Agent", "新建 Agent")}</div>
+                  <div className="settings-field-label">
+                    {t("New Conversation", "新建对话")}
+                  </div>
                   <div className="settings-field-row">
                     <input
                       className="settings-input settings-input--shortcut"
@@ -2356,30 +2352,6 @@ export function SettingsView({
                   </div>
                   <div className="settings-help">
                     {t("Default:", "默认：")} {formatShortcut("cmd+shift+n")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">{t("New Clone Agent", "新建克隆 Agent")}</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.newCloneAgent)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "newCloneAgentShortcut")
-                      }
-                      placeholder={t("Type shortcut", "按下快捷键")}
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("newCloneAgentShortcut", null)}
-                    >
-                      {t("Clear", "清空")}
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    {t("Default:", "默认：")} {formatShortcut("cmd+alt+n")}
                   </div>
                 </div>
                 <div className="settings-field">

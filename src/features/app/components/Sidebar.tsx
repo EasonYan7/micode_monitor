@@ -68,7 +68,6 @@ type SidebarProps = {
   onConnectWorkspace: (workspace: WorkspaceInfo) => void;
   onAddAgent: (workspace: WorkspaceInfo) => void;
   onAddWorktreeAgent: (workspace: WorkspaceInfo) => void;
-  onAddCloneAgent: (workspace: WorkspaceInfo) => void;
   onToggleWorkspaceCollapse: (workspaceId: string, collapsed: boolean) => void;
   onSelectThread: (workspaceId: string, threadId: string) => void;
   onDeleteThread: (workspaceId: string, threadId: string) => void;
@@ -119,7 +118,6 @@ export function Sidebar({
   onConnectWorkspace,
   onAddAgent,
   onAddWorktreeAgent,
-  onAddCloneAgent,
   onToggleWorkspaceCollapse,
   onSelectThread,
   onDeleteThread,
@@ -543,7 +541,7 @@ export function Sidebar({
                                 onAddAgent(entry);
                               }}
                             >
-                              {language === "zh" ? "新建 Agent" : "New agent"}
+                              {language === "zh" ? "新建对话" : "New conversation"}
                             </button>
                             <button
                               className="workspace-add-option"
@@ -553,17 +551,9 @@ export function Sidebar({
                                 onAddWorktreeAgent(entry);
                               }}
                             >
-                              {language === "zh" ? "新建工作树 Agent" : "New worktree agent"}
-                            </button>
-                            <button
-                              className="workspace-add-option"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setAddMenuAnchor(null);
-                                onAddCloneAgent(entry);
-                              }}
-                            >
-                              {language === "zh" ? "新建克隆 Agent" : "New clone agent"}
+                              {language === "zh"
+                                ? "新建工作树 Agent（高级）"
+                                : "New worktree agent (Advanced)"}
                             </button>
                           </div>,
                           document.body,
@@ -585,7 +575,7 @@ export function Sidebar({
                         >
                           <span className={`thread-status ${draftStatusClass}`} aria-hidden />
                           <span className="thread-name">
-                            {language === "zh" ? "新建 Agent" : "New Agent"}
+                            {language === "zh" ? "新建对话" : "New Conversation"}
                           </span>
                         </div>
                       )}

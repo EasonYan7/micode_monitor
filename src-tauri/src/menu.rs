@@ -88,17 +88,16 @@ pub(crate) fn build_menu<R: tauri::Runtime>(
         ],
     )?;
 
-    let new_agent_item = MenuItemBuilder::with_id("file_new_agent", "New Agent").build(handle)?;
+    let new_agent_item =
+        MenuItemBuilder::with_id("file_new_agent", "New Conversation").build(handle)?;
     let new_worktree_agent_item =
-        MenuItemBuilder::with_id("file_new_worktree_agent", "New Worktree Agent").build(handle)?;
-    let new_clone_agent_item =
-        MenuItemBuilder::with_id("file_new_clone_agent", "New Clone Agent").build(handle)?;
+        MenuItemBuilder::with_id("file_new_worktree_agent", "New Worktree Agent (Advanced)")
+            .build(handle)?;
     let add_workspace_item =
         MenuItemBuilder::with_id("file_add_workspace", "Add Workspace...").build(handle)?;
 
     registry.register("file_new_agent", &new_agent_item);
     registry.register("file_new_worktree_agent", &new_worktree_agent_item);
-    registry.register("file_new_clone_agent", &new_clone_agent_item);
 
     #[cfg(target_os = "linux")]
     let file_menu = {
@@ -112,7 +111,6 @@ pub(crate) fn build_menu<R: tauri::Runtime>(
             &[
                 &new_agent_item,
                 &new_worktree_agent_item,
-                &new_clone_agent_item,
                 &PredefinedMenuItem::separator(handle)?,
                 &add_workspace_item,
                 &PredefinedMenuItem::separator(handle)?,
@@ -126,12 +124,11 @@ pub(crate) fn build_menu<R: tauri::Runtime>(
         handle,
         "File",
         true,
-        &[
-            &new_agent_item,
-            &new_worktree_agent_item,
-            &new_clone_agent_item,
-            &PredefinedMenuItem::separator(handle)?,
-            &add_workspace_item,
+            &[
+                &new_agent_item,
+                &new_worktree_agent_item,
+                &PredefinedMenuItem::separator(handle)?,
+                &add_workspace_item,
             &PredefinedMenuItem::separator(handle)?,
             &PredefinedMenuItem::close_window(handle, None)?,
             #[cfg(not(target_os = "macos"))]
@@ -340,7 +337,6 @@ pub(crate) fn handle_menu_event<R: tauri::Runtime>(
         }
         "file_new_agent" => emit_menu_event(app, "menu-new-agent"),
         "file_new_worktree_agent" => emit_menu_event(app, "menu-new-worktree-agent"),
-        "file_new_clone_agent" => emit_menu_event(app, "menu-new-clone-agent"),
         "file_add_workspace" => emit_menu_event(app, "menu-add-workspace"),
         "file_open_settings" => emit_menu_event(app, "menu-open-settings"),
         "file_close_window" | "window_close" => {

@@ -19,10 +19,6 @@ export function useMenuAcceleratorController({ appSettings, onDebug }: Params) {
         shortcut: appSettings.newWorktreeAgentShortcut,
       },
       {
-        id: "file_new_clone_agent",
-        shortcut: appSettings.newCloneAgentShortcut,
-      },
-      {
         id: "view_toggle_projects_sidebar",
         shortcut: appSettings.toggleProjectsSidebarShortcut,
       },
@@ -84,7 +80,6 @@ export function useMenuAcceleratorController({ appSettings, onDebug }: Params) {
       appSettings.cycleWorkspacePrevShortcut,
       appSettings.collaborationModesEnabled,
       appSettings.newAgentShortcut,
-      appSettings.newCloneAgentShortcut,
       appSettings.newWorktreeAgentShortcut,
       appSettings.toggleGitSidebarShortcut,
       appSettings.toggleDebugPanelShortcut,

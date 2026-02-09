@@ -14,7 +14,6 @@ type Params = {
   selectWorkspace: (workspaceId: string) => void;
   onStartNewAgentDraft: (workspaceId: string) => void;
   openWorktreePrompt: (workspace: WorkspaceInfo) => void;
-  openClonePrompt: (workspace: WorkspaceInfo) => void;
   composerInputRef: RefObject<HTMLTextAreaElement | null>;
   onDebug: (entry: DebugEntry) => void;
 };
@@ -30,7 +29,6 @@ export function useWorkspaceActions({
   selectWorkspace,
   onStartNewAgentDraft,
   openWorktreePrompt,
-  openClonePrompt,
   composerInputRef,
   onDebug,
 }: Params) {
@@ -115,14 +113,6 @@ export function useWorkspaceActions({
     [exitDiffView, openWorktreePrompt],
   );
 
-  const handleAddCloneAgent = useCallback(
-    async (workspace: WorkspaceInfo) => {
-      exitDiffView();
-      openClonePrompt(workspace);
-    },
-    [exitDiffView, openClonePrompt],
-  );
-
   useNewAgentShortcut({
     isEnabled: Boolean(activeWorkspace),
     onTrigger: () => {
@@ -137,6 +127,5 @@ export function useWorkspaceActions({
     handleAddWorkspaceFromPath,
     handleAddAgent,
     handleAddWorktreeAgent,
-    handleAddCloneAgent,
   };
 }

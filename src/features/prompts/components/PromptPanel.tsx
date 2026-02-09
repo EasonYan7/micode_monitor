@@ -362,9 +362,9 @@ export function PromptPanel({
               }
               void onSendPromptToNewAgent(text);
             }}
-            title="Send to a new agent"
+            title="Send to a new conversation"
           >
-            New agent
+            New conversation
           </button>
           <button
             type="button"

@@ -205,7 +205,7 @@ export function useThreadActions({
               type: "setThreadName",
               workspaceId,
               threadId,
-              name: previewThreadName(preview, "New Agent"),
+              name: previewThreadName(preview, "New Conversation"),
             });
           }
           const lastAgentMessage = [...mergedItems]

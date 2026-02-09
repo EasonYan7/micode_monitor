@@ -50,6 +50,8 @@
 - [x] Remove Features experimental toggles (Multi-agent/Apps) from Settings UI
 - [x] Remove MiCode remote backend host/token inputs from Settings UI
 - [x] Expand Chinese UI localization: SettingsView major sections/controls + sidebar core labels/search/thread list actions
+- [x] Rename creation entry to New Conversation / 新建对话
+- [x] Remove New Clone Agent feature path (sidebar entry, menu event, accelerators, modal/hook/files, shortcuts UI)
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

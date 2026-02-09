@@ -19,6 +19,7 @@ import { getDefaultInterruptShortcut } from "../../../utils/shortcuts";
 
 const allowedThemes = new Set(["system", "light", "dark", "dim"]);
 const allowedPersonality = new Set(["friendly", "pragmatic"]);
+const allowedLanguages = new Set(["en", "zh"]);
 
 const defaultSettings: AppSettings = {
   agentProvider: "micode-acp",
@@ -38,7 +39,6 @@ const defaultSettings: AppSettings = {
   interruptShortcut: getDefaultInterruptShortcut(),
   newAgentShortcut: "cmd+n",
   newWorktreeAgentShortcut: "cmd+shift+n",
-  newCloneAgentShortcut: "cmd+alt+n",
   archiveThreadShortcut: "cmd+ctrl+a",
   toggleProjectsSidebarShortcut: "cmd+shift+p",
   toggleGitSidebarShortcut: "cmd+shift+g",
@@ -53,6 +53,7 @@ const defaultSettings: AppSettings = {
   lastComposerReasoningEffort: null,
   uiScale: UI_SCALE_DEFAULT,
   theme: "system",
+  language: "en",
   usageShowRemaining: false,
   uiFontFamily: DEFAULT_UI_FONT_FAMILY,
   codeFontFamily: DEFAULT_CODE_FONT_FAMILY,
@@ -123,6 +124,9 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
       : (settings.agentArgs?.trim() ? settings.agentArgs.trim() : null),
     uiScale: clampUiScale(settings.uiScale),
     theme: allowedThemes.has(settings.theme) ? settings.theme : "system",
+    language: allowedLanguages.has(settings.language ?? "")
+      ? settings.language
+      : "en",
     uiFontFamily: normalizeFontFamily(
       settings.uiFontFamily,
       DEFAULT_UI_FONT_FAMILY,

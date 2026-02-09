@@ -3,7 +3,6 @@ import { useTauriEvent } from "./useTauriEvent";
 import {
   subscribeMenuAddWorkspace,
   subscribeMenuNewAgent,
-  subscribeMenuNewCloneAgent,
   subscribeMenuNewWorktreeAgent,
   subscribeMenuOpenSettings,
   subscribeMenuPrevAgent,
@@ -23,7 +22,6 @@ type Params = {
   onAddWorkspace: () => void;
   onAddAgent: (workspace: WorkspaceInfo) => void;
   onAddWorktreeAgent: (workspace: WorkspaceInfo) => void;
-  onAddCloneAgent: (workspace: WorkspaceInfo) => void;
   onOpenSettings: () => void;
   onCycleAgent: (direction: "next" | "prev") => void;
   onCycleWorkspace: (direction: "next" | "prev") => void;
@@ -43,7 +41,6 @@ export function useAppMenuEvents({
   onAddWorkspace,
   onAddAgent,
   onAddWorktreeAgent,
-  onAddCloneAgent,
   onOpenSettings,
   onCycleAgent,
   onCycleWorkspace,
@@ -67,13 +64,6 @@ export function useAppMenuEvents({
     const workspace = baseWorkspaceRef.current;
     if (workspace) {
       onAddWorktreeAgent(workspace);
-    }
-  });
-
-  useTauriEvent(subscribeMenuNewCloneAgent, () => {
-    const workspace = baseWorkspaceRef.current;
-    if (workspace) {
-      onAddCloneAgent(workspace);
     }
   });
 

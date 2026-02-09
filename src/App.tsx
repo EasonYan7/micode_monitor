@@ -23,7 +23,6 @@ import "./styles/plan.css";
 import "./styles/about.css";
 import "./styles/tabbar.css";
 import "./styles/worktree-modal.css";
-import "./styles/clone-modal.css";
 import "./styles/branch-switcher-modal.css";
 import "./styles/settings.css";
 import "./styles/compact-base.css";
@@ -77,7 +76,6 @@ import { useComposerController } from "./features/app/hooks/useComposerControlle
 import { useComposerInsert } from "./features/app/hooks/useComposerInsert";
 import { useRenameThreadPrompt } from "./features/threads/hooks/useRenameThreadPrompt";
 import { useWorktreePrompt } from "./features/workspaces/hooks/useWorktreePrompt";
-import { useClonePrompt } from "./features/workspaces/hooks/useClonePrompt";
 import { useWorkspaceController } from "./features/app/hooks/useWorkspaceController";
 import { useWorkspaceSelection } from "./features/workspaces/hooks/useWorkspaceSelection";
 import { useLocalUsage } from "./features/home/hooks/useLocalUsage";
@@ -340,7 +338,6 @@ function MainApp() {
     setActiveWorkspaceId,
     addWorkspace,
     addWorkspaceFromPath,
-    addCloneAgent,
     addWorktreeAgent,
     connectWorkspace,
     markWorkspaceConnected,
@@ -1093,20 +1090,6 @@ function MainApp() {
     },
   });
 
-  const resolveCloneProjectContext = useCallback(
-    (workspace: WorkspaceInfo) => {
-      const groupId = workspace.settings.groupId ?? null;
-      const group = groupId
-        ? appSettings.workspaceGroups.find((entry) => entry.id === groupId)
-        : null;
-      return {
-        groupId,
-        copiesFolder: group?.copiesFolder ?? null,
-      };
-    },
-    [appSettings.workspaceGroups],
-  );
-
   const handleSelectOpenAppId = useCallback(
     (id: string) => {
       if (typeof window !== "undefined") {
@@ -1151,45 +1134,6 @@ function MainApp() {
     },
     [addDebugEntry, queueSaveSettings, setAppSettings],
   );
-
-  const persistProjectCopiesFolder = useCallback(
-    async (groupId: string, copiesFolder: string) => {
-      await queueSaveSettings({
-        ...appSettings,
-        workspaceGroups: appSettings.workspaceGroups.map((entry) =>
-          entry.id === groupId ? { ...entry, copiesFolder } : entry,
-        ),
-      });
-    },
-    [appSettings, queueSaveSettings],
-  );
-
-  const {
-    clonePrompt,
-    openPrompt: openClonePrompt,
-    confirmPrompt: confirmClonePrompt,
-    cancelPrompt: cancelClonePrompt,
-    updateCopyName: updateCloneCopyName,
-    chooseCopiesFolder: chooseCloneCopiesFolder,
-    useSuggestedCopiesFolder: useSuggestedCloneCopiesFolder,
-    clearCopiesFolder: clearCloneCopiesFolder,
-  } = useClonePrompt({
-    addCloneAgent,
-    connectWorkspace,
-    onSelectWorkspace: selectWorkspace,
-    resolveProjectContext: resolveCloneProjectContext,
-    persistProjectCopiesFolder,
-    onCompactActivate: isCompact ? () => setActiveTab("micode") : undefined,
-    onError: (message) => {
-      addDebugEntry({
-        id: `${Date.now()}-client-add-clone-error`,
-        timestamp: Date.now(),
-        source: "error",
-        label: "clone/add error",
-        payload: message,
-      });
-    },
-  });
 
   const latestAgentRuns = useMemo(() => {
     const entries: Array<{
@@ -1690,7 +1634,6 @@ function MainApp() {
     handleAddWorkspaceFromPath,
     handleAddAgent,
     handleAddWorktreeAgent,
-    handleAddCloneAgent,
   } = useWorkspaceActions({
     activeWorkspace,
     isCompact,
@@ -1702,7 +1645,6 @@ function MainApp() {
     selectWorkspace,
     onStartNewAgentDraft: startNewAgentDraft,
     openWorktreePrompt,
-    openClonePrompt,
     composerInputRef,
     onDebug: addDebugEntry,
   });
@@ -1930,9 +1872,6 @@ function MainApp() {
     onAddWorktreeAgent: (workspace) => {
       void handleAddWorktreeAgent(workspace);
     },
-    onAddCloneAgent: (workspace) => {
-      void handleAddCloneAgent(workspace);
-    },
     onOpenSettings: () => openSettings(),
     onCycleAgent: handleCycleAgent,
     onCycleWorkspace: handleCycleWorkspace,
@@ -2037,7 +1976,6 @@ function MainApp() {
     },
     onAddAgent: handleAddAgent,
     onAddWorktreeAgent: handleAddWorktreeAgent,
-    onAddCloneAgent: handleAddCloneAgent,
     onToggleWorkspaceCollapse: (workspaceId, collapsed) => {
       const target = workspacesById.get(workspaceId);
       if (!target) {
@@ -2549,13 +2487,6 @@ function MainApp() {
         onWorktreeSetupScriptChange={updateWorktreeSetupScript}
         onWorktreePromptCancel={cancelWorktreePrompt}
         onWorktreePromptConfirm={confirmWorktreePrompt}
-        clonePrompt={clonePrompt}
-        onClonePromptCopyNameChange={updateCloneCopyName}
-        onClonePromptChooseCopiesFolder={chooseCloneCopiesFolder}
-        onClonePromptUseSuggestedFolder={useSuggestedCloneCopiesFolder}
-        onClonePromptClearCopiesFolder={clearCloneCopiesFolder}
-        onClonePromptCancel={cancelClonePrompt}
-        onClonePromptConfirm={confirmClonePrompt}
         branchSwitcher={branchSwitcher}
         branches={branches}
         workspaces={workspaces}
