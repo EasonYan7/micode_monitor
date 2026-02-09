@@ -436,8 +436,8 @@ fn extract_approval_command(params: &Value) -> Vec<String> {
 }
 
 fn micode_settings_path() -> Option<PathBuf> {
-    let home = env::var("HOME").ok()?;
-    Some(PathBuf::from(home).join(".micode").join("settings.json"))
+    let micode_home = resolve_micode_home_path()?;
+    Some(micode_home.join("settings.json"))
 }
 
 fn resolve_micode_home_path() -> Option<PathBuf> {
@@ -449,6 +449,24 @@ fn resolve_micode_home_path() -> Option<PathBuf> {
     }
     let home = env::var("HOME").ok()?;
     Some(PathBuf::from(home).join(".micode"))
+}
+
+fn read_configured_mcp_servers() -> Value {
+    let Some(settings_path) = micode_settings_path() else {
+        return json!({});
+    };
+    let raw = match std::fs::read_to_string(settings_path) {
+        Ok(value) => value,
+        Err(_) => return json!({}),
+    };
+    let root: Value = match serde_json::from_str(&raw) {
+        Ok(value) => value,
+        Err(_) => return json!({}),
+    };
+    match root.get("mcpServers") {
+        Some(Value::Object(map)) => Value::Object(map.clone()),
+        _ => json!({}),
+    }
 }
 
 fn read_usage_number(value: Option<&Value>) -> i64 {
@@ -1319,9 +1337,13 @@ impl WorkspaceSession {
     }
 
     async fn create_session_for_cwd(&self, cwd: String) -> Result<String, String> {
+        let mcp_servers = read_configured_mcp_servers();
         let response = self
-            // ACP requires mcpServers in session/new. Start with an empty override list.
-            .send_acp_request("session/new", json!({ "cwd": cwd, "mcpServers": [] }))
+            // ACP requires mcpServers in session/new. Pass configured servers from settings.
+            .send_acp_request(
+                "session/new",
+                json!({ "cwd": cwd, "mcpServers": mcp_servers }),
+            )
             .await?;
         let result = response.get("result").cloned().ok_or_else(|| {
             acp_error_message(&response).unwrap_or_else(|| "missing ACP result".to_string())
@@ -1885,7 +1907,6 @@ impl WorkspaceSession {
             "account/rateLimits/read" => {
                 Ok(json!({ "result": { "source": "synthetic", "limits": [] } }))
             }
-            "skills/list" => Ok(json!({ "result": { "skills": [] } })),
             "app/list" => {
                 Ok(json!({ "result": { "apps": [], "hasMore": false, "nextCursor": null } }))
             }

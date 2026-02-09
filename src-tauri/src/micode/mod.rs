@@ -354,7 +354,22 @@ pub(crate) async fn list_mcp_server_status(
         .await;
     }
 
-    micode_core::list_mcp_server_status_core(&state.sessions, workspace_id, cursor, limit).await
+    let result = micode_core::list_mcp_server_status_core(
+        &state.sessions,
+        workspace_id.clone(),
+        cursor.clone(),
+        limit,
+    )
+    .await;
+    match result {
+        Ok(value) => Ok(value),
+        Err(error) if is_workspace_not_connected_error(&error) => {
+            ensure_workspace_session_connected(&state, &workspace_id, &app).await?;
+            micode_core::list_mcp_server_status_core(&state.sessions, workspace_id, cursor, limit)
+                .await
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[tauri::command]
@@ -766,7 +781,15 @@ pub(crate) async fn skills_list(
         .await;
     }
 
-    micode_core::skills_list_core(&state.sessions, workspace_id).await
+    let result = micode_core::skills_list_core(&state.sessions, workspace_id.clone()).await;
+    match result {
+        Ok(value) => Ok(value),
+        Err(error) if is_workspace_not_connected_error(&error) => {
+            ensure_workspace_session_connected(&state, &workspace_id, &app).await?;
+            micode_core::skills_list_core(&state.sessions, workspace_id).await
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[tauri::command]
