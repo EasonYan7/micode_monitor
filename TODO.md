@@ -46,6 +46,7 @@
 - [x] Add Display language setting (`English` / `中文`) and wire core home-page copy switch
 - [x] Remove sidebar bottom-left Account button; localize sidebar usage labels (`Session/Weekly/Resets/Credits/Tokens`) for `中文`
 - [x] Make settings updates optimistic (including language switch) with save-failure rollback
+- [x] Prevent settings UI flashback on save errors (keep optimistic state; log save failure to Debug panel)
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

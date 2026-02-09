@@ -1129,6 +1129,29 @@ function MainApp() {
 
   const openAppIconById = useOpenAppIcons(appSettings.openAppTargets);
 
+  const handleUpdateAppSettings = useCallback(
+    async (next: AppSettings) => {
+      setAppSettings(next);
+      try {
+        await queueSaveSettings(next);
+      } catch (error) {
+        addDebugEntry({
+          id: `${Date.now()}-settings-save-error`,
+          timestamp: Date.now(),
+          source: "error",
+          label: "settings/save error",
+          payload:
+            error instanceof Error
+              ? error.message
+              : typeof error === "string"
+                ? error
+                : "Unknown settings save error",
+        });
+      }
+    },
+    [addDebugEntry, queueSaveSettings, setAppSettings],
+  );
+
   const persistProjectCopiesFolder = useCallback(
     async (groupId: string, copiesFolder: string) => {
       await queueSaveSettings({
@@ -2561,16 +2584,7 @@ function MainApp() {
           onToggleTransparency: setReduceTransparency,
           appSettings,
           openAppIconById,
-          onUpdateAppSettings: async (next) => {
-            const previous = appSettings;
-            setAppSettings(next);
-            try {
-              await queueSaveSettings(next);
-            } catch (error) {
-              setAppSettings(previous);
-              throw error;
-            }
-          },
+          onUpdateAppSettings: handleUpdateAppSettings,
           onRunDoctor: doctor,
           onUpdateWorkspaceMiCodeBin: async (id, micodeBin) => {
             await updateWorkspaceMiCodeBin(id, micodeBin);
