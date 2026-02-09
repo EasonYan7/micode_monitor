@@ -1063,6 +1063,50 @@ fn infer_tool_name_from_title(title: &str) -> Option<String> {
     None
 }
 
+fn extract_tool_content_text(value: &Value) -> Option<String> {
+    let mut parts: Vec<String> = Vec::new();
+    let mut push_text = |text: &str| {
+        let trimmed = text.trim();
+        if !trimmed.is_empty() {
+            parts.push(trimmed.to_string());
+        }
+    };
+
+    match value {
+        Value::String(text) => push_text(text),
+        Value::Object(map) => {
+            if let Some(text) = map.get("text").and_then(Value::as_str) {
+                push_text(text);
+            }
+            if let Some(content) = map.get("content") {
+                if let Some(text) = content.get("text").and_then(Value::as_str) {
+                    push_text(text);
+                }
+            }
+            if let Some(old_text) = map.get("oldText").and_then(Value::as_str) {
+                push_text(old_text);
+            }
+            if let Some(new_text) = map.get("newText").and_then(Value::as_str) {
+                push_text(new_text);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                if let Some(text) = extract_tool_content_text(item) {
+                    push_text(&text);
+                }
+            }
+        }
+        _ => {}
+    }
+
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join("\n"))
+    }
+}
+
 fn extract_tool_presentation_from_update(update: &Value) -> ToolCallPresentation {
     let title = sanitize_tool_title(update.get("title").and_then(Value::as_str));
     let mut tool = extract_string_field(
@@ -1098,20 +1142,21 @@ fn extract_tool_presentation_from_update(update: &Value) -> ToolCallPresentation
         server,
         tool,
         title,
-        arguments: update.get("arguments").cloned().or_else(|| {
-            update
-                .get("content")
-                .and_then(Value::as_object)
-                .map(|content| Value::Object(content.clone()))
-        }),
+        arguments: update
+            .get("arguments")
+            .cloned()
+            .or_else(|| update.get("rawInput").cloned())
+            .or_else(|| update.get("content").cloned()),
         result: update
             .get("result")
             .and_then(Value::as_str)
-            .map(ToString::to_string),
+            .map(ToString::to_string)
+            .or_else(|| update.get("content").and_then(extract_tool_content_text)),
         error: update
             .get("error")
             .and_then(Value::as_str)
-            .map(ToString::to_string),
+            .map(ToString::to_string)
+            .or_else(|| update.get("failure").and_then(extract_tool_content_text)),
     }
 }
 
@@ -1137,14 +1182,18 @@ fn extract_tool_presentation_from_permission(params: &Value) -> Option<(String, 
             server,
             tool,
             title,
-            arguments: tool_call.get("arguments").cloned().or_else(|| {
-                let command = extract_approval_command(params);
-                if command.is_empty() {
-                    None
-                } else {
-                    Some(json!({ "command": command }))
-                }
-            }),
+            arguments: tool_call
+                .get("arguments")
+                .cloned()
+                .or_else(|| tool_call.get("rawInput").cloned())
+                .or_else(|| {
+                    let command = extract_approval_command(params);
+                    if command.is_empty() {
+                        None
+                    } else {
+                        Some(json!({ "command": command }))
+                    }
+                }),
             result: tool_call
                 .get("result")
                 .and_then(Value::as_str)
@@ -2910,6 +2959,74 @@ mod tests {
             .unwrap_or(Value::Null);
         assert_eq!(item.get("server").and_then(Value::as_str), Some("micode"));
         assert_eq!(item.get("tool").and_then(Value::as_str), Some("edit"));
+    }
+
+    #[test]
+    fn translate_tool_call_captures_raw_input_as_arguments() {
+        let update = json!({
+            "sessionUpdate": "tool_call",
+            "toolCallId": "call_exec_1",
+            "kind": "execute",
+            "rawInput": {
+                "command": ["zsh", "-lc", "micode mcp list"]
+            }
+        });
+        let context = ActivePromptContext::new("thread-6".to_string(), "turn-6".to_string());
+        let events = translate_acp_update(&context, &update, "ws-6", None, None);
+        assert_eq!(events.len(), 1);
+        let item = events[0]
+            .message
+            .get("params")
+            .and_then(|value| value.get("item"))
+            .cloned()
+            .unwrap_or(Value::Null);
+        let arguments = item.get("arguments").cloned().unwrap_or(Value::Null);
+        assert_eq!(
+            arguments
+                .get("command")
+                .and_then(Value::as_array)
+                .and_then(|arr| arr.get(2))
+                .and_then(Value::as_str),
+            Some("micode mcp list")
+        );
+    }
+
+    #[test]
+    fn translate_tool_call_update_captures_content_text_as_result() {
+        let update = json!({
+            "sessionUpdate": "tool_call_update",
+            "toolCallId": "call_exec_2",
+            "content": [
+                {
+                    "type": "content",
+                    "content": {
+                        "type": "text",
+                        "text": "Configured MCP servers:\\n- feishu-mcp"
+                    }
+                }
+            ]
+        });
+        let context = ActivePromptContext::new("thread-7".to_string(), "turn-7".to_string());
+        let cached = ToolCallPresentation {
+            server: Some("micode".to_string()),
+            tool: Some("execute".to_string()),
+            title: Some("execute".to_string()),
+            arguments: None,
+            result: None,
+            error: None,
+        };
+        let events = translate_acp_update(&context, &update, "ws-7", None, Some(&cached));
+        assert_eq!(events.len(), 1);
+        let item = events[0]
+            .message
+            .get("params")
+            .and_then(|value| value.get("item"))
+            .cloned()
+            .unwrap_or(Value::Null);
+        assert_eq!(
+            item.get("result").and_then(Value::as_str),
+            Some("Configured MCP servers:\\n- feishu-mcp")
+        );
     }
 
     #[test]
