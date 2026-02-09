@@ -25,6 +25,7 @@
 - [x] Invalidate persisted thread session ids when model-triggered reconnect happens
 - [x] Reduce model-switch/thread-switch stalls via approval mapping cleanup and collaboration-mode fallback
 - [x] Stabilize ACP delta routing with active-turn session context (prevent cross-thread ghost chunks)
+- [x] Emit per-turn token usage (`thread/tokenUsage/updated`) from MiCode session chat logs
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -63,3 +64,4 @@
 - Prompt parsing fix: ACP `turn/start` adapter now accepts legacy `text` payload (in addition to `input[]`) to prevent empty-prompt stalls on mixed invoke paths.
 - Stream routing fix: session updates now bind to in-memory active prompt context (`sessionId -> threadId/turnId`) so assistant deltas don't drift to wrong thread after reconnect/model switch.
 - Event-id stability fix: assistant/reasoning/tool fallback item IDs now derive from stable `turnId` instead of mutable `messageIndex`, reducing missing-message and stuck-working edge cases.
+- Usage telemetry fix: adapter now reads `~/.micode/tmp/**/chats/session-*.json` by `sessionId` and emits `thread/tokenUsage/updated` after each completed turn with both `last` and cumulative `total` token breakdown.

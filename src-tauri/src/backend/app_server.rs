@@ -11,7 +11,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::{mpsc, oneshot, Mutex};
-use tokio::time::timeout;
+use tokio::time::{sleep, timeout};
 use uuid::Uuid;
 
 use crate::backend::events::{AppServerEvent, EventSink};
@@ -334,6 +334,166 @@ fn extract_approval_command(params: &Value) -> Vec<String> {
 fn micode_settings_path() -> Option<PathBuf> {
     let home = env::var("HOME").ok()?;
     Some(PathBuf::from(home).join(".micode").join("settings.json"))
+}
+
+fn resolve_micode_home_path() -> Option<PathBuf> {
+    if let Ok(raw) = env::var("MICODE_HOME") {
+        let trimmed = raw.trim();
+        if !trimmed.is_empty() {
+            return Some(PathBuf::from(trimmed));
+        }
+    }
+    let home = env::var("HOME").ok()?;
+    Some(PathBuf::from(home).join(".micode"))
+}
+
+fn read_usage_number(value: Option<&Value>) -> i64 {
+    match value {
+        Some(raw) => raw
+            .as_i64()
+            .or_else(|| raw.as_u64().map(|v| v.min(i64::MAX as u64) as i64))
+            .or_else(|| raw.as_str().and_then(|s| s.parse::<i64>().ok()))
+            .unwrap_or(0),
+        None => 0,
+    }
+}
+
+fn normalize_message_token_usage(message: &Value) -> Option<(i64, i64, i64, i64, i64)> {
+    let tokens = message.get("tokens")?.as_object()?;
+    let input_tokens = read_usage_number(tokens.get("input"));
+    let cached_input_tokens = read_usage_number(tokens.get("cached"));
+    let output_tokens = read_usage_number(tokens.get("output"));
+    let reasoning_output_tokens = read_usage_number(tokens.get("thoughts"));
+    let tool_tokens = read_usage_number(tokens.get("tool"));
+    let total_tokens = {
+        let explicit = read_usage_number(tokens.get("total"));
+        if explicit > 0 {
+            explicit
+        } else {
+            input_tokens
+                .saturating_add(output_tokens)
+                .saturating_add(reasoning_output_tokens)
+                .saturating_add(tool_tokens)
+        }
+    };
+    Some((
+        input_tokens.max(0),
+        cached_input_tokens.max(0),
+        output_tokens.saturating_add(tool_tokens).max(0),
+        reasoning_output_tokens.max(0),
+        total_tokens.max(0),
+    ))
+}
+
+fn parse_thread_token_usage_from_session(value: &Value) -> Option<Value> {
+    let messages = value.get("messages")?.as_array()?;
+    let mut total_input = 0_i64;
+    let mut total_cached_input = 0_i64;
+    let mut total_output = 0_i64;
+    let mut total_reasoning = 0_i64;
+    let mut total_total = 0_i64;
+    let mut last = None;
+
+    for message in messages {
+        let Some((input, cached, output, reasoning, total)) =
+            normalize_message_token_usage(message)
+        else {
+            continue;
+        };
+        total_input = total_input.saturating_add(input);
+        total_cached_input = total_cached_input.saturating_add(cached);
+        total_output = total_output.saturating_add(output);
+        total_reasoning = total_reasoning.saturating_add(reasoning);
+        total_total = total_total.saturating_add(total);
+        last = Some((input, cached, output, reasoning, total));
+    }
+
+    let Some((last_input, last_cached, last_output, last_reasoning, last_total)) = last else {
+        return None;
+    };
+
+    Some(json!({
+        "last": {
+            "totalTokens": last_total,
+            "inputTokens": last_input,
+            "cachedInputTokens": last_cached,
+            "outputTokens": last_output,
+            "reasoningOutputTokens": last_reasoning
+        },
+        "total": {
+            "totalTokens": total_total,
+            "inputTokens": total_input,
+            "cachedInputTokens": total_cached_input,
+            "outputTokens": total_output,
+            "reasoningOutputTokens": total_reasoning
+        },
+        "modelContextWindow": null
+    }))
+}
+
+fn load_thread_token_usage_for_session_in_home(
+    session_id: &str,
+    micode_home: &Path,
+) -> Option<Value> {
+    let normalized_session_id = session_id.trim();
+    if normalized_session_id.is_empty() {
+        return None;
+    }
+
+    let tmp_root = micode_home.join("tmp");
+    let project_dirs = std::fs::read_dir(&tmp_root).ok()?;
+    let mut latest: Option<(SystemTime, Value)> = None;
+
+    for project_dir in project_dirs.flatten() {
+        let chats_dir = project_dir.path().join("chats");
+        if !chats_dir.is_dir() {
+            continue;
+        }
+        let chat_files = match std::fs::read_dir(chats_dir) {
+            Ok(entries) => entries,
+            Err(_) => continue,
+        };
+        for chat_file in chat_files.flatten() {
+            let path = chat_file.path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+                continue;
+            }
+            let raw = match std::fs::read_to_string(&path) {
+                Ok(raw) => raw,
+                Err(_) => continue,
+            };
+            if !raw.contains(normalized_session_id) {
+                continue;
+            }
+            let parsed: Value = match serde_json::from_str(&raw) {
+                Ok(value) => value,
+                Err(_) => continue,
+            };
+            if parsed.get("sessionId").and_then(Value::as_str) != Some(normalized_session_id) {
+                continue;
+            }
+            let Some(token_usage) = parse_thread_token_usage_from_session(&parsed) else {
+                continue;
+            };
+            let modified_at = std::fs::metadata(&path)
+                .and_then(|meta| meta.modified())
+                .unwrap_or(UNIX_EPOCH);
+            let replace = latest
+                .as_ref()
+                .map(|(current_modified, _)| modified_at > *current_modified)
+                .unwrap_or(true);
+            if replace {
+                latest = Some((modified_at, token_usage));
+            }
+        }
+    }
+
+    latest.map(|(_, usage)| usage)
+}
+
+fn load_thread_token_usage_for_session(session_id: &str) -> Option<Value> {
+    let micode_home = resolve_micode_home_path()?;
+    load_thread_token_usage_for_session_in_home(session_id, &micode_home)
 }
 
 fn read_selected_auth_mode() -> Option<String> {
@@ -666,6 +826,33 @@ impl WorkspaceSession {
         had_streaming
     }
 
+    async fn emit_latest_thread_token_usage(&self, thread_id: &str, session_id: &str) {
+        let normalized_session_id = session_id.trim();
+        if normalized_session_id.is_empty() {
+            return;
+        }
+        for _attempt in 0..3 {
+            let lookup_session_id = normalized_session_id.to_string();
+            let usage = tokio::task::spawn_blocking(move || {
+                load_thread_token_usage_for_session(&lookup_session_id)
+            })
+            .await
+            .ok()
+            .flatten();
+            if let Some(token_usage) = usage {
+                self.emit_event(
+                    "thread/tokenUsage/updated",
+                    json!({
+                        "threadId": thread_id,
+                        "tokenUsage": token_usage
+                    }),
+                );
+                return;
+            }
+            sleep(Duration::from_millis(120)).await;
+        }
+    }
+
     async fn write_message(&self, value: Value) -> Result<(), String> {
         let mut stdin = self.stdin.lock().await;
         let mut line = serde_json::to_string(&value).map_err(|e| e.to_string())?;
@@ -931,6 +1118,8 @@ impl WorkspaceSession {
                         let had_streaming = self.finish_prompt_lifecycle(&tracked_session_id).await;
                         if had_streaming {
                             self.thread_store.lock().await.touch_message(&thread_id);
+                            self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
+                                .await;
                             let normalized_turn = json!({
                                 "id": turn_id,
                                 "threadId": thread.thread_id
@@ -984,6 +1173,8 @@ impl WorkspaceSession {
                                 self.finish_prompt_lifecycle(&tracked_session_id).await;
                             if had_streaming {
                                 self.thread_store.lock().await.touch_message(&thread_id);
+                                self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
+                                    .await;
                                 let normalized_turn = json!({
                                     "id": turn_id,
                                     "threadId": thread.thread_id
@@ -1014,6 +1205,8 @@ impl WorkspaceSession {
                 if let Some(error) = acp_error_message(&response) {
                     if is_request_aborted_message(&error) {
                         self.thread_store.lock().await.touch_message(&thread_id);
+                        self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
+                            .await;
                         let normalized_turn = json!({
                             "id": turn_id,
                             "threadId": thread.thread_id
@@ -1035,6 +1228,8 @@ impl WorkspaceSession {
                     return Err(format!("turn/start failed: {error}"));
                 }
                 self.thread_store.lock().await.touch_message(&thread_id);
+                self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
+                    .await;
                 let mut normalized_response = response.clone();
                 let normalized_turn = json!({
                     "id": turn_id,
@@ -1756,10 +1951,13 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
 #[cfg(test)]
 mod tests {
     use super::{
-        build_initialize_params, extract_approval_command, translate_acp_update,
-        ActivePromptContext, WorkspaceSession,
+        build_initialize_params, extract_approval_command,
+        load_thread_token_usage_for_session_in_home, translate_acp_update, ActivePromptContext,
+        WorkspaceSession,
     };
     use serde_json::json;
+    use std::path::PathBuf;
+    use uuid::Uuid;
 
     #[test]
     fn build_initialize_params_sets_protocol_version() {
@@ -1843,5 +2041,76 @@ mod tests {
         });
         let command = extract_approval_command(&params);
         assert_eq!(command, vec!["Approve action"]);
+    }
+
+    #[test]
+    fn load_thread_token_usage_reads_last_and_total_from_micode_session_file() {
+        let root = std::env::temp_dir().join(format!("micode-usage-{}", Uuid::new_v4()));
+        let chats = root.join("tmp").join("project-a").join("chats");
+        std::fs::create_dir_all(&chats).expect("create chats dir");
+
+        let session_id = "session-usage-1";
+        let payload = json!({
+            "sessionId": session_id,
+            "messages": [
+                { "type": "user", "content": "hello" },
+                {
+                    "type": "assistant",
+                    "content": "first",
+                    "tokens": {
+                        "input": 10,
+                        "cached": 3,
+                        "output": 4,
+                        "thoughts": 1,
+                        "tool": 2,
+                        "total": 17
+                    }
+                },
+                {
+                    "type": "assistant",
+                    "content": "second",
+                    "tokens": {
+                        "input": 20,
+                        "cached": 6,
+                        "output": 8,
+                        "thoughts": 2,
+                        "tool": 1,
+                        "total": 31
+                    }
+                }
+            ]
+        });
+        let file = chats.join("session-usage.json");
+        std::fs::write(
+            &file,
+            serde_json::to_string_pretty(&payload).expect("serialize payload"),
+        )
+        .expect("write payload");
+
+        let usage = load_thread_token_usage_for_session_in_home(session_id, &root)
+            .expect("expected token usage");
+        assert_eq!(
+            usage
+                .get("last")
+                .and_then(|v| v.get("inputTokens"))
+                .and_then(|v| v.as_i64()),
+            Some(20)
+        );
+        assert_eq!(
+            usage
+                .get("last")
+                .and_then(|v| v.get("outputTokens"))
+                .and_then(|v| v.as_i64()),
+            Some(9)
+        );
+        assert_eq!(
+            usage
+                .get("total")
+                .and_then(|v| v.get("totalTokens"))
+                .and_then(|v| v.as_i64()),
+            Some(48)
+        );
+
+        let _ = std::fs::remove_dir_all(PathBuf::from(&root));
     }
 }
