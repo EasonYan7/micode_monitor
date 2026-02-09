@@ -1,145 +1,139 @@
-# MiCodeMonitor
+# MiCodeMonitor / MiCode 监控台
 
 ![MiCodeMonitor](screenshot.png)
 
-MiCodeMonitor is a macOS Tauri app for orchestrating multiple MiCode agents across local workspaces. It provides a sidebar to manage projects, a home screen for quick actions, and a conversation view backed by the MiCode app-server protocol.
+MiCodeMonitor is a Tauri desktop app for orchestrating multiple MiCode agents across local workspaces.
 
-## Features
+MiCodeMonitor 是一个基于 Tauri 的桌面应用，用于在本地多个项目中统一编排与管理 MiCode 智能体会话。
 
-### Workspaces & Threads
+## Origin & Attribution / 来源与引用
 
-- Add and persist workspaces, group/sort them, and jump into recent agent activity from the home dashboard.
-- Spawn one `micode app-server` per workspace, resume threads, and track unread/running state.
-- Worktree and clone agents for isolated work; worktrees live under the app data directory (legacy `.micode-worktrees` supported).
-- Thread management: pin/rename/archive/copy, per-thread drafts, and stop/interrupt in-flight turns.
-- Optional remote backend (daemon) mode for running MiCode on another machine.
+- This project is derived from [Dimillian/CodexMonitor](https://github.com/Dimillian/CodexMonitor).
+- The codebase was migrated incrementally from Codex-oriented runtime to MiCode-oriented runtime, tracked in [`TODO.md`](TODO.md).
+- Credit to the original CodexMonitor maintainers for the architecture and baseline product design.
 
-### Composer & Agent Controls
+- 本项目基于 [Dimillian/CodexMonitor](https://github.com/Dimillian/CodexMonitor) 演进。
+- 迁移过程采用分阶段替换（从 Codex 运行时迁移到 MiCode 运行时），完整记录见 [`TODO.md`](TODO.md)。
+- 感谢 CodexMonitor 原作者与维护者提供的基础架构与产品设计。
 
-- Compose with queueing plus image attachments (picker, drag/drop, paste).
-- Autocomplete for skills (`$`), prompts (`/prompts:`), reviews (`/review`), and file paths (`@`).
-- Model picker, collaboration modes (when enabled), reasoning effort, access mode, and context usage ring.
-- Dictation with hold-to-talk shortcuts and live waveform (Whisper).
-- Render reasoning/tool/diff items and handle approval prompts.
+## Why This Fork / 改造背景
 
-### Git & GitHub
+- Align GUI behavior with MiCode CLI behavior (`/mcp list`, MCP visibility, model/runtime behavior).
+- Improve Chinese localization and setting stability for daily usage.
+- Improve thread/history/token usage persistence and recovery.
+- Add project/workspace operations needed in real usage (e.g. clear project conversation history).
 
-- Diff stats, staged/unstaged file diffs, revert/stage controls, and commit log.
-- Branch list with checkout/create plus upstream ahead/behind counts.
-- GitHub Issues and Pull Requests via `gh` (lists, diffs, comments) and open commits/PRs in the browser.
-- PR composer: "Ask PR" to send PR context into a new agent thread.
+- 对齐 GUI 与 MiCode CLI 行为（如 `/mcp list`、MCP 可见性、模型切换生效）。
+- 提升中文体验与设置页稳定性（避免闪回、误触发）。
+- 强化线程历史与 Token 使用数据持久化和恢复能力。
+- 增加高频项目操作能力（如清空项目对话记录）。
 
-### Files & Prompts
+## Compared with CodexMonitor / 与原版 CodexMonitor 的差异
 
-- File tree with search, file-type icons, and Reveal in Finder.
-- Prompt library for global/workspace prompts: create/edit/delete/move and run in current or new threads.
+| Area | CodexMonitor (upstream) | MiCodeMonitor (this repo) |
+|---|---|---|
+| Runtime | `codex app-server` | MiCode ACP / app-server compatibility path |
+| Slash behavior | Codex-oriented | MiCode CLI parity (`/mcp list` behavior, fallback logic) |
+| MCP visibility | Depends on runtime | Added fallback from settings + routing fixes |
+| Language | Mostly English | Extended Chinese UI coverage + i18n fixes |
+| Persistence | Baseline thread persistence | Enhanced history/tool timeline/token usage persistence |
+| Home usage | Baseline | Reads MiCode `tmp/*/chats/session-*.json` + workspace filtering |
+| Workspace actions | Baseline operations | Adds clear project conversation history flow |
 
-### UI & Experience
+## Core Features / 核心功能
 
-- Resizable sidebar/right/plan/terminal/debug panels with persisted sizes.
-- Responsive layouts (desktop/tablet/phone) with tabbed navigation.
-- Sidebar usage and credits meter for account rate limits plus a home usage snapshot.
-- Terminal dock with multiple tabs for background commands (experimental).
-- In-app updates with toast-driven download/install, debug panel copy/clear, sound notifications, and macOS overlay title bar with vibrancy + reduced transparency toggle.
+- Multi-workspace management with sidebar/home navigation.
+- Thread lifecycle management: create/resume/rename/archive/delete.
+- MCP-aware conversations and tool timeline display.
+- Model selection and runtime switching.
+- Local usage dashboard (tokens/time/top models).
+- Git/GitHub panels (status, branch, PR/issue related flows).
 
-## Requirements
+- 多工作区管理与侧栏/首页联动。
+- 对话线程全生命周期管理：新建、恢复、重命名、归档、删除。
+- MCP 工具链路可视化（工具调用时间线与详情）。
+- 模型选择与运行时切换。
+- 本地使用统计看板（Token、时长、热门模型）。
+- Git/GitHub 面板能力（状态、分支、PR/Issue 相关流程）。
+
+## Requirements / 环境要求
 
 - Node.js + npm
-- Rust toolchain (stable)
-- CMake (required for native dependencies; Whisper/dictation uses it on non-Windows)
-- MiCode installed on your system and available as `micode` in `PATH`
-- Git CLI (used for worktree operations)
-- GitHub CLI (`gh`) for the Issues panel (optional)
+- Rust stable toolchain
+- CMake (required by native dependencies)
+- MiCode CLI installed and available in `PATH`
+- Git CLI
+- `gh` (optional, for GitHub panel workflows)
 
-If the `micode` binary is not in `PATH`, update the backend to pass a custom path per workspace.
-If you hit native build errors, run:
+如果本机无法找到 `micode`，可先运行：
 
 ```bash
 npm run doctor
 ```
 
-## Getting Started
-
-Install dependencies:
+## Quick Start / 快速开始
 
 ```bash
 npm install
+npm run tauri:dev
 ```
 
-Run in dev mode:
+## Build / 打包
+
+### macOS
 
 ```bash
-npm run tauri dev
+npm run tauri:build
 ```
 
-## Release Build
-
-Build the production Tauri bundle (app + dmg):
-
-```bash
-npm run tauri build
-```
-
-The macOS app bundle will be in `src-tauri/target/release/bundle/macos/`.
-
-### Windows (opt-in)
-
-Windows builds are opt-in and use a separate Tauri config file to avoid macOS-only window effects.
+### Windows
 
 ```bash
 npm run tauri:build:win
 ```
 
-Artifacts will be in:
+Artifacts are generated under `src-tauri/target/release/bundle/`.
 
-- `src-tauri/target/release/bundle/nsis/` (installer exe)
-- `src-tauri/target/release/bundle/msi/` (msi)
+产物目录位于 `src-tauri/target/release/bundle/`。
 
-Note: dictation is currently disabled on Windows builds (to avoid requiring LLVM/libclang for `whisper-rs`/bindgen).
-
-## Type Checking
-
-Run the TypeScript checker (no emit):
+## Verification Commands / 常用校验命令
 
 ```bash
 npm run typecheck
+npm test
+cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
-Note: `npm run build` also runs `tsc` before bundling the frontend.
+## Data & Config Paths / 数据与配置路径
 
-## Project Structure
+- Workspace metadata: app data `workspaces.json`
+- App settings: app data `settings.json`
+- MiCode global config/home: typically `~/.micode` (compatible with `~/.codex` fallback in several flows)
+- Local thread cache/history: workspace `.micodemonitor/` and MiCode tmp/session data
 
-```
-src/
-  features/         feature-sliced UI + hooks
-  services/         Tauri IPC wrapper
-  styles/           split CSS by area
-  types.ts          shared types
-src-tauri/
-  src/lib.rs        Tauri backend + micode app-server client
-  tauri.conf.json   window configuration
-```
+- 工作区元数据：应用数据目录中的 `workspaces.json`
+- 应用设置：应用数据目录中的 `settings.json`
+- MiCode 全局目录：通常为 `~/.micode`（部分链路兼容 `~/.codex`）
+- 线程历史缓存：工作区 `.micodemonitor/` 与 MiCode 的 tmp/session 数据
 
-## Notes
+## Notes for Migration History / 迁移说明
 
-- Workspaces persist to `workspaces.json` under the app data directory.
-- App settings persist to `settings.json` under the app data directory (MiCode path, default access mode, UI scale).
-- Feature settings are supported in the UI and synced to `$CODEX_HOME/config.toml` (or `~/.micode/config.toml`) on load/save. Stable: Collaboration modes (`features.collaboration_modes`), personality (`personality`), Steer mode (`features.steer`), and Background terminal (`features.unified_exec`). Experimental: Collab mode (`features.collab`) and Apps (`features.apps`).
-- On launch and on window focus, the app reconnects and refreshes thread lists for each workspace.
-- Threads are restored by filtering `thread/list` results using the workspace `cwd`.
-- Selecting a thread always calls `thread/resume` to refresh messages from disk.
-- CLI sessions appear if their `cwd` matches the workspace path; they are not live-streamed unless resumed.
-- The app uses `micode app-server` over stdio; see `src-tauri/src/lib.rs`.
-- MiCode sessions use the default MiCode home (usually `~/.micode`); if a legacy `.micodemonitor/` exists in a workspace, it is used for that workspace.
-- Worktree agents live under the app data directory (`worktrees/<workspace-id>`); legacy `.micode-worktrees/` paths remain supported, and the app no longer edits repo `.gitignore` files.
-- UI state (panel sizes, reduced transparency toggle, recent thread activity) is stored in `localStorage`.
-- Custom prompts load from `$CODEX_HOME/prompts` (or `~/.micode/prompts`) with optional frontmatter description/argument hints.
+- Migration milestones and rationale are tracked in [`TODO.md`](TODO.md).
+- If you need implementation-level details, start from:
+  - `src-tauri/src/lib.rs`
+  - `src-tauri/src/bin/codex_monitor_daemon.rs`
+  - `src-tauri/src/shared/`
+  - `src/features/`
 
-## Tauri IPC Surface
+- 迁移里程碑与动机已记录在 [`TODO.md`](TODO.md)。
+- 如需查看实现细节，建议从以下目录开始：
+  - `src-tauri/src/lib.rs`
+  - `src-tauri/src/bin/codex_monitor_daemon.rs`
+  - `src-tauri/src/shared/`
+  - `src/features/`
 
-Frontend calls live in `src/services/tauri.ts` and map to commands in `src-tauri/src/lib.rs`. Core commands include:
+## License / 许可
 
-- Workspace lifecycle: `list_workspaces`, `add_workspace`, `add_worktree`, `remove_workspace`, `remove_worktree`, `connect_workspace`, `update_workspace_settings`.
-- Threads: `start_thread`, `list_threads`, `resume_thread`, `archive_thread`, `send_user_message`, `turn_interrupt`, `respond_to_server_request`.
-- Reviews + models: `start_review`, `model_list`, `account_rate_limits`, `skills_list`.
-- Git + files: `get_git_status`, `get_git_diffs`, `get_git_log`, `get_git_remote`, `list_git_branches`, `checkout_git_branch`, `create_git_branch`, `list_workspace_files`.
+Please follow the upstream repository license and your internal distribution policy.
+
+请遵循上游仓库许可证及你自己的分发策略。

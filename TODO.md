@@ -71,6 +71,7 @@
 - [x] Fix locale leakage in English UI time labels: force relative/day formatting by app language (`en-US`/`zh-CN`) instead of system locale
 - [x] Resolve frontend TypeScript baseline errors so `npm run typecheck` passes again
 - [x] Add sidebar workspace action: clear project conversation history with confirm dialog, and wipe local history cache (`.micodemonitor` + global `~/.micode|~/.codex/tmp`)
+- [x] Publish bilingual README (CN/EN): origin attribution to CodexMonitor, migration rationale, comparison, and usage/build guidance
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
