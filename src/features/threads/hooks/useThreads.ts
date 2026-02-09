@@ -20,6 +20,18 @@ import {
   saveThreadTokenUsage,
 } from "../utils/threadStorage";
 
+const BUILTIN_SLASH_COMMANDS: { name: string; description?: string }[] = [
+  { name: "status", description: "Show current session status." },
+  { name: "mcp", description: "List available MCP servers and tools." },
+  { name: "skills", description: "List available local skills." },
+  { name: "apps", description: "List connected or installable apps." },
+  { name: "new", description: "Create a new conversation." },
+  { name: "review", description: "Start review mode." },
+  { name: "resume", description: "Refresh current conversation." },
+  { name: "compact", description: "Compact conversation context." },
+  { name: "fork", description: "Fork from current conversation." },
+];
+
 type UseThreadsOptions = {
   activeWorkspace: WorkspaceInfo | null;
   onWorkspaceConnected: (id: string) => void;
@@ -383,6 +395,7 @@ export function useThreads({
     startResume,
     startCompact,
     startApps,
+    startSkills,
     startMcp,
     startStatus,
     reviewPrompt,
@@ -434,6 +447,21 @@ export function useThreads({
     forkThreadForWorkspace,
     updateThreadParent,
   });
+
+  const activeSlashCommands = useMemo(() => {
+    const dynamic = activeThreadId ? slashCommandsByThread[activeThreadId] ?? [] : [];
+    const merged = [...dynamic];
+    const seen = new Set(dynamic.map((command) => command.name.toLowerCase()));
+    for (const command of BUILTIN_SLASH_COMMANDS) {
+      const key = command.name.toLowerCase();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      merged.push(command);
+    }
+    return merged;
+  }, [activeThreadId, slashCommandsByThread]);
 
   const setActiveThreadId = useCallback(
     (threadId: string | null, workspaceId?: string) => {
@@ -502,7 +530,7 @@ export function useThreads({
     accountByWorkspace: state.accountByWorkspace,
     planByThread: state.planByThread,
     lastAgentMessageByThread: state.lastAgentMessageByThread,
-    activeSlashCommands: activeThreadId ? slashCommandsByThread[activeThreadId] ?? [] : [],
+    activeSlashCommands,
     refreshAccountRateLimits,
     refreshAccountInfo,
     interruptTurn,
@@ -526,6 +554,7 @@ export function useThreads({
     startResume,
     startCompact,
     startApps,
+    startSkills,
     startMcp,
     startStatus,
     reviewPrompt,

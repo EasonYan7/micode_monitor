@@ -52,6 +52,7 @@
 - [x] Expand Chinese UI localization: SettingsView major sections/controls + sidebar core labels/search/thread list actions
 - [x] Rename creation entry to New Conversation / 新建对话
 - [x] Remove New Clone Agent feature path (sidebar entry, menu event, accelerators, modal/hook/files, shortcuts UI)
+- [x] Restore app-level slash routing for built-in commands and add `/skills` list command (plus fallback slash autocomplete entries)
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
@@ -71,8 +72,9 @@
 - UX fix: always optimistic-render user messages immediately after send.
 - Stability tweak: increase ACP prompt timeout from 30s to 90s to reduce false timeout during long streaming turns.
 - Data integrity fix: enforce unique sessionId per workspace thread and auto-repair duplicate session mappings in sessions.json.
-- Slash passthrough mode: disable app-level slash interception/autocomplete; forward `/...` directly to MiCode.
+- Slash passthrough mode (historical): app-level interception was temporarily disabled to forward `/...` directly to MiCode.
 - Slash UX parity: wire ACP `available_commands_update` into composer so `/` suggestions now come from MiCode runtime commands.
+- Slash command update: re-enable local routing for built-in commands (`/new`, `/review`, `/resume`, `/compact`, `/fork`, `/status`, `/mcp`, `/apps`, `/skills`) while still merging ACP-provided command suggestions.
 - Turn reliability: if ACP streamed chunks but `session/prompt` final response times out, synthesize `turn/completed` to prevent stuck "Working...".
 - UX polish: strip internal fenced JSON routing payloads (e.g. title/worktreeName blocks) from assistant message display.
 - UX tweak: keep Debug log entrypoint always visible (not only on warnings) for faster troubleshooting.

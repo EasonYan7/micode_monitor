@@ -25,6 +25,7 @@ type UseQueuedSendOptions = {
   startResume: (text: string) => Promise<void>;
   startCompact: (text: string) => Promise<void>;
   startApps: (text: string) => Promise<void>;
+  startSkills: (text: string) => Promise<void>;
   startMcp: (text: string) => Promise<void>;
   startStatus: (text: string) => Promise<void>;
   clearActiveImages: () => void;
@@ -43,19 +44,20 @@ export function useQueuedSend({
   isProcessing,
   isReviewing,
   steerEnabled,
-  appsEnabled: _appsEnabled,
+  appsEnabled,
   activeWorkspace,
   connectWorkspace,
   sendUserMessage,
-  startThreadForWorkspace: _startThreadForWorkspace,
-  sendUserMessageToThread: _sendUserMessageToThread,
-  startFork: _startFork,
-  startReview: _startReview,
-  startResume: _startResume,
-  startCompact: _startCompact,
-  startApps: _startApps,
-  startMcp: _startMcp,
-  startStatus: _startStatus,
+  startThreadForWorkspace,
+  sendUserMessageToThread,
+  startFork,
+  startReview,
+  startResume,
+  startCompact,
+  startApps,
+  startSkills,
+  startMcp,
+  startStatus,
   clearActiveImages,
 }: UseQueuedSendOptions): UseQueuedSendResult {
   const [queuedByThread, setQueuedByThread] = useState<
@@ -99,11 +101,84 @@ export function useQueuedSend({
     }));
   }, []);
 
+  const executeSlashOrSend = useCallback(
+    async (trimmed: string, images: string[] = []) => {
+      const nextImages = images;
+      const slashMatch = trimmed.match(/^\/([a-z0-9_-]+)\b/i);
+      if (slashMatch) {
+        const command = slashMatch[1].toLowerCase();
+        switch (command) {
+          case "new": {
+            if (!activeWorkspace) {
+              return;
+            }
+            const threadId = await startThreadForWorkspace(activeWorkspace.id);
+            if (!threadId) {
+              return;
+            }
+            const nextText = trimmed.replace(/^\/new\b/i, "").trim();
+            if (nextText) {
+              await sendUserMessageToThread(activeWorkspace, threadId, nextText, []);
+            }
+            return;
+          }
+          case "review":
+            await startReview(trimmed);
+            return;
+          case "fork":
+            await startFork(trimmed);
+            return;
+          case "resume":
+            await startResume(trimmed);
+            return;
+          case "compact":
+            await startCompact(trimmed);
+            return;
+          case "apps":
+            if (appsEnabled) {
+              await startApps(trimmed);
+              return;
+            }
+            break;
+          case "mcp":
+            await startMcp(trimmed);
+            return;
+          case "skills":
+            await startSkills(trimmed);
+            return;
+          case "status":
+            await startStatus(trimmed);
+            return;
+          default:
+            break;
+        }
+      }
+      if (activeWorkspace && !activeWorkspace.connected) {
+        await connectWorkspace(activeWorkspace);
+      }
+      await sendUserMessage(trimmed, nextImages);
+    },
+    [
+      activeWorkspace,
+      appsEnabled,
+      connectWorkspace,
+      sendUserMessage,
+      sendUserMessageToThread,
+      startApps,
+      startCompact,
+      startFork,
+      startMcp,
+      startResume,
+      startReview,
+      startSkills,
+      startStatus,
+      startThreadForWorkspace,
+    ],
+  );
+
   const handleSend = useCallback(
     async (text: string, images: string[] = []) => {
       const trimmed = text.trim();
-      // MiCode-first mode: do not intercept slash commands in the app.
-      // Forward `/...` prompts to MiCode as plain user input.
       const nextImages = images;
       if (!trimmed && nextImages.length === 0) {
         return;
@@ -122,22 +197,17 @@ export function useQueuedSend({
         clearActiveImages();
         return;
       }
-      if (activeWorkspace && !activeWorkspace.connected) {
-        await connectWorkspace(activeWorkspace);
-      }
-      await sendUserMessage(trimmed, nextImages);
+      await executeSlashOrSend(trimmed, nextImages);
       clearActiveImages();
     },
     [
       activeThreadId,
-      activeWorkspace,
       clearActiveImages,
-      connectWorkspace,
       enqueueMessage,
+      executeSlashOrSend,
       isProcessing,
       isReviewing,
       steerEnabled,
-      sendUserMessage,
     ],
   );
 
@@ -216,7 +286,7 @@ export function useQueuedSend({
     }));
     (async () => {
       try {
-        await sendUserMessage(nextItem.text, nextItem.images ?? []);
+        await executeSlashOrSend(nextItem.text, nextItem.images ?? []);
       } catch {
         setInFlightByThread((prev) => ({ ...prev, [threadId]: null }));
         setHasStartedByThread((prev) => ({ ...prev, [threadId]: false }));
@@ -230,7 +300,7 @@ export function useQueuedSend({
     isReviewing,
     prependQueuedMessage,
     queuedByThread,
-    sendUserMessage,
+    executeSlashOrSend,
   ]);
 
   return {

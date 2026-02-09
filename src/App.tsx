@@ -827,6 +827,7 @@ function MainApp() {
     startResume,
     startCompact,
     startApps,
+    startSkills,
     startMcp,
     startStatus,
     reviewPrompt,
@@ -1342,6 +1343,7 @@ function MainApp() {
     startResume,
     startCompact,
     startApps,
+    startSkills,
     startMcp,
     startStatus,
   });

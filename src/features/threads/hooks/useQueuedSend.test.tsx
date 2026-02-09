@@ -30,6 +30,7 @@ const makeOptions = (
   startResume: vi.fn().mockResolvedValue(undefined),
   startCompact: vi.fn().mockResolvedValue(undefined),
   startApps: vi.fn().mockResolvedValue(undefined),
+  startSkills: vi.fn().mockResolvedValue(undefined),
   startMcp: vi.fn().mockResolvedValue(undefined),
   startStatus: vi.fn().mockResolvedValue(undefined),
   clearActiveImages: vi.fn(),
@@ -307,6 +308,22 @@ describe("useQueuedSend", () => {
     });
 
     expect(startMcp).toHaveBeenCalledWith("/mcp now");
+    expect(options.sendUserMessage).not.toHaveBeenCalled();
+    expect(options.startReview).not.toHaveBeenCalled();
+  });
+
+  it("routes /skills to the skills handler", async () => {
+    const startSkills = vi.fn().mockResolvedValue(undefined);
+    const options = makeOptions({ startSkills });
+    const { result } = renderHook((props) => useQueuedSend(props), {
+      initialProps: options,
+    });
+
+    await act(async () => {
+      await result.current.handleSend("/skills now", ["img-1"]);
+    });
+
+    expect(startSkills).toHaveBeenCalledWith("/skills now");
     expect(options.sendUserMessage).not.toHaveBeenCalled();
     expect(options.startReview).not.toHaveBeenCalled();
   });

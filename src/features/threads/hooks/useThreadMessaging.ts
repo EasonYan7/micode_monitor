@@ -13,6 +13,7 @@ import {
   sendUserMessage as sendUserMessageService,
   startReview as startReviewService,
   interruptTurn as interruptTurnService,
+  getSkillsList as getSkillsListService,
   getAppsList as getAppsListService,
   listMcpServerStatus as listMcpServerStatusService,
 } from "../../../services/tauri";
@@ -815,6 +816,89 @@ export function useThreadMessaging({
     ],
   );
 
+  const startSkills = useCallback(
+    async (_text: string) => {
+      if (!activeWorkspace) {
+        return;
+      }
+      const threadId = await ensureThreadForActiveWorkspace();
+      if (!threadId) {
+        return;
+      }
+
+      try {
+        const response = (await getSkillsListService(
+          activeWorkspace.id,
+        )) as Record<string, unknown> | null;
+        const result = (response?.result ?? response) as
+          | Record<string, unknown>
+          | null;
+        const dataBuckets = Array.isArray(result?.data)
+          ? (result?.data as Array<Record<string, unknown>>)
+          : [];
+        const rawSkills =
+          (Array.isArray(result?.skills) ? result?.skills : null) ??
+          (Array.isArray((response as Record<string, unknown> | null)?.skills)
+            ? ((response as Record<string, unknown>).skills as unknown[])
+            : null) ??
+          dataBuckets.flatMap((bucket) =>
+            Array.isArray(bucket.skills) ? bucket.skills : [],
+          );
+
+        const skills = rawSkills
+          .map((item) =>
+            item && typeof item === "object"
+              ? (item as Record<string, unknown>)
+              : null,
+          )
+          .filter((item): item is Record<string, unknown> => Boolean(item))
+          .map((item) => ({
+            name: String(item.name ?? "").trim(),
+            description:
+              typeof item.description === "string" ? item.description.trim() : "",
+            path: typeof item.path === "string" ? item.path.trim() : "",
+          }))
+          .filter((item) => item.name.length > 0)
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        const lines: string[] = ["Skills:"];
+        if (skills.length === 0) {
+          lines.push("- No skills available.");
+        } else {
+          for (const skill of skills) {
+            const details = [skill.description, skill.path].filter(Boolean).join(" | ");
+            lines.push(`- ${skill.name}${details ? ` — ${details}` : ""}`);
+          }
+        }
+
+        const timestamp = Date.now();
+        recordThreadActivity(activeWorkspace.id, threadId, timestamp);
+        dispatch({
+          type: "addAssistantMessage",
+          threadId,
+          text: lines.join("\n"),
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to load skills.";
+        dispatch({
+          type: "addAssistantMessage",
+          threadId,
+          text: `Skills:\n- ${message}`,
+        });
+      } finally {
+        safeMessageActivity();
+      }
+    },
+    [
+      activeWorkspace,
+      dispatch,
+      ensureThreadForActiveWorkspace,
+      recordThreadActivity,
+      safeMessageActivity,
+    ],
+  );
+
   const startFork = useCallback(
     async (text: string) => {
       if (!activeWorkspace || !activeThreadId) {
@@ -905,6 +989,7 @@ export function useThreadMessaging({
     startResume,
     startCompact,
     startApps,
+    startSkills,
     startMcp,
     startStatus,
     reviewPrompt,
