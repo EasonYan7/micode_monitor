@@ -50,6 +50,10 @@ export function useSidebarMenus({
         text: "Archive",
         action: () => onDeleteThread(workspaceId, threadId),
       });
+      const deleteConversationItem = await MenuItem.new({
+        text: "Delete Conversation",
+        action: () => onDeleteThread(workspaceId, threadId),
+      });
       const copyItem = await MenuItem.new({
         text: "Copy ID",
         action: async () => {
@@ -76,7 +80,7 @@ export function useSidebarMenus({
           }),
         );
       }
-      items.push(copyItem, archiveItem);
+      items.push(copyItem, archiveItem, deleteConversationItem);
       const menu = await Menu.new({ items });
       const window = getCurrentWindow();
       const position = new LogicalPosition(event.clientX, event.clientY);

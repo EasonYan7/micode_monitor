@@ -38,6 +38,9 @@
 - [x] Persist per-thread conversation items locally and restore on `thread/resume`
 - [x] Persist `thread/tokenUsage` to local storage across app restart
 - [x] Aggregate sidebar usage by workspace threads (not only active thread)
+- [x] Persist tool-call timeline and restore after restart
+- [x] Split assistant bubbles before/after tool calls (avoid mixed text block)
+- [x] Add thread context menu action: Delete Conversation (keep usage)
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -92,6 +95,10 @@
 - History persistence fix: backend now writes user/assistant thread items to `.micodemonitor/thread-items/<threadId>.json` during `turn/start`, and returns them in `thread/resume` (`thread.turns[*].items`) so restart/resume can reload message history.
 - Usage persistence fix: frontend now persists `tokenUsageByThread` in localStorage (`micodemonitor.threadTokenUsage`) and restores it at startup.
 - Usage aggregation fix: sidebar usage now sums token usage across all threads in the active workspace, with active-thread fallback when workspace aggregate is unavailable.
+- History compatibility fix: persisted user messages now use `content[].type = "text"` so `thread/resume` can rebuild user bubbles correctly after app restart.
+- Tool timeline persistence fix: adapter now persists `mcpToolCall` items (`in_progress/completed`) into local thread-items store and rehydrates them on resume.
+- Streaming UX fix: adapter now rotates assistant `itemId` segment after `tool_call`, so post-tool response starts a new assistant bubble instead of appending to pre-tool text.
+- Thread delete semantics fix: context menu now includes `Delete Conversation`; removing a thread no longer drops accumulated `tokenUsageByThread`.
 - Re-validated after fix:
   - `npm run typecheck`
   - `cargo check --manifest-path src-tauri/Cargo.toml`

@@ -291,7 +291,7 @@ fn build_user_thread_item(thread_id: &str, turn_id: &str, text: &str) -> Value {
         "type": "userMessage",
         "content": [
             {
-                "type": "input_text",
+                "type": "text",
                 "text": text
             }
         ]
@@ -303,6 +303,23 @@ fn build_agent_thread_item(thread_id: &str, turn_id: &str, text: &str) -> Value 
         "id": format!("agent-{thread_id}-{turn_id}"),
         "type": "agentMessage",
         "text": text
+    })
+}
+
+fn build_tool_thread_item(
+    thread_id: &str,
+    tool_item_id: &str,
+    presentation: &ToolCallPresentation,
+    status: &str,
+) -> Value {
+    json!({
+        "id": tool_item_id,
+        "type": "mcpToolCall",
+        "server": presentation.server,
+        "tool": presentation.tool,
+        "title": tool_call_display_title(presentation),
+        "status": status,
+        "threadId": thread_id
     })
 }
 
@@ -835,8 +852,11 @@ impl ActivePromptContext {
         Self { thread_id, turn_id }
     }
 
-    fn agent_item_id(&self) -> String {
-        format!("agent-{}-{}", self.thread_id, self.turn_id)
+    fn agent_item_id(&self, segment: u32) -> String {
+        if segment == 0 {
+            return format!("agent-{}-{}", self.thread_id, self.turn_id);
+        }
+        format!("agent-{}-{}-s{}", self.thread_id, self.turn_id, segment)
     }
 
     fn reasoning_item_id(&self) -> String {
@@ -938,9 +958,18 @@ fn extract_tool_presentation_from_update(update: &Value) -> ToolCallPresentation
 fn extract_tool_presentation_from_permission(params: &Value) -> Option<(String, ToolCallPresentation)> {
     let tool_call = params.get("toolCall")?;
     let tool_call_id = tool_call.get("toolCallId").and_then(Value::as_str)?;
-    let tool = extract_string_field(tool_call, &["tool", "toolName", "name", "kind", "method"])
+    let mut tool = extract_string_field(tool_call, &["tool", "toolName", "name", "kind", "method"])
         .and_then(normalize_tool_name);
     let title = sanitize_tool_title(tool_call.get("title").and_then(Value::as_str));
+    if tool.is_none() {
+        tool = title
+            .as_deref()
+            .and_then(infer_tool_name_from_title)
+            .or_else(|| {
+                let command = extract_approval_command(params);
+                command.first().cloned()
+            });
+    }
     let server = Some("micode".to_string());
     Some((
         tool_call_id.to_string(),
@@ -996,6 +1025,7 @@ pub(crate) struct WorkspaceSession {
     approval_requests: Mutex<HashMap<String, Value>>,
     pending_prompt_streaming: Mutex<HashMap<String, bool>>,
     pending_prompt_agent_messages: Mutex<HashMap<String, String>>,
+    pending_prompt_agent_segments: Mutex<HashMap<String, u32>>,
     active_prompts: Mutex<HashMap<String, ActivePromptContext>>,
     background_threads: Mutex<HashMap<String, String>>,
     tool_call_presentations: Mutex<HashMap<String, ToolCallPresentation>>,
@@ -1016,6 +1046,10 @@ impl WorkspaceSession {
             .lock()
             .await
             .remove(session_id);
+        self.pending_prompt_agent_segments
+            .lock()
+            .await
+            .insert(session_id.to_string(), 0);
     }
 
     async fn register_active_prompt(&self, session_id: &str, thread_id: &str, turn_id: &str) {
@@ -1058,11 +1092,17 @@ impl WorkspaceSession {
     }
 
     async fn finish_prompt_tracking(&self, session_id: &str) -> bool {
-        self.pending_prompt_streaming
+        let had_streaming = self
+            .pending_prompt_streaming
             .lock()
             .await
             .remove(session_id)
-            .unwrap_or(false)
+            .unwrap_or(false);
+        self.pending_prompt_agent_segments
+            .lock()
+            .await
+            .remove(session_id);
+        had_streaming
     }
 
     async fn finish_prompt_lifecycle(&self, session_id: &str) -> bool {
@@ -1078,6 +1118,24 @@ impl WorkspaceSession {
         let mut messages = self.pending_prompt_agent_messages.lock().await;
         let entry = messages.entry(session_id.to_string()).or_default();
         entry.push_str(delta);
+    }
+
+    async fn current_prompt_agent_item_id(&self, session_id: &str) -> Option<String> {
+        let segment = self
+            .pending_prompt_agent_segments
+            .lock()
+            .await
+            .get(session_id)
+            .copied()?;
+        let context = self.active_prompt(session_id).await?;
+        Some(context.agent_item_id(segment))
+    }
+
+    async fn bump_prompt_agent_segment(&self, session_id: &str) {
+        let mut segments = self.pending_prompt_agent_segments.lock().await;
+        if let Some(segment) = segments.get_mut(session_id) {
+            *segment = segment.saturating_add(1);
+        }
     }
 
     async fn take_prompt_agent_message(&self, session_id: &str) -> Option<String> {
@@ -2024,6 +2082,7 @@ fn translate_acp_update(
     context: &ActivePromptContext,
     update: &Value,
     workspace_id: &str,
+    agent_item_id: Option<&str>,
     cached_tool: Option<&ToolCallPresentation>,
 ) -> Vec<AppServerEvent> {
     let mut events = Vec::new();
@@ -2041,13 +2100,16 @@ fn translate_acp_update(
                 .unwrap_or_default()
                 .to_string();
             if !delta.is_empty() {
+                let item_id = agent_item_id
+                    .map(ToString::to_string)
+                    .unwrap_or_else(|| context.agent_item_id(0));
                 events.push(AppServerEvent {
                     workspace_id: workspace_id.to_string(),
                     message: json!({
                         "method": "item/agentMessage/delta",
                         "params": {
                             "threadId": context.thread_id,
-                            "itemId": context.agent_item_id(),
+                            "itemId": item_id,
                             "delta": delta
                         }
                     }),
@@ -2222,6 +2284,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
         approval_requests: Mutex::new(HashMap::new()),
         pending_prompt_streaming: Mutex::new(HashMap::new()),
         pending_prompt_agent_messages: Mutex::new(HashMap::new()),
+        pending_prompt_agent_segments: Mutex::new(HashMap::new()),
         active_prompts: Mutex::new(HashMap::new()),
         background_threads: Mutex::new(HashMap::new()),
         tool_call_presentations: Mutex::new(HashMap::new()),
@@ -2308,6 +2371,11 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                                 .await;
                         }
                         if let Some(context) = context {
+                            let agent_item_id = if update_kind == "agent_message_chunk" {
+                                session_clone.current_prompt_agent_item_id(&session_id).await
+                            } else {
+                                None
+                            };
                             let tool_call_id = update
                                 .get("toolCallId")
                                 .and_then(Value::as_str)
@@ -2332,6 +2400,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                                 &context,
                                 update,
                                 &workspace_id,
+                                agent_item_id.as_deref(),
                                 cached_tool.as_ref(),
                             );
                             let background_callback = {
@@ -2351,6 +2420,33 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                                 if let Some(tool_call_id) = tool_call_id.as_deref() {
                                     session_clone.clear_tool_call_presentation(tool_call_id).await;
                                 }
+                            }
+                            if !context.thread_id.is_empty() && matches!(update_kind, "tool_call" | "tool_call_update")
+                            {
+                                if let Some(tool_call_id) = tool_call_id.as_deref() {
+                                    if let Some(presentation) = cached_tool.as_ref() {
+                                        let status = if update_kind == "tool_call_update" {
+                                            "completed"
+                                        } else {
+                                            "in_progress"
+                                        };
+                                        let tool_item_id = format!("tool-{tool_call_id}");
+                                        session_clone
+                                            .persist_thread_item(
+                                                &context.thread_id,
+                                                build_tool_thread_item(
+                                                    &context.thread_id,
+                                                    &tool_item_id,
+                                                    presentation,
+                                                    status,
+                                                ),
+                                            )
+                                            .await;
+                                    }
+                                }
+                            }
+                            if update_kind == "tool_call" {
+                                session_clone.bump_prompt_agent_segment(&session_id).await;
                             }
                         }
                     }
@@ -2389,6 +2485,17 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                             .await;
                         if !existed && !thread_id.is_empty() {
                             let item_id = format!("tool-{tool_call_id}");
+                            session_clone
+                                .persist_thread_item(
+                                    &thread_id,
+                                    build_tool_thread_item(
+                                        &thread_id,
+                                        &item_id,
+                                        &merged,
+                                        "in_progress",
+                                    ),
+                                )
+                                .await;
                             let _ = event_tx.send(AppServerEvent {
                                 workspace_id: workspace_id.clone(),
                                 message: json!({
@@ -2511,7 +2618,7 @@ mod tests {
             "content": { "type": "text", "text": "hello" }
         });
         let context = ActivePromptContext::new("thread-1".to_string(), "turn-1".to_string());
-        let events = translate_acp_update(&context, &update, "ws-1", None);
+        let events = translate_acp_update(&context, &update, "ws-1", None, None);
         assert_eq!(events.len(), 1);
         let method = events[0]
             .message
@@ -2529,7 +2636,7 @@ mod tests {
             ]
         });
         let context = ActivePromptContext::new("thread-2".to_string(), "turn-2".to_string());
-        let events = translate_acp_update(&context, &update, "ws-2", None);
+        let events = translate_acp_update(&context, &update, "ws-2", None, None);
         assert_eq!(events.len(), 1);
         let method = events[0]
             .message
@@ -2547,7 +2654,7 @@ mod tests {
             ]
         });
         let context = ActivePromptContext::new("thread-3".to_string(), "turn-3".to_string());
-        let events = translate_acp_update(&context, &update, "ws-3", None);
+        let events = translate_acp_update(&context, &update, "ws-3", None, None);
         assert_eq!(events.len(), 1);
         let method = events[0]
             .message
@@ -2564,7 +2671,7 @@ mod tests {
             "toolName": "glob"
         });
         let context = ActivePromptContext::new("thread-4".to_string(), "turn-4".to_string());
-        let events = translate_acp_update(&context, &update, "ws-4", None);
+        let events = translate_acp_update(&context, &update, "ws-4", None, None);
         assert_eq!(events.len(), 1);
         let item = events[0]
             .message
@@ -2588,7 +2695,7 @@ mod tests {
             tool: Some("edit".to_string()),
             title: Some("abc.md: foo => bar".to_string()),
         };
-        let events = translate_acp_update(&context, &update, "ws-5", Some(&cached));
+        let events = translate_acp_update(&context, &update, "ws-5", None, Some(&cached));
         assert_eq!(events.len(), 1);
         let item = events[0]
             .message

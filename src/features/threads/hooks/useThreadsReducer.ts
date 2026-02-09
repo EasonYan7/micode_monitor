@@ -480,7 +480,6 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
       const { [action.threadId]: ___, ...restTurns } = state.activeTurnIdByThread;
       const { [action.threadId]: ____, ...restPlans } = state.planByThread;
       const { [action.threadId]: _____, ...restParents } = state.threadParentById;
-      const { [action.threadId]: ______, ...restTokenUsage } = state.tokenUsageByThread;
       const { [action.threadId]: _______, ...restLastAgent } = state.lastAgentMessageByThread;
       return {
         ...state,
@@ -493,7 +492,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
         activeTurnIdByThread: restTurns,
         planByThread: restPlans,
         threadParentById: restParents,
-        tokenUsageByThread: restTokenUsage,
+        // Keep token usage after deleting a thread so workspace usage snapshots remain stable.
+        tokenUsageByThread: state.tokenUsageByThread,
         lastAgentMessageByThread: restLastAgent,
         activeThreadIdByWorkspace: {
           ...state.activeThreadIdByWorkspace,
