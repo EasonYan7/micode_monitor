@@ -34,6 +34,7 @@
 - [x] Persist thread title from first user prompt (survives restart)
 - [x] Make thread delete remove local persisted thread records (not archive-only)
 - [x] Fallback sidebar usage display to token usage when rate-limit API is synthetic/empty
+- [x] Preserve and display MCP tool identity (`server/tool`) across tool start/completion and approval flow
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -83,7 +84,11 @@
 - UX persistence fix: auto-name new thread from first user prompt on `turn/start` and emit `thread/name/updated`; thread title now survives app restart via `.micodemonitor/sessions.json`.
 - Data deletion fix: `thread/archive` now hard-removes foreground thread records from local `sessions.json`; frontend waits for backend success before removing thread in UI.
 - Usage fallback fix: sidebar `Session`/`Credits` now falls back to `thread/tokenUsage/updated` values when `account/rateLimits/read` is synthetic or empty.
+- Tool label fix: ACP adapter now caches per-`toolCallId` tool identity and emits `mcpToolCall` items with stable `server/tool` fields so UI can render real tool names instead of `Tool Call`/argument fragments.
+- Approval bridge fix: when `session/request_permission` arrives before a tool update, adapter seeds tool identity from `toolCall.kind` and emits a synthetic `item/started` for consistent tool timeline.
 - Re-validated after fix:
   - `npm run typecheck`
   - `cargo check --manifest-path src-tauri/Cargo.toml`
   - `npm test -- src/features/settings/components/SettingsView.test.tsx src/features/home/components/Home.test.tsx src/features/settings/hooks/useAppSettings.test.ts`
+  - `cargo test --manifest-path src-tauri/Cargo.toml translate_tool_call_event_includes_server_and_tool`
+  - `cargo test --manifest-path src-tauri/Cargo.toml translate_tool_call_update_uses_cached_tool_identity`

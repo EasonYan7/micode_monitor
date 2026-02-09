@@ -775,6 +775,142 @@ impl ActivePromptContext {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+struct ToolCallPresentation {
+    server: Option<String>,
+    tool: Option<String>,
+    title: Option<String>,
+}
+
+fn sanitize_tool_title(raw: Option<&str>) -> Option<String> {
+    let title = sanitize_approval_title(raw)?;
+    let trimmed = title.trim();
+    if trimmed == "." || trimmed == ".." || trimmed == "/" {
+        return None;
+    }
+    Some(trimmed.to_string())
+}
+
+fn extract_string_field<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a str> {
+    keys.iter()
+        .find_map(|key| value.get(*key).and_then(Value::as_str))
+}
+
+fn normalize_tool_name(raw: &str) -> Option<String> {
+    let normalized = raw.trim().trim_matches('"').trim_matches('\'');
+    if normalized.is_empty() {
+        return None;
+    }
+    Some(normalized.to_string())
+}
+
+fn infer_tool_name_from_title(title: &str) -> Option<String> {
+    let lower = title.to_ascii_lowercase();
+    if lower.contains("=>") {
+        return Some("edit".to_string());
+    }
+    if lower.contains("**/") || lower.contains("*.") {
+        return Some("glob".to_string());
+    }
+    if lower.ends_with(".md")
+        || lower.ends_with(".txt")
+        || lower.ends_with(".json")
+        || lower.contains(".md:")
+        || lower.contains(".txt:")
+        || lower.contains(".json:")
+    {
+        return Some("edit".to_string());
+    }
+    None
+}
+
+fn extract_tool_presentation_from_update(update: &Value) -> ToolCallPresentation {
+    let title = sanitize_tool_title(update.get("title").and_then(Value::as_str));
+    let mut tool = extract_string_field(
+        update,
+        &["tool", "toolName", "name", "kind", "method", "action"],
+    )
+    .and_then(normalize_tool_name);
+    if tool.is_none() {
+        tool = title
+            .as_deref()
+            .and_then(infer_tool_name_from_title)
+            .or_else(|| {
+                update
+                    .get("content")
+                    .and_then(|content| {
+                        extract_string_field(
+                            content,
+                            &["tool", "toolName", "name", "kind", "method", "action"],
+                        )
+                    })
+                    .and_then(normalize_tool_name)
+            });
+    }
+    let mut server = extract_string_field(
+        update,
+        &["server", "serverName", "mcpServer", "provider", "namespace"],
+    )
+    .and_then(normalize_tool_name);
+    if server.is_none() && tool.is_some() {
+        server = Some("micode".to_string());
+    }
+    ToolCallPresentation {
+        server,
+        tool,
+        title,
+    }
+}
+
+fn extract_tool_presentation_from_permission(params: &Value) -> Option<(String, ToolCallPresentation)> {
+    let tool_call = params.get("toolCall")?;
+    let tool_call_id = tool_call.get("toolCallId").and_then(Value::as_str)?;
+    let tool = extract_string_field(tool_call, &["tool", "toolName", "name", "kind", "method"])
+        .and_then(normalize_tool_name);
+    let title = sanitize_tool_title(tool_call.get("title").and_then(Value::as_str));
+    let server = Some("micode".to_string());
+    Some((
+        tool_call_id.to_string(),
+        ToolCallPresentation {
+            server,
+            tool,
+            title,
+        },
+    ))
+}
+
+fn merge_tool_presentation(
+    current: Option<ToolCallPresentation>,
+    incoming: ToolCallPresentation,
+) -> ToolCallPresentation {
+    let mut merged = current.unwrap_or_default();
+    if merged.server.is_none() {
+        merged.server = incoming.server;
+    }
+    if merged.tool.is_none() {
+        merged.tool = incoming.tool;
+    }
+    if merged.title.is_none() {
+        merged.title = incoming.title;
+    }
+    if merged.server.is_none() && merged.tool.is_some() {
+        merged.server = Some("micode".to_string());
+    }
+    merged
+}
+
+fn tool_call_display_title(presentation: &ToolCallPresentation) -> String {
+    match (presentation.server.as_deref(), presentation.tool.as_deref()) {
+        (Some(server), Some(tool)) => format!("Tool: {server} / {tool}"),
+        (_, Some(tool)) => format!("Tool: {tool}"),
+        _ => presentation
+            .title
+            .as_ref()
+            .map(|title| format!("Tool: {title}"))
+            .unwrap_or_else(|| "Tool Call".to_string()),
+    }
+}
+
 pub(crate) struct WorkspaceSession {
     pub(crate) entry: WorkspaceEntry,
     pub(crate) child: Mutex<Child>,
@@ -788,6 +924,7 @@ pub(crate) struct WorkspaceSession {
     pending_prompt_streaming: Mutex<HashMap<String, bool>>,
     active_prompts: Mutex<HashMap<String, ActivePromptContext>>,
     background_threads: Mutex<HashMap<String, String>>,
+    tool_call_presentations: Mutex<HashMap<String, ToolCallPresentation>>,
 }
 
 impl WorkspaceSession {
@@ -816,6 +953,23 @@ impl WorkspaceSession {
 
     async fn clear_active_prompt(&self, session_id: &str) {
         self.active_prompts.lock().await.remove(session_id);
+    }
+
+    async fn merge_tool_call_presentation(
+        &self,
+        tool_call_id: &str,
+        incoming: ToolCallPresentation,
+    ) -> (ToolCallPresentation, bool) {
+        let mut cache = self.tool_call_presentations.lock().await;
+        let existing = cache.get(tool_call_id).cloned();
+        let was_present = existing.is_some();
+        let merged = merge_tool_presentation(existing, incoming);
+        cache.insert(tool_call_id.to_string(), merged.clone());
+        (merged, was_present)
+    }
+
+    async fn clear_tool_call_presentation(&self, tool_call_id: &str) {
+        self.tool_call_presentations.lock().await.remove(tool_call_id);
     }
 
     async fn mark_prompt_streaming(&self, session_id: &str) {
@@ -1718,6 +1872,7 @@ fn translate_acp_update(
     context: &ActivePromptContext,
     update: &Value,
     workspace_id: &str,
+    cached_tool: Option<&ToolCallPresentation>,
 ) -> Vec<AppServerEvent> {
     let mut events = Vec::new();
     let kind = update
@@ -1805,10 +1960,11 @@ fn translate_acp_update(
                 .and_then(Value::as_str)
                 .map(|value| format!("tool-{value}"))
                 .unwrap_or_else(|| context.fallback_tool_item_id());
-            let title = update
-                .get("title")
-                .and_then(Value::as_str)
-                .unwrap_or("Tool Call");
+            let presentation = merge_tool_presentation(
+                cached_tool.cloned(),
+                extract_tool_presentation_from_update(update),
+            );
+            let title = tool_call_display_title(&presentation);
             events.push(AppServerEvent {
                 workspace_id: workspace_id.to_string(),
                 message: json!({
@@ -1819,6 +1975,8 @@ fn translate_acp_update(
                             "id": item_id,
                             "type": "mcpToolCall",
                             "title": title,
+                            "server": presentation.server,
+                            "tool": presentation.tool,
                             "status": "in_progress"
                         }
                     }
@@ -1831,10 +1989,11 @@ fn translate_acp_update(
                 .and_then(Value::as_str)
                 .map(|value| format!("tool-{value}"))
                 .unwrap_or_else(|| context.fallback_tool_item_id());
-            let title = update
-                .get("title")
-                .and_then(Value::as_str)
-                .unwrap_or("Tool Call");
+            let presentation = merge_tool_presentation(
+                cached_tool.cloned(),
+                extract_tool_presentation_from_update(update),
+            );
+            let title = tool_call_display_title(&presentation);
             events.push(AppServerEvent {
                 workspace_id: workspace_id.to_string(),
                 message: json!({
@@ -1845,6 +2004,8 @@ fn translate_acp_update(
                             "id": item_id,
                             "type": "mcpToolCall",
                             "title": title,
+                            "server": presentation.server,
+                            "tool": presentation.tool,
                             "status": "completed"
                         }
                     }
@@ -1910,6 +2071,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
         pending_prompt_streaming: Mutex::new(HashMap::new()),
         active_prompts: Mutex::new(HashMap::new()),
         background_threads: Mutex::new(HashMap::new()),
+        tool_call_presentations: Mutex::new(HashMap::new()),
     });
 
     let session_clone = Arc::clone(&session);
@@ -1983,7 +2145,32 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                             session_clone.mark_prompt_streaming(&session_id).await;
                         }
                         if let Some(context) = context {
-                            let translated = translate_acp_update(&context, update, &workspace_id);
+                            let tool_call_id = update
+                                .get("toolCallId")
+                                .and_then(Value::as_str)
+                                .map(ToString::to_string);
+                            let cached_tool = if matches!(update_kind, "tool_call" | "tool_call_update")
+                            {
+                                if let Some(tool_call_id) = tool_call_id.as_deref() {
+                                    let (merged, _) = session_clone
+                                        .merge_tool_call_presentation(
+                                            tool_call_id,
+                                            extract_tool_presentation_from_update(update),
+                                        )
+                                        .await;
+                                    Some(merged)
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            };
+                            let translated = translate_acp_update(
+                                &context,
+                                update,
+                                &workspace_id,
+                                cached_tool.as_ref(),
+                            );
                             let background_callback = {
                                 let callbacks = session_clone.background_thread_callbacks.lock().await;
                                 callbacks.get(&context.thread_id).cloned()
@@ -1995,6 +2182,11 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                             } else {
                                 for event in translated {
                                     let _ = event_tx.send(event);
+                                }
+                            }
+                            if update_kind == "tool_call_update" {
+                                if let Some(tool_call_id) = tool_call_id.as_deref() {
+                                    session_clone.clear_tool_call_presentation(tool_call_id).await;
                                 }
                             }
                         }
@@ -2026,6 +2218,33 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                             .unwrap_or_default()
                     };
                     let command = extract_approval_command(&params);
+                    if let Some((tool_call_id, tool_presentation)) =
+                        extract_tool_presentation_from_permission(&params)
+                    {
+                        let (merged, existed) = session_clone
+                            .merge_tool_call_presentation(&tool_call_id, tool_presentation)
+                            .await;
+                        if !existed && !thread_id.is_empty() {
+                            let item_id = format!("tool-{tool_call_id}");
+                            let _ = event_tx.send(AppServerEvent {
+                                workspace_id: workspace_id.clone(),
+                                message: json!({
+                                    "method": "item/started",
+                                    "params": {
+                                        "threadId": thread_id,
+                                        "item": {
+                                            "id": item_id,
+                                            "type": "mcpToolCall",
+                                            "title": tool_call_display_title(&merged),
+                                            "server": merged.server,
+                                            "tool": merged.tool,
+                                            "status": "in_progress"
+                                        }
+                                    }
+                                }),
+                            });
+                        }
+                    }
                     let _ = event_tx.send(AppServerEvent {
                         workspace_id: workspace_id.clone(),
                         message: json!({
@@ -2105,9 +2324,9 @@ mod tests {
     use super::{
         build_initialize_params, extract_approval_command,
         load_thread_token_usage_for_session_in_home, translate_acp_update, ActivePromptContext,
-        WorkspaceSession,
+        ToolCallPresentation, WorkspaceSession,
     };
-    use serde_json::json;
+    use serde_json::{json, Value};
     use std::path::PathBuf;
     use uuid::Uuid;
 
@@ -2129,7 +2348,7 @@ mod tests {
             "content": { "type": "text", "text": "hello" }
         });
         let context = ActivePromptContext::new("thread-1".to_string(), "turn-1".to_string());
-        let events = translate_acp_update(&context, &update, "ws-1");
+        let events = translate_acp_update(&context, &update, "ws-1", None);
         assert_eq!(events.len(), 1);
         let method = events[0]
             .message
@@ -2147,7 +2366,7 @@ mod tests {
             ]
         });
         let context = ActivePromptContext::new("thread-2".to_string(), "turn-2".to_string());
-        let events = translate_acp_update(&context, &update, "ws-2");
+        let events = translate_acp_update(&context, &update, "ws-2", None);
         assert_eq!(events.len(), 1);
         let method = events[0]
             .message
@@ -2165,13 +2384,57 @@ mod tests {
             ]
         });
         let context = ActivePromptContext::new("thread-3".to_string(), "turn-3".to_string());
-        let events = translate_acp_update(&context, &update, "ws-3");
+        let events = translate_acp_update(&context, &update, "ws-3", None);
         assert_eq!(events.len(), 1);
         let method = events[0]
             .message
             .get("method")
             .and_then(|value| value.as_str());
         assert_eq!(method, Some("micode/availableCommands/updated"));
+    }
+
+    #[test]
+    fn translate_tool_call_event_includes_server_and_tool() {
+        let update = json!({
+            "sessionUpdate": "tool_call",
+            "toolCallId": "call_1",
+            "toolName": "glob"
+        });
+        let context = ActivePromptContext::new("thread-4".to_string(), "turn-4".to_string());
+        let events = translate_acp_update(&context, &update, "ws-4", None);
+        assert_eq!(events.len(), 1);
+        let item = events[0]
+            .message
+            .get("params")
+            .and_then(|value| value.get("item"))
+            .cloned()
+            .unwrap_or(Value::Null);
+        assert_eq!(item.get("server").and_then(Value::as_str), Some("micode"));
+        assert_eq!(item.get("tool").and_then(Value::as_str), Some("glob"));
+    }
+
+    #[test]
+    fn translate_tool_call_update_uses_cached_tool_identity() {
+        let update = json!({
+            "sessionUpdate": "tool_call_update",
+            "toolCallId": "call_2"
+        });
+        let context = ActivePromptContext::new("thread-5".to_string(), "turn-5".to_string());
+        let cached = ToolCallPresentation {
+            server: Some("micode".to_string()),
+            tool: Some("edit".to_string()),
+            title: Some("abc.md: foo => bar".to_string()),
+        };
+        let events = translate_acp_update(&context, &update, "ws-5", Some(&cached));
+        assert_eq!(events.len(), 1);
+        let item = events[0]
+            .message
+            .get("params")
+            .and_then(|value| value.get("item"))
+            .cloned()
+            .unwrap_or(Value::Null);
+        assert_eq!(item.get("server").and_then(Value::as_str), Some("micode"));
+        assert_eq!(item.get("tool").and_then(Value::as_str), Some("edit"));
     }
 
     #[test]
