@@ -67,6 +67,7 @@
 - [x] Hide composer "Default" controls: remove collaboration selector when only default mode exists and hide thinking selector when no reasoning options
 - [x] Restore Home top-model stats by parsing new MiCode `tmp/*/chats/session-*.json` usage source (not only legacy jsonl)
 - [x] Fix usage root resolution: scan MiCode `tmp/<hash>/chats` directories (keep legacy `sessions` fallback) so Home model usage refreshes correctly
+- [x] Fix workspace-scoped usage filtering for `tmp/<hash>/chats` by matching `projectHash` to selected workspace path hash
 - [x] Add sidebar workspace action: clear project conversation history with confirm dialog, and wipe local history cache (`.micodemonitor` + global `~/.micode|~/.codex/tmp`)
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.

@@ -1,5 +1,6 @@
 use chrono::{DateTime, Duration, Local, TimeZone, Utc};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -81,13 +82,11 @@ fn scan_local_usage(
 
     for root in sessions_roots {
         // New MiCode runtime writes chat snapshots under `tmp/<hash>/chats/session-*.json`.
-        // Prefer this source for global usage to keep model totals and token stats up to date.
-        if workspace_path.is_none() {
-            let used_chat_source =
-                scan_chat_sessions(root, &mut daily, &mut model_totals, workspace_path)?;
-            if used_chat_source {
-                continue;
-            }
+        // Use this source for both global and workspace-scoped usage when available.
+        let used_chat_source =
+            scan_chat_sessions(root, &mut daily, &mut model_totals, workspace_path)?;
+        if used_chat_source {
+            continue;
         }
         for day_key in &day_keys {
             let day_dir = day_dir_for_key(root, day_key);
@@ -117,9 +116,6 @@ fn scan_chat_sessions(
     model_totals: &mut HashMap<String, i64>,
     workspace_path: Option<&Path>,
 ) -> Result<bool, String> {
-    if workspace_path.is_some() {
-        return Ok(false);
-    }
     let chats_dir = root.join("chats");
     if !chats_dir.is_dir() {
         return Ok(false);
@@ -128,6 +124,7 @@ fn scan_chat_sessions(
         Ok(entries) => entries,
         Err(_) => return Ok(false),
     };
+    let workspace_project_hash = workspace_path.map(project_hash_for_workspace);
     let mut used = false;
     for entry in entries.flatten() {
         let path = entry.path();
@@ -142,8 +139,14 @@ fn scan_chat_sessions(
         {
             continue;
         }
-        scan_chat_file(&path, daily, model_totals)?;
-        used = true;
+        if scan_chat_file(
+            &path,
+            daily,
+            model_totals,
+            workspace_project_hash.as_deref(),
+        )? {
+            used = true;
+        }
     }
     Ok(used)
 }
@@ -152,25 +155,32 @@ fn scan_chat_file(
     path: &Path,
     daily: &mut HashMap<String, DailyTotals>,
     model_totals: &mut HashMap<String, i64>,
-) -> Result<(), String> {
+    workspace_project_hash: Option<&str>,
+) -> Result<bool, String> {
     let text = match std::fs::read_to_string(path) {
         Ok(text) => text,
-        Err(_) => return Ok(()),
+        Err(_) => return Ok(false),
     };
     if text.len() > 8_000_000 {
-        return Ok(());
+        return Ok(false);
     }
     let value = match serde_json::from_str::<Value>(&text) {
         Ok(value) => value,
-        Err(_) => return Ok(()),
+        Err(_) => return Ok(false),
     };
+    if let Some(target_hash) = workspace_project_hash {
+        let file_hash = value.get("projectHash").and_then(|hash| hash.as_str());
+        if file_hash != Some(target_hash) {
+            return Ok(false);
+        }
+    }
     let messages = value
         .get("messages")
         .and_then(|messages| messages.as_array())
         .cloned()
         .unwrap_or_default();
     if messages.is_empty() {
-        return Ok(());
+        return Ok(false);
     }
 
     let mut previous_totals: Option<UsageTotals> = None;
@@ -240,7 +250,12 @@ fn scan_chat_file(
         }
     }
 
-    Ok(())
+    Ok(true)
+}
+
+fn project_hash_for_workspace(workspace_path: &Path) -> String {
+    let path_text = workspace_path.to_string_lossy();
+    format!("{:x}", Sha256::digest(path_text.as_bytes()))
 }
 
 fn build_snapshot(
@@ -831,6 +846,18 @@ mod tests {
         (home, hash_dir)
     }
 
+    fn write_chat_session_file(
+        root: &Path,
+        file_name: &str,
+        content: &str,
+    ) -> PathBuf {
+        let chats_dir = root.join("chats");
+        fs::create_dir_all(&chats_dir).expect("create chats dir");
+        let file_path = chats_dir.join(file_name);
+        fs::write(&file_path, content).expect("write chat file");
+        file_path
+    }
+
     fn write_session_file(root: &Path, day_key: &str, lines: &[String]) -> PathBuf {
         let day_dir = day_dir_for_key(root, day_key);
         fs::create_dir_all(&day_dir).expect("create day dir");
@@ -1076,5 +1103,30 @@ mod tests {
         let (home, hash_dir) = make_temp_micode_home_with_tmp_hash();
         let roots = resolve_micode_scan_roots(Some(home));
         assert!(roots.iter().any(|root| root == &hash_dir));
+    }
+
+    #[test]
+    fn scan_local_usage_filters_chat_files_by_workspace_project_hash() {
+        let root = make_temp_sessions_root();
+        let workspace_path = Path::new("/tmp/project-usage-a");
+        let matched_hash = project_hash_for_workspace(workspace_path);
+        let other_hash = project_hash_for_workspace(Path::new("/tmp/project-usage-b"));
+        let now = Utc::now().to_rfc3339();
+
+        let matched = format!(
+            r#"{{"projectHash":"{matched_hash}","messages":[{{"timestamp":"{now}","type":"assistant","model":"mimo-v2-flash","tokens":{{"input":10,"cached":2,"output":5}}}}]}}"#
+        );
+        let unmatched = format!(
+            r#"{{"projectHash":"{other_hash}","messages":[{{"timestamp":"{now}","type":"assistant","model":"mimo-v2","tokens":{{"input":1000,"cached":0,"output":1000}}}}]}}"#
+        );
+
+        write_chat_session_file(&root, "session-matched.json", &matched);
+        write_chat_session_file(&root, "session-unmatched.json", &unmatched);
+
+        let snapshot = scan_local_usage(7, Some(workspace_path), &[root]).expect("scan usage");
+        assert_eq!(snapshot.totals.last30_days_tokens, 15);
+        assert_eq!(snapshot.top_models.len(), 1);
+        assert_eq!(snapshot.top_models[0].model, "mimo-v2-flash");
+        assert_eq!(snapshot.top_models[0].tokens, 15);
     }
 }
