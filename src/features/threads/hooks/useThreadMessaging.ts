@@ -284,7 +284,24 @@ export function useThreadMessaging({
         return;
       }
       const finalText = promptExpansion?.expanded ?? messageText;
-      const threadId = await ensureThreadForActiveWorkspace();
+      let threadId: string | null = null;
+      try {
+        threadId = await ensureThreadForActiveWorkspace();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        onDebug?.({
+          id: `${Date.now()}-client-ensure-thread-error`,
+          timestamp: Date.now(),
+          source: "error",
+          label: "thread/ensure error",
+          payload: message,
+        });
+        if (activeThreadId) {
+          pushThreadErrorMessage(activeThreadId, message);
+          safeMessageActivity();
+        }
+        return;
+      }
       if (!threadId) {
         return;
       }

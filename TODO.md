@@ -26,6 +26,8 @@
 - [x] Reduce model-switch/thread-switch stalls via approval mapping cleanup and collaboration-mode fallback
 - [x] Stabilize ACP delta routing with active-turn session context (prevent cross-thread ghost chunks)
 - [x] Emit per-turn token usage (`thread/tokenUsage/updated`) from MiCode session chat logs
+- [x] Restore thread list visibility after restart by returning Codex-compatible `thread/list` payload shape
+- [x] Auto-reconnect workspace session on `workspace not connected` and retry first command
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -65,3 +67,6 @@
 - Stream routing fix: session updates now bind to in-memory active prompt context (`sessionId -> threadId/turnId`) so assistant deltas don't drift to wrong thread after reconnect/model switch.
 - Event-id stability fix: assistant/reasoning/tool fallback item IDs now derive from stable `turnId` instead of mutable `messageIndex`, reducing missing-message and stuck-working edge cases.
 - Usage telemetry fix: adapter now reads `~/.micode/tmp/**/chats/session-*.json` by `sessionId` and emits `thread/tokenUsage/updated` after each completed turn with both `last` and cumulative `total` token breakdown.
+- Thread list compatibility fix: ACP `thread/list` now returns both `result.data` and `result.threads`, with `cwd/preview/updatedAt` fields so existing frontend filtering and sorting can render persisted threads after app restart.
+- First-send reliability fix: command handlers now detect `workspace not connected`, reconnect session automatically, and retry (`start_thread`, `send_user_message`, `resume/list/archive/compact/set_name/interrupt`).
+- UX diagnostics fix: frontend now logs `thread/ensure error` to debug instead of silently dropping first message when thread bootstrap fails.

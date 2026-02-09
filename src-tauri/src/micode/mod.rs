@@ -45,6 +45,40 @@ pub(crate) async fn spawn_workspace_session(
     .await
 }
 
+fn is_workspace_not_connected_error(error: &str) -> bool {
+    error
+        .to_ascii_lowercase()
+        .contains("workspace not connected")
+}
+
+async fn ensure_workspace_session_connected(
+    state: &AppState,
+    workspace_id: &str,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let has_session = { state.sessions.lock().await.contains_key(workspace_id) };
+    if has_session {
+        return Ok(());
+    }
+    let app_for_spawn = app.clone();
+    workspaces_core::connect_workspace_core(
+        workspace_id.to_string(),
+        &state.workspaces,
+        &state.sessions,
+        &state.app_settings,
+        move |entry, default_bin, agent_args, agent_home| {
+            spawn_workspace_session(
+                entry,
+                default_bin,
+                agent_args,
+                app_for_spawn.clone(),
+                agent_home,
+            )
+        },
+    )
+    .await
+}
+
 #[tauri::command]
 pub(crate) async fn micode_doctor(
     micode_bin: Option<String>,
@@ -157,7 +191,15 @@ pub(crate) async fn start_thread(
         .await;
     }
 
-    micode_core::start_thread_core(&state.sessions, workspace_id).await
+    let result = micode_core::start_thread_core(&state.sessions, workspace_id.clone()).await;
+    match result {
+        Ok(value) => Ok(value),
+        Err(error) if is_workspace_not_connected_error(&error) => {
+            ensure_workspace_session_connected(&state, &workspace_id, &app).await?;
+            micode_core::start_thread_core(&state.sessions, workspace_id).await
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[tauri::command]
@@ -177,7 +219,17 @@ pub(crate) async fn resume_thread(
         .await;
     }
 
-    micode_core::resume_thread_core(&state.sessions, workspace_id, thread_id).await
+    let result =
+        micode_core::resume_thread_core(&state.sessions, workspace_id.clone(), thread_id.clone())
+            .await;
+    match result {
+        Ok(value) => Ok(value),
+        Err(error) if is_workspace_not_connected_error(&error) => {
+            ensure_workspace_session_connected(&state, &workspace_id, &app).await?;
+            micode_core::resume_thread_core(&state.sessions, workspace_id, thread_id).await
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[tauri::command]
@@ -197,7 +249,17 @@ pub(crate) async fn fork_thread(
         .await;
     }
 
-    micode_core::fork_thread_core(&state.sessions, workspace_id, thread_id).await
+    let result =
+        micode_core::fork_thread_core(&state.sessions, workspace_id.clone(), thread_id.clone())
+            .await;
+    match result {
+        Ok(value) => Ok(value),
+        Err(error) if is_workspace_not_connected_error(&error) => {
+            ensure_workspace_session_connected(&state, &workspace_id, &app).await?;
+            micode_core::fork_thread_core(&state.sessions, workspace_id, thread_id).await
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[tauri::command]
@@ -218,7 +280,21 @@ pub(crate) async fn list_threads(
         .await;
     }
 
-    micode_core::list_threads_core(&state.sessions, workspace_id, cursor, limit).await
+    let result = micode_core::list_threads_core(
+        &state.sessions,
+        workspace_id.clone(),
+        cursor.clone(),
+        limit,
+    )
+    .await;
+    match result {
+        Ok(value) => Ok(value),
+        Err(error) if is_workspace_not_connected_error(&error) => {
+            ensure_workspace_session_connected(&state, &workspace_id, &app).await?;
+            micode_core::list_threads_core(&state.sessions, workspace_id, cursor, limit).await
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[tauri::command]
@@ -259,7 +335,20 @@ pub(crate) async fn archive_thread(
         .await;
     }
 
-    micode_core::archive_thread_core(&state.sessions, workspace_id, thread_id).await
+    let result = micode_core::archive_thread_core(
+        &state.sessions,
+        workspace_id.clone(),
+        thread_id.clone(),
+    )
+    .await;
+    match result {
+        Ok(value) => Ok(value),
+        Err(error) if is_workspace_not_connected_error(&error) => {
+            ensure_workspace_session_connected(&state, &workspace_id, &app).await?;
+            micode_core::archive_thread_core(&state.sessions, workspace_id, thread_id).await
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[tauri::command]
@@ -279,7 +368,20 @@ pub(crate) async fn compact_thread(
         .await;
     }
 
-    micode_core::compact_thread_core(&state.sessions, workspace_id, thread_id).await
+    let result = micode_core::compact_thread_core(
+        &state.sessions,
+        workspace_id.clone(),
+        thread_id.clone(),
+    )
+    .await;
+    match result {
+        Ok(value) => Ok(value),
+        Err(error) if is_workspace_not_connected_error(&error) => {
+            ensure_workspace_session_connected(&state, &workspace_id, &app).await?;
+            micode_core::compact_thread_core(&state.sessions, workspace_id, thread_id).await
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[tauri::command]
@@ -300,7 +402,22 @@ pub(crate) async fn set_thread_name(
         .await;
     }
 
-    micode_core::set_thread_name_core(&state.sessions, workspace_id, thread_id, name).await
+    let result = micode_core::set_thread_name_core(
+        &state.sessions,
+        workspace_id.clone(),
+        thread_id.clone(),
+        name.clone(),
+    )
+    .await;
+    match result {
+        Ok(value) => Ok(value),
+        Err(error) if is_workspace_not_connected_error(&error) => {
+            ensure_workspace_session_connected(&state, &workspace_id, &app).await?;
+            micode_core::set_thread_name_core(&state.sessions, workspace_id, thread_id, name)
+                .await
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[tauri::command]
@@ -379,18 +496,37 @@ pub(crate) async fn send_user_message(
         }
     }
 
-    micode_core::send_user_message_core(
+    let result = micode_core::send_user_message_core(
         &state.sessions,
-        workspace_id,
-        thread_id,
-        text,
-        model,
-        effort,
-        access_mode,
-        images,
-        collaboration_mode,
+        workspace_id.clone(),
+        thread_id.clone(),
+        text.clone(),
+        model.clone(),
+        effort.clone(),
+        access_mode.clone(),
+        images.clone(),
+        collaboration_mode.clone(),
     )
-    .await
+    .await;
+    match result {
+        Ok(value) => Ok(value),
+        Err(error) if is_workspace_not_connected_error(&error) => {
+            ensure_workspace_session_connected(&state, &workspace_id, &app).await?;
+            micode_core::send_user_message_core(
+                &state.sessions,
+                workspace_id,
+                thread_id,
+                text,
+                model,
+                effort,
+                access_mode,
+                images,
+                collaboration_mode,
+            )
+            .await
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[tauri::command]
@@ -430,7 +566,22 @@ pub(crate) async fn turn_interrupt(
         .await;
     }
 
-    micode_core::turn_interrupt_core(&state.sessions, workspace_id, thread_id, turn_id).await
+    let result = micode_core::turn_interrupt_core(
+        &state.sessions,
+        workspace_id.clone(),
+        thread_id.clone(),
+        turn_id.clone(),
+    )
+    .await;
+    match result {
+        Ok(value) => Ok(value),
+        Err(error) if is_workspace_not_connected_error(&error) => {
+            ensure_workspace_session_connected(&state, &workspace_id, &app).await?;
+            micode_core::turn_interrupt_core(&state.sessions, workspace_id, thread_id, turn_id)
+                .await
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[tauri::command]

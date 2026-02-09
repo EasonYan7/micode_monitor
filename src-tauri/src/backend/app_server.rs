@@ -987,12 +987,26 @@ impl WorkspaceSession {
                         json!({
                             "id": entry.thread_id,
                             "name": entry.title,
-                            "updatedAt": entry.updated_at
+                            "updatedAt": entry.updated_at,
+                            "updated_at": entry.updated_at,
+                            "preview": entry.title,
+                            "cwd": self.entry.path,
+                            "createdAt": entry.updated_at,
+                            "created_at": entry.updated_at
                         })
                     })
                     .collect::<Vec<_>>();
                 Ok(
-                    json!({ "result": { "threads": threads, "hasMore": false, "nextCursor": null } }),
+                    json!({
+                        "result": {
+                            // CodexMonitor frontend reads `result.data` and filters by `cwd`.
+                            // Keep both shapes for backward compatibility.
+                            "data": threads,
+                            "threads": threads,
+                            "hasMore": false,
+                            "nextCursor": null
+                        }
+                    }),
                 )
             }
             "thread/resume" => {
