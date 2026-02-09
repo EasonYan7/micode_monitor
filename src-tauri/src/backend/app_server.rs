@@ -2380,15 +2380,17 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                                 .get("toolCallId")
                                 .and_then(Value::as_str)
                                 .map(ToString::to_string);
+                            let mut tool_presentation_was_existing = true;
                             let cached_tool = if matches!(update_kind, "tool_call" | "tool_call_update")
                             {
                                 if let Some(tool_call_id) = tool_call_id.as_deref() {
-                                    let (merged, _) = session_clone
+                                    let (merged, existed) = session_clone
                                         .merge_tool_call_presentation(
                                             tool_call_id,
                                             extract_tool_presentation_from_update(update),
                                         )
                                         .await;
+                                    tool_presentation_was_existing = existed;
                                     Some(merged)
                                 } else {
                                     None
@@ -2445,7 +2447,9 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                                     }
                                 }
                             }
-                            if update_kind == "tool_call" {
+                            // Start a new assistant bubble only when we see a tool call for the first time.
+                            // Permission/update events can arrive in different orders, so we guard with cache existence.
+                            if update_kind == "tool_call" && !tool_presentation_was_existing {
                                 session_clone.bump_prompt_agent_segment(&session_id).await;
                             }
                         }
@@ -2485,6 +2489,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                             .await;
                         if !existed && !thread_id.is_empty() {
                             let item_id = format!("tool-{tool_call_id}");
+                            session_clone.bump_prompt_agent_segment(session_id).await;
                             session_clone
                                 .persist_thread_item(
                                     &thread_id,

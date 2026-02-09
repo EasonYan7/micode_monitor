@@ -99,6 +99,7 @@
 - Tool timeline persistence fix: adapter now persists `mcpToolCall` items (`in_progress/completed`) into local thread-items store and rehydrates them on resume.
 - Streaming UX fix: adapter now rotates assistant `itemId` segment after `tool_call`, so post-tool response starts a new assistant bubble instead of appending to pre-tool text.
 - Thread delete semantics fix: context menu now includes `Delete Conversation`; removing a thread no longer drops accumulated `tokenUsageByThread`.
+- Tool bubble split fix v2: trigger assistant segment split on first `session/request_permission` tool presentation as well (not only `session/update.tool_call`), with de-dup guard to avoid double-split.
 - Re-validated after fix:
   - `npm run typecheck`
   - `cargo check --manifest-path src-tauri/Cargo.toml`
