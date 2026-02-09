@@ -5,14 +5,14 @@ mod agent_home;
 #[allow(dead_code)]
 #[path = "../backend/mod.rs"]
 mod backend;
-#[path = "../micode/config.rs"]
-mod micode_config;
 #[path = "../files/io.rs"]
 mod file_io;
 #[path = "../files/ops.rs"]
 mod file_ops;
 #[path = "../files/policy.rs"]
 mod file_policy;
+#[path = "../micode/config.rs"]
+mod micode_config;
 #[path = "../rules.rs"]
 mod rules;
 #[path = "../shared/mod.rs"]
@@ -70,7 +70,7 @@ use tokio::sync::{broadcast, mpsc, Mutex};
 use backend::app_server::{spawn_workspace_session, WorkspaceSession};
 use backend::events::{AppServerEvent, EventSink, TerminalExit, TerminalOutput};
 use shared::micode_core::MiCodeLoginCancelState;
-use shared::{micode_core, files_core, git_core, settings_core, workspaces_core, worktree_core};
+use shared::{files_core, git_core, micode_core, settings_core, workspaces_core, worktree_core};
 use storage::{read_settings, read_workspaces};
 use types::{AppSettings, WorkspaceEntry, WorkspaceInfo, WorkspaceSettings, WorktreeSetupStatus};
 use workspace_settings::apply_workspace_settings_update;
@@ -147,6 +147,15 @@ struct WorkspaceFileResponse {
 }
 
 impl DaemonState {
+    fn mcp_status_has_entries(value: &Value) -> bool {
+        let result = value.get("result").unwrap_or(value);
+        result
+            .get("data")
+            .and_then(Value::as_array)
+            .map(|items| !items.is_empty())
+            .unwrap_or(false)
+    }
+
     fn load(config: &DaemonConfig, event_sink: DaemonEventSink) -> Self {
         let storage_path = config.data_dir.join("workspaces.json");
         let settings_path = config.data_dir.join("settings.json");
@@ -545,7 +554,31 @@ impl DaemonState {
         cursor: Option<String>,
         limit: Option<u32>,
     ) -> Result<Value, String> {
-        micode_core::list_mcp_server_status_core(&self.sessions, workspace_id, cursor, limit).await
+        match micode_core::list_mcp_server_status_core(
+            &self.sessions,
+            workspace_id.clone(),
+            cursor,
+            limit,
+        )
+        .await
+        {
+            Ok(value) => {
+                if Self::mcp_status_has_entries(&value) {
+                    Ok(value)
+                } else {
+                    micode_core::list_mcp_server_status_from_settings_core(
+                        &self.workspaces,
+                        workspace_id,
+                    )
+                    .await
+                    .or(Ok(value))
+                }
+            }
+            Err(_) => {
+                micode_core::list_mcp_server_status_from_settings_core(&self.workspaces, workspace_id)
+                    .await
+            }
+        }
     }
 
     async fn archive_thread(
@@ -635,12 +668,17 @@ impl DaemonState {
     }
 
     async fn micode_login(&self, workspace_id: String) -> Result<Value, String> {
-        micode_core::micode_login_core(&self.sessions, &self.micode_login_cancels, workspace_id).await
+        micode_core::micode_login_core(&self.sessions, &self.micode_login_cancels, workspace_id)
+            .await
     }
 
     async fn micode_login_cancel(&self, workspace_id: String) -> Result<Value, String> {
-        micode_core::micode_login_cancel_core(&self.sessions, &self.micode_login_cancels, workspace_id)
-            .await
+        micode_core::micode_login_cancel_core(
+            &self.sessions,
+            &self.micode_login_cancels,
+            workspace_id,
+        )
+        .await
     }
 
     async fn skills_list(&self, workspace_id: String) -> Result<Value, String> {

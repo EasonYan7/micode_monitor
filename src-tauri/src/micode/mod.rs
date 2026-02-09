@@ -118,6 +118,15 @@ async fn ensure_workspace_session_connected(
     .await
 }
 
+fn mcp_status_has_entries(value: &Value) -> bool {
+    let result = value.get("result").unwrap_or(value);
+    result
+        .get("data")
+        .and_then(Value::as_array)
+        .map(|items| !items.is_empty())
+        .unwrap_or(false)
+}
+
 #[tauri::command]
 pub(crate) async fn micode_doctor(
     micode_bin: Option<String>,
@@ -362,13 +371,51 @@ pub(crate) async fn list_mcp_server_status(
     )
     .await;
     match result {
-        Ok(value) => Ok(value),
+        Ok(value) => {
+            if mcp_status_has_entries(&value) {
+                Ok(value)
+            } else {
+                micode_core::list_mcp_server_status_from_settings_core(
+                    &state.workspaces,
+                    workspace_id,
+                )
+                .await
+                .or(Ok(value))
+            }
+        }
         Err(error) if is_workspace_not_connected_error(&error) => {
             ensure_workspace_session_connected(&state, &workspace_id, &app).await?;
-            micode_core::list_mcp_server_status_core(&state.sessions, workspace_id, cursor, limit)
+            let retried = micode_core::list_mcp_server_status_core(
+                &state.sessions,
+                workspace_id.clone(),
+                cursor,
+                limit,
+            )
+            .await;
+            match retried {
+                Ok(value) => {
+                    if mcp_status_has_entries(&value) {
+                        Ok(value)
+                    } else {
+                        micode_core::list_mcp_server_status_from_settings_core(
+                            &state.workspaces,
+                            workspace_id,
+                        )
+                        .await
+                        .or(Ok(value))
+                    }
+                }
+                Err(_) => micode_core::list_mcp_server_status_from_settings_core(
+                    &state.workspaces,
+                    workspace_id,
+                )
+                .await,
+            }
+        }
+        Err(_) => {
+            micode_core::list_mcp_server_status_from_settings_core(&state.workspaces, workspace_id)
                 .await
         }
-        Err(error) => Err(error),
     }
 }
 

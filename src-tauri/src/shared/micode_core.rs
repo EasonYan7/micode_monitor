@@ -116,6 +116,79 @@ pub(crate) async fn list_mcp_server_status_core(
     session.send_request("mcpServerStatus/list", params).await
 }
 
+pub(crate) async fn list_mcp_server_status_from_settings_core(
+    workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
+    workspace_id: String,
+) -> Result<Value, String> {
+    let (entry, parent_entry) = resolve_workspace_and_parent(workspaces, &workspace_id).await?;
+    let micode_home = resolve_workspace_micode_home(&entry, parent_entry.as_ref())
+        .or_else(resolve_default_micode_home)
+        .ok_or_else(|| "Unable to resolve CODEX_HOME".to_string())?;
+    let settings_path = micode_home.join("settings.json");
+    let raw = std::fs::read_to_string(&settings_path)
+        .map_err(|err| format!("Failed to read {}: {err}", settings_path.display()))?;
+    let root: Value =
+        serde_json::from_str(&raw).map_err(|err| format!("Invalid settings.json: {err}"))?;
+    let mcp_servers = root
+        .get("mcpServers")
+        .cloned()
+        .unwrap_or_else(|| Value::Object(Map::new()));
+    let mut data: Vec<Value> = Vec::new();
+    match mcp_servers {
+        Value::Object(map) => {
+            for (name, config) in map {
+                let transport = config
+                    .get("transport")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                let http_url = config
+                    .get("httpUrl")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                let command = config
+                    .get("command")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                let auth_status = if !http_url.is_empty() || !command.is_empty() {
+                    "configured"
+                } else {
+                    "unknown"
+                };
+                data.push(json!({
+                    "name": name,
+                    "transport": transport,
+                    "httpUrl": if http_url.is_empty() { Value::Null } else { Value::String(http_url.to_string()) },
+                    "command": if command.is_empty() { Value::Null } else { Value::String(command.to_string()) },
+                    "authStatus": auth_status,
+                    "tools": {},
+                }));
+            }
+        }
+        Value::Array(list) => {
+            for item in list {
+                let name = item
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .trim();
+                if name.is_empty() {
+                    continue;
+                }
+                data.push(json!({
+                    "name": name,
+                    "transport": item.get("transport").cloned().unwrap_or(Value::Null),
+                    "httpUrl": item.get("httpUrl").cloned().unwrap_or(Value::Null),
+                    "command": item.get("command").cloned().unwrap_or(Value::Null),
+                    "authStatus": "configured",
+                    "tools": {},
+                }));
+            }
+        }
+        _ => {}
+    }
+    Ok(json!({ "result": { "data": data } }))
+}
+
 pub(crate) async fn archive_thread_core(
     sessions: &Mutex<HashMap<String, Arc<WorkspaceSession>>>,
     workspace_id: String,
