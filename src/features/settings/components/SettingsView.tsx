@@ -341,8 +341,6 @@ export function SettingsView({
   const [micodeArgsDraft, setMiCodeArgsDraft] = useState(
     appSettings.agentArgs ?? appSettings.micodeArgs ?? "",
   );
-  const [remoteHostDraft, setRemoteHostDraft] = useState(appSettings.remoteBackendHost);
-  const [remoteTokenDraft, setRemoteTokenDraft] = useState(appSettings.remoteBackendToken ?? "");
   const [scaleDraft, setScaleDraft] = useState(
     `${Math.round(clampUiScale(appSettings.uiScale) * 100)}%`,
   );
@@ -534,13 +532,6 @@ export function SettingsView({
     setMiCodeArgsDraft(appSettings.agentArgs ?? appSettings.micodeArgs ?? "");
   }, [appSettings.agentArgs, appSettings.micodeArgs]);
 
-  useEffect(() => {
-    setRemoteHostDraft(appSettings.remoteBackendHost);
-  }, [appSettings.remoteBackendHost]);
-
-  useEffect(() => {
-    setRemoteTokenDraft(appSettings.remoteBackendToken ?? "");
-  }, [appSettings.remoteBackendToken]);
 
   useEffect(() => {
     setScaleDraft(`${Math.round(clampUiScale(appSettings.uiScale) * 100)}%`);
@@ -726,29 +717,6 @@ export function SettingsView({
     }
   };
 
-  const handleCommitRemoteHost = async () => {
-    const nextHost = remoteHostDraft.trim() || "127.0.0.1:4732";
-    setRemoteHostDraft(nextHost);
-    if (nextHost === appSettings.remoteBackendHost) {
-      return;
-    }
-    await onUpdateAppSettings({
-      ...appSettings,
-      remoteBackendHost: nextHost,
-    });
-  };
-
-  const handleCommitRemoteToken = async () => {
-    const nextToken = remoteTokenDraft.trim() ? remoteTokenDraft.trim() : null;
-    setRemoteTokenDraft(nextToken ?? "");
-    if (nextToken === appSettings.remoteBackendToken) {
-      return;
-    }
-    await onUpdateAppSettings({
-      ...appSettings,
-      remoteBackendToken: nextToken,
-    });
-  };
 
   const handleCommitScale = async () => {
     if (parsedScale === null) {
@@ -1560,6 +1528,25 @@ export function SettingsView({
                 <div className="settings-subsection-title">Display</div>
                 <div className="settings-subsection-subtitle">
                   Adjust how the window renders backgrounds and effects.
+                </div>
+                <div className="settings-field">
+                  <label className="settings-field-label" htmlFor="language-select">
+                    Language
+                  </label>
+                  <select
+                    id="language-select"
+                    className="settings-select"
+                    value={appSettings.language ?? "en"}
+                    onChange={(event) =>
+                      void onUpdateAppSettings({
+                        ...appSettings,
+                        language: event.target.value as "en" | "zh",
+                      })
+                    }
+                  >
+                    <option value="en">English</option>
+                    <option value="zh">中文</option>
+                  </select>
                 </div>
                 <div className="settings-field">
                   <label className="settings-field-label" htmlFor="theme-select">
@@ -3153,49 +3140,6 @@ export function SettingsView({
                   </div>
                 </div>
 
-                {appSettings.backendMode === "remote" && (
-                  <div className="settings-field">
-                    <div className="settings-field-label">Remote backend</div>
-                    <div className="settings-field-row">
-                      <input
-                        className="settings-input settings-input--compact"
-                        value={remoteHostDraft}
-                        placeholder="127.0.0.1:4732"
-                        onChange={(event) => setRemoteHostDraft(event.target.value)}
-                        onBlur={() => {
-                          void handleCommitRemoteHost();
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            void handleCommitRemoteHost();
-                          }
-                        }}
-                        aria-label="Remote backend host"
-                      />
-                      <input
-                        type="password"
-                        className="settings-input settings-input--compact"
-                        value={remoteTokenDraft}
-                        placeholder="Token (optional)"
-                        onChange={(event) => setRemoteTokenDraft(event.target.value)}
-                        onBlur={() => {
-                          void handleCommitRemoteToken();
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            void handleCommitRemoteToken();
-                          }
-                        }}
-                        aria-label="Remote backend token"
-                      />
-                    </div>
-                    <div className="settings-help">
-                      Start the daemon separately and point Agent Monitor to it (host:port + token).
-                    </div>
-                  </div>
-                )}
 
                 <FileEditorCard
                   title="Global AGENTS.md"
@@ -3422,7 +3366,7 @@ export function SettingsView({
               <section className="settings-section">
                 <div className="settings-section-title">Features</div>
                 <div className="settings-section-subtitle">
-                  Manage stable and experimental agent features.
+                  Manage stable agent features.
                 </div>
                 {hasMiCodeHomeOverrides && (
                   <div className="settings-help">
@@ -3535,52 +3479,6 @@ export function SettingsView({
                       })
                     }
                     aria-pressed={appSettings.unifiedExecEnabled}
-                  >
-                    <span className="settings-toggle-knob" />
-                  </button>
-                </div>
-                <div className="settings-subsection-title">Experimental Features</div>
-                <div className="settings-subsection-subtitle">
-                  Preview features that may change or be removed.
-                </div>
-                <div className="settings-toggle-row">
-                  <div>
-                    <div className="settings-toggle-title">Multi-agent</div>
-                    <div className="settings-toggle-subtitle">
-                      Enable multi-agent collaboration tools in the agent.
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className={`settings-toggle ${appSettings.experimentalCollabEnabled ? "on" : ""}`}
-                    onClick={() =>
-                      void onUpdateAppSettings({
-                        ...appSettings,
-                        experimentalCollabEnabled: !appSettings.experimentalCollabEnabled,
-                      })
-                    }
-                    aria-pressed={appSettings.experimentalCollabEnabled}
-                  >
-                    <span className="settings-toggle-knob" />
-                  </button>
-                </div>
-                <div className="settings-toggle-row">
-                  <div>
-                    <div className="settings-toggle-title">Apps</div>
-                    <div className="settings-toggle-subtitle">
-                      Enable ChatGPT apps/connectors and the <code>/apps</code> command.
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className={`settings-toggle ${appSettings.experimentalAppsEnabled ? "on" : ""}`}
-                    onClick={() =>
-                      void onUpdateAppSettings({
-                        ...appSettings,
-                        experimentalAppsEnabled: !appSettings.experimentalAppsEnabled,
-                      })
-                    }
-                    aria-pressed={appSettings.experimentalAppsEnabled}
                   >
                     <span className="settings-toggle-knob" />
                   </button>

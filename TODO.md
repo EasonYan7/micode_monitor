@@ -47,6 +47,8 @@
 - [x] Remove sidebar bottom-left Account button; localize sidebar usage labels (`Session/Weekly/Resets/Credits/Tokens`) for `中文`
 - [x] Make settings updates optimistic (including language switch) with save-failure rollback
 - [x] Prevent settings UI flashback on save errors (keep optimistic state; log save failure to Debug panel)
+- [x] Remove Features experimental toggles (Multi-agent/Apps) from Settings UI
+- [x] Remove MiCode remote backend host/token inputs from Settings UI
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
