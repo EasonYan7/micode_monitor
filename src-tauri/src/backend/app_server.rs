@@ -115,6 +115,7 @@ impl LocalThreadStore {
         self.records.retain(|entry| entry.thread_id != thread_id);
         let changed = self.records.len() != before;
         if changed {
+            let _ = std::fs::remove_file(self.thread_items_path(thread_id));
             self.persist();
         }
         changed
@@ -211,6 +212,57 @@ impl LocalThreadStore {
         }
         changed
     }
+
+    fn thread_items_path(&self, thread_id: &str) -> PathBuf {
+        let safe_thread_id = thread_id.replace('/', "_");
+        self.path
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join("thread-items")
+            .join(format!("{safe_thread_id}.json"))
+    }
+
+    fn load_thread_items(&self, thread_id: &str) -> Vec<Value> {
+        let path = self.thread_items_path(thread_id);
+        let Ok(raw) = std::fs::read_to_string(path) else {
+            return Vec::new();
+        };
+        serde_json::from_str::<Vec<Value>>(&raw).unwrap_or_default()
+    }
+
+    fn persist_thread_items(&self, thread_id: &str, items: &[Value]) {
+        let path = self.thread_items_path(thread_id);
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(raw) = serde_json::to_string_pretty(items) {
+            let _ = std::fs::write(path, raw);
+        }
+    }
+
+    fn upsert_thread_item(&self, thread_id: &str, item: Value) {
+        let mut items = self.load_thread_items(thread_id);
+        let item_id = item
+            .get("id")
+            .and_then(Value::as_str)
+            .map(|value| value.to_string());
+        if let Some(item_id) = item_id {
+            if let Some(index) = items.iter().position(|entry| {
+                entry
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .map(|value| value == item_id)
+                    .unwrap_or(false)
+            }) {
+                items[index] = item;
+            } else {
+                items.push(item);
+            }
+        } else {
+            items.push(item);
+        }
+        self.persist_thread_items(thread_id, &items);
+    }
 }
 
 fn now_ts() -> i64 {
@@ -231,6 +283,27 @@ fn derive_thread_title(prompt: &str) -> Option<String> {
     }
     let title = compact.chars().take(38).collect::<String>();
     Some(title)
+}
+
+fn build_user_thread_item(thread_id: &str, turn_id: &str, text: &str) -> Value {
+    json!({
+        "id": format!("user-{thread_id}-{turn_id}"),
+        "type": "userMessage",
+        "content": [
+            {
+                "type": "input_text",
+                "text": text
+            }
+        ]
+    })
+}
+
+fn build_agent_thread_item(thread_id: &str, turn_id: &str, text: &str) -> Value {
+    json!({
+        "id": format!("agent-{thread_id}-{turn_id}"),
+        "type": "agentMessage",
+        "text": text
+    })
 }
 
 fn acp_error_message(value: &Value) -> Option<String> {
@@ -922,6 +995,7 @@ pub(crate) struct WorkspaceSession {
     thread_store: Mutex<LocalThreadStore>,
     approval_requests: Mutex<HashMap<String, Value>>,
     pending_prompt_streaming: Mutex<HashMap<String, bool>>,
+    pending_prompt_agent_messages: Mutex<HashMap<String, String>>,
     active_prompts: Mutex<HashMap<String, ActivePromptContext>>,
     background_threads: Mutex<HashMap<String, String>>,
     tool_call_presentations: Mutex<HashMap<String, ToolCallPresentation>>,
@@ -938,6 +1012,10 @@ impl WorkspaceSession {
             .lock()
             .await
             .insert(session_id.to_string(), false);
+        self.pending_prompt_agent_messages
+            .lock()
+            .await
+            .remove(session_id);
     }
 
     async fn register_active_prompt(&self, session_id: &str, thread_id: &str, turn_id: &str) {
@@ -991,6 +1069,42 @@ impl WorkspaceSession {
         let had_streaming = self.finish_prompt_tracking(session_id).await;
         self.clear_active_prompt(session_id).await;
         had_streaming
+    }
+
+    async fn append_prompt_agent_delta(&self, session_id: &str, delta: &str) {
+        if delta.is_empty() {
+            return;
+        }
+        let mut messages = self.pending_prompt_agent_messages.lock().await;
+        let entry = messages.entry(session_id.to_string()).or_default();
+        entry.push_str(delta);
+    }
+
+    async fn take_prompt_agent_message(&self, session_id: &str) -> Option<String> {
+        self.pending_prompt_agent_messages
+            .lock()
+            .await
+            .remove(session_id)
+    }
+
+    async fn persist_thread_item(&self, thread_id: &str, item: Value) {
+        self.thread_store.lock().await.upsert_thread_item(thread_id, item);
+    }
+
+    async fn persist_prompt_agent_item(
+        &self,
+        thread_id: &str,
+        turn_id: &str,
+        session_id: &str,
+    ) {
+        let Some(text) = self.take_prompt_agent_message(session_id).await else {
+            return;
+        };
+        if text.trim().is_empty() {
+            return;
+        }
+        self.persist_thread_item(thread_id, build_agent_thread_item(thread_id, turn_id, &text))
+            .await;
     }
 
     async fn emit_latest_thread_token_usage(&self, thread_id: &str, session_id: &str) {
@@ -1211,10 +1325,23 @@ impl WorkspaceSession {
                     .await
                     .set_session_id(&thread.thread_id, new_session.clone());
                 thread.session_id = new_session;
+                let history_items = self.thread_store.lock().await.load_thread_items(thread_id);
+                let turns = if history_items.is_empty() {
+                    Vec::new()
+                } else {
+                    vec![json!({
+                        "id": format!("turn-history-{}", thread.thread_id),
+                        "items": history_items
+                    })]
+                };
                 Ok(json!({
                     "result": {
-                        "thread": { "id": thread.thread_id, "name": thread.title },
-                        "items": []
+                        "thread": {
+                            "id": thread.thread_id,
+                            "name": thread.title,
+                            "turns": turns
+                        },
+                        "items": history_items
                     }
                 }))
             }
@@ -1349,6 +1476,11 @@ impl WorkspaceSession {
                 }
                 let turn_id = Uuid::new_v4().to_string();
                 if !is_background_thread {
+                    self.persist_thread_item(
+                        &thread_id,
+                        build_user_thread_item(&thread_id, &turn_id, &prompt_text),
+                    )
+                    .await;
                     self.emit_event(
                         "turn/started",
                         json!({
@@ -1381,6 +1513,12 @@ impl WorkspaceSession {
                         let had_streaming = self.finish_prompt_lifecycle(&tracked_session_id).await;
                         if had_streaming {
                             if !is_background_thread {
+                                self.persist_prompt_agent_item(
+                                    &thread_id,
+                                    &turn_id,
+                                    &tracked_session_id,
+                                )
+                                .await;
                                 self.thread_store.lock().await.touch_message(&thread_id);
                                 self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
                                     .await;
@@ -1447,6 +1585,12 @@ impl WorkspaceSession {
                                 self.finish_prompt_lifecycle(&tracked_session_id).await;
                             if had_streaming {
                                 if !is_background_thread {
+                                    self.persist_prompt_agent_item(
+                                        &thread_id,
+                                        &turn_id,
+                                        &tracked_session_id,
+                                    )
+                                    .await;
                                     self.thread_store.lock().await.touch_message(&thread_id);
                                     self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
                                         .await;
@@ -1483,6 +1627,12 @@ impl WorkspaceSession {
                 if let Some(error) = acp_error_message(&response) {
                     if is_request_aborted_message(&error) {
                         if !is_background_thread {
+                            self.persist_prompt_agent_item(
+                                &thread_id,
+                                &turn_id,
+                                &tracked_session_id,
+                            )
+                            .await;
                             self.thread_store.lock().await.touch_message(&thread_id);
                             self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
                                 .await;
@@ -1510,6 +1660,8 @@ impl WorkspaceSession {
                     return Err(format!("turn/start failed: {error}"));
                 }
                 if !is_background_thread {
+                    self.persist_prompt_agent_item(&thread_id, &turn_id, &tracked_session_id)
+                        .await;
                     self.thread_store.lock().await.touch_message(&thread_id);
                     self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
                         .await;
@@ -2069,6 +2221,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
         thread_store: Mutex::new(LocalThreadStore::load(&entry.path)),
         approval_requests: Mutex::new(HashMap::new()),
         pending_prompt_streaming: Mutex::new(HashMap::new()),
+        pending_prompt_agent_messages: Mutex::new(HashMap::new()),
         active_prompts: Mutex::new(HashMap::new()),
         background_threads: Mutex::new(HashMap::new()),
         tool_call_presentations: Mutex::new(HashMap::new()),
@@ -2143,6 +2296,16 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
                                 | "plan"
                         ) {
                             session_clone.mark_prompt_streaming(&session_id).await;
+                        }
+                        if update_kind == "agent_message_chunk" {
+                            let delta = update
+                                .get("content")
+                                .and_then(|content| content.get("text"))
+                                .and_then(Value::as_str)
+                                .unwrap_or_default();
+                            session_clone
+                                .append_prompt_agent_delta(&session_id, delta)
+                                .await;
                         }
                         if let Some(context) = context {
                             let tool_call_id = update
@@ -2525,6 +2688,54 @@ mod tests {
                 .and_then(|v| v.as_i64()),
             Some(48)
         );
+
+        let _ = std::fs::remove_dir_all(PathBuf::from(&root));
+    }
+
+    #[test]
+    fn local_thread_store_persists_and_updates_thread_items() {
+        let root = std::env::temp_dir().join(format!("micode-thread-store-{}", Uuid::new_v4()));
+        let workspace = root.join("workspace");
+        std::fs::create_dir_all(&workspace).expect("create workspace dir");
+        let workspace_path = workspace.to_string_lossy().to_string();
+        let mut store = super::LocalThreadStore::load(&workspace_path);
+
+        let thread_id = "thread-1";
+        store.upsert(super::LocalThreadRecord {
+            thread_id: thread_id.to_string(),
+            session_id: "session-1".to_string(),
+            title: "New Thread".to_string(),
+            archived: false,
+            updated_at: 1,
+            message_index: 0,
+        });
+
+        store.upsert_thread_item(
+            thread_id,
+            json!({
+                "id": "agent-thread-1-turn-1",
+                "type": "agentMessage",
+                "text": "hello"
+            }),
+        );
+        store.upsert_thread_item(
+            thread_id,
+            json!({
+                "id": "agent-thread-1-turn-1",
+                "type": "agentMessage",
+                "text": "hello world"
+            }),
+        );
+
+        let loaded = store.load_thread_items(thread_id);
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(
+            loaded[0].get("text").and_then(Value::as_str),
+            Some("hello world")
+        );
+
+        assert!(store.delete(thread_id));
+        assert!(store.load_thread_items(thread_id).is_empty());
 
         let _ = std::fs::remove_dir_all(PathBuf::from(&root));
     }

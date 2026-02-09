@@ -9,6 +9,7 @@ import type {
   TurnPlan,
 } from "../../../types";
 import { normalizeItem, prepareThreadItems, upsertItem } from "../../../utils/threadItems";
+import { loadThreadTokenUsage } from "../utils/threadStorage";
 
 const MAX_THREAD_NAME_LENGTH = 38;
 
@@ -263,7 +264,7 @@ export const initialState: ThreadState = {
   activeTurnIdByThread: {},
   approvals: [],
   userInputRequests: [],
-  tokenUsageByThread: {},
+  tokenUsageByThread: loadThreadTokenUsage(),
   rateLimitsByWorkspace: {},
   accountByWorkspace: {},
   planByThread: {},
@@ -479,6 +480,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
       const { [action.threadId]: ___, ...restTurns } = state.activeTurnIdByThread;
       const { [action.threadId]: ____, ...restPlans } = state.planByThread;
       const { [action.threadId]: _____, ...restParents } = state.threadParentById;
+      const { [action.threadId]: ______, ...restTokenUsage } = state.tokenUsageByThread;
+      const { [action.threadId]: _______, ...restLastAgent } = state.lastAgentMessageByThread;
       return {
         ...state,
         threadsByWorkspace: {
@@ -490,6 +493,8 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
         activeTurnIdByThread: restTurns,
         planByThread: restPlans,
         threadParentById: restParents,
+        tokenUsageByThread: restTokenUsage,
+        lastAgentMessageByThread: restLastAgent,
         activeThreadIdByWorkspace: {
           ...state.activeThreadIdByWorkspace,
           [action.workspaceId]: nextActive,

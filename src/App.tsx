@@ -106,6 +106,7 @@ import { pickWorkspacePath } from "./services/tauri";
 import type {
   AccessMode,
   ComposerEditorSettings,
+  ThreadTokenUsage,
   WorkspaceInfo,
 } from "./types";
 import { OPEN_APP_STORAGE_KEY } from "./features/app/constants";
@@ -120,6 +121,48 @@ const AboutView = lazy(() =>
     default: module.AboutView,
   })),
 );
+
+function mergeTokenUsage(
+  usages: Array<ThreadTokenUsage | null | undefined>,
+): ThreadTokenUsage | null {
+  let hasUsage = false;
+  const merged: ThreadTokenUsage = {
+    total: {
+      totalTokens: 0,
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+      reasoningOutputTokens: 0,
+    },
+    last: {
+      totalTokens: 0,
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+      reasoningOutputTokens: 0,
+    },
+    modelContextWindow: null,
+  };
+
+  usages.forEach((usage) => {
+    if (!usage) {
+      return;
+    }
+    hasUsage = true;
+    merged.total.totalTokens += usage.total.totalTokens;
+    merged.total.inputTokens += usage.total.inputTokens;
+    merged.total.cachedInputTokens += usage.total.cachedInputTokens;
+    merged.total.outputTokens += usage.total.outputTokens;
+    merged.total.reasoningOutputTokens += usage.total.reasoningOutputTokens;
+    merged.last.totalTokens += usage.last.totalTokens;
+    merged.last.inputTokens += usage.last.inputTokens;
+    merged.last.cachedInputTokens += usage.last.cachedInputTokens;
+    merged.last.outputTokens += usage.last.outputTokens;
+    merged.last.reasoningOutputTokens += usage.last.reasoningOutputTokens;
+  });
+
+  return hasUsage ? merged : null;
+}
 
 const SettingsView = lazy(() =>
   import("./features/settings/components/SettingsView").then((module) => ({
@@ -1062,9 +1105,19 @@ function MainApp() {
   const activeRateLimits = activeWorkspaceId
     ? rateLimitsByWorkspace[activeWorkspaceId] ?? null
     : null;
-  const activeTokenUsage = activeThreadId
-    ? tokenUsageByThread[activeThreadId] ?? null
-    : null;
+  const activeTokenUsage = useMemo(() => {
+    if (!activeWorkspaceId) {
+      return activeThreadId ? tokenUsageByThread[activeThreadId] ?? null : null;
+    }
+    const workspaceThreads = threadsByWorkspace[activeWorkspaceId] ?? [];
+    const workspaceUsage = mergeTokenUsage(
+      workspaceThreads.map((thread) => tokenUsageByThread[thread.id] ?? null),
+    );
+    if (workspaceUsage) {
+      return workspaceUsage;
+    }
+    return activeThreadId ? tokenUsageByThread[activeThreadId] ?? null : null;
+  }, [activeThreadId, activeWorkspaceId, threadsByWorkspace, tokenUsageByThread]);
   const activePlan = activeThreadId
     ? planByThread[activeThreadId] ?? null
     : null;

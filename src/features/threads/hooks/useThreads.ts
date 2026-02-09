@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { CustomPromptOption, DebugEntry, WorkspaceInfo } from "../../../types";
 import { useAppServerEvents } from "../../app/hooks/useAppServerEvents";
 import { initialState, threadReducer } from "./useThreadsReducer";
@@ -14,7 +14,11 @@ import { useThreadSelectors } from "./useThreadSelectors";
 import { useThreadStatus } from "./useThreadStatus";
 import { useThreadUserInput } from "./useThreadUserInput";
 import { setThreadName as setThreadNameService } from "../../../services/tauri";
-import { makeCustomNameKey, saveCustomName } from "../utils/threadStorage";
+import {
+  makeCustomNameKey,
+  saveCustomName,
+  saveThreadTokenUsage,
+} from "../utils/threadStorage";
 
 type UseThreadsOptions = {
   activeWorkspace: WorkspaceInfo | null;
@@ -70,6 +74,11 @@ export function useThreads({
   void pinnedThreadsVersion;
 
   const activeWorkspaceId = activeWorkspace?.id ?? null;
+
+  useEffect(() => {
+    saveThreadTokenUsage(state.tokenUsageByThread);
+  }, [state.tokenUsageByThread]);
+
   const { activeThreadId, activeItems } = useThreadSelectors({
     activeWorkspaceId,
     activeThreadIdByWorkspace: state.activeThreadIdByWorkspace,

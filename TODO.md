@@ -35,6 +35,9 @@
 - [x] Make thread delete remove local persisted thread records (not archive-only)
 - [x] Fallback sidebar usage display to token usage when rate-limit API is synthetic/empty
 - [x] Preserve and display MCP tool identity (`server/tool`) across tool start/completion and approval flow
+- [x] Persist per-thread conversation items locally and restore on `thread/resume`
+- [x] Persist `thread/tokenUsage` to local storage across app restart
+- [x] Aggregate sidebar usage by workspace threads (not only active thread)
 - [ ] Final integration validation and documentation
 
 ## Notes
@@ -86,6 +89,9 @@
 - Usage fallback fix: sidebar `Session`/`Credits` now falls back to `thread/tokenUsage/updated` values when `account/rateLimits/read` is synthetic or empty.
 - Tool label fix: ACP adapter now caches per-`toolCallId` tool identity and emits `mcpToolCall` items with stable `server/tool` fields so UI can render real tool names instead of `Tool Call`/argument fragments.
 - Approval bridge fix: when `session/request_permission` arrives before a tool update, adapter seeds tool identity from `toolCall.kind` and emits a synthetic `item/started` for consistent tool timeline.
+- History persistence fix: backend now writes user/assistant thread items to `.micodemonitor/thread-items/<threadId>.json` during `turn/start`, and returns them in `thread/resume` (`thread.turns[*].items`) so restart/resume can reload message history.
+- Usage persistence fix: frontend now persists `tokenUsageByThread` in localStorage (`micodemonitor.threadTokenUsage`) and restores it at startup.
+- Usage aggregation fix: sidebar usage now sums token usage across all threads in the active workspace, with active-thread fallback when workspace aggregate is unavailable.
 - Re-validated after fix:
   - `npm run typecheck`
   - `cargo check --manifest-path src-tauri/Cargo.toml`
