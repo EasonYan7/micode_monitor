@@ -32,6 +32,27 @@ MiCodeMonitor is a Tauri desktop app for orchestrating multiple MiCode agents ac
 | Usage source | Baseline | Reads MiCode `tmp/*/chats/session-*.json` |
 | Workspace actions | Baseline | Adds clear conversation history action |
 
+## What Was Removed / Changed in This Fork
+
+The following adjustments were made on top of the original CodexMonitor behavior:
+
+- Removed legacy/low-value UI entries:
+  - Removed sidebar bottom-left account button.
+  - Removed `New Clone Agent` flow and related menu/shortcut path.
+  - Simplified creation menu naming and semantics (`New Conversation`, `New Worktree Agent`).
+- Removed settings items that were confusing for current target users:
+  - Removed experimental feature toggles from settings surface.
+  - Removed remote backend host/token inputs from settings surface.
+- Changed slash behavior to match MiCode CLI expectations:
+  - Slash-prefixed input is routed as command-first behavior.
+  - `/mcp` and `/mcp list` behavior aligned with CLI, with settings fallback when runtime status is empty.
+- Changed localization behavior:
+  - Expanded Chinese coverage.
+  - Forced date/relative-time rendering by app language (`en-US` / `zh-CN`) instead of system locale.
+- Changed data lifecycle behavior:
+  - Added “Clear conversation history” at workspace/worktree level.
+  - Enhanced thread history/tool timeline/token usage persistence and restoration.
+
 ## Requirements
 
 - Node.js + npm
