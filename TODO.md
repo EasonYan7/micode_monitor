@@ -72,6 +72,7 @@
 - [x] Resolve frontend TypeScript baseline errors so `npm run typecheck` passes again
 - [x] Add sidebar workspace action: clear project conversation history with confirm dialog, and wipe local history cache (`.micodemonitor` + global `~/.micode|~/.codex/tmp`)
 - [x] Split README into standalone EN/CN versions (`README.md` + `README.zh-CN.md`) with language switch links and MiCode install guide
+- [x] Update README install section with official MiCode one-click install commands (macOS/Linux and Windows)
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

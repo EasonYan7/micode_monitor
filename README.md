@@ -42,9 +42,15 @@ MiCodeMonitor is a Tauri desktop app for orchestrating multiple MiCode agents ac
 
 If MiCode is missing from your environment, run:
 
-```bash
-npm run doctor
+Mac
+``` 
+bash -c "$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)"
 ```
+
+Windows
+``` 
+powershell -ExecutionPolicy Bypass -Command "iwr -useb https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.ps1 | iex"
+``` 
 
 ## Quick Start
 
