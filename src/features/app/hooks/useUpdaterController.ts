@@ -1,13 +1,11 @@
 import { useCallback, useRef } from "react";
-import { useUpdater } from "../../update/hooks/useUpdater";
 import { useAgentSoundNotifications } from "../../notifications/hooks/useAgentSoundNotifications";
 import { useAgentSystemNotifications } from "../../notifications/hooks/useAgentSystemNotifications";
 import { useWindowFocusState } from "../../layout/hooks/useWindowFocusState";
-import { useTauriEvent } from "./useTauriEvent";
 import { playNotificationSound } from "../../../utils/notificationSounds";
-import { subscribeUpdaterCheck } from "../../../services/events";
 import { sendNotification } from "../../../services/tauri";
 import type { DebugEntry } from "../../../types";
+import type { UpdateState } from "../../update/hooks/useUpdater";
 
 type Params = {
   notificationSoundsEnabled: boolean;
@@ -28,31 +26,9 @@ export function useUpdaterController({
   successSoundUrl,
   errorSoundUrl,
 }: Params) {
-  const { state: updaterState, startUpdate, checkForUpdates, dismiss } = useUpdater({
-    onDebug,
-  });
+  const updaterState: UpdateState = { stage: "idle" };
   const isWindowFocused = useWindowFocusState();
   const nextTestSoundIsError = useRef(false);
-
-  const subscribeUpdaterCheckEvent = useCallback(
-    (handler: () => void) =>
-      subscribeUpdaterCheck(handler, {
-        onError: (error) => {
-          onDebug({
-            id: `${Date.now()}-client-updater-menu-error`,
-            timestamp: Date.now(),
-            source: "error",
-            label: "updater/menu-error",
-            payload: error instanceof Error ? error.message : String(error),
-          });
-        },
-      }),
-    [onDebug],
-  );
-
-  useTauriEvent(subscribeUpdaterCheckEvent, () => {
-    void checkForUpdates({ announceNoUpdate: true });
-  });
 
   useAgentSoundNotifications({
     enabled: notificationSoundsEnabled,
@@ -94,11 +70,18 @@ export function useUpdaterController({
     });
   }, [onDebug, systemNotificationsEnabled]);
 
+  const startUpdate = useCallback(() => {
+    // Updates are intentionally disabled in this build.
+  }, []);
+
+  const dismissUpdate = useCallback(() => {
+    // Updates are intentionally disabled in this build.
+  }, []);
+
   return {
     updaterState,
     startUpdate,
-    checkForUpdates,
-    dismissUpdate: dismiss,
+    dismissUpdate,
     handleTestNotificationSound,
     handleTestSystemNotification,
   };

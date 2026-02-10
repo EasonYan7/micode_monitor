@@ -65,8 +65,6 @@ pub(crate) fn build_menu<R: tauri::Runtime>(
     let app_name = handle.package_info().name.clone();
     let about_item =
         MenuItemBuilder::with_id("about", format!("About {app_name}")).build(handle)?;
-    let check_updates_item =
-        MenuItemBuilder::with_id("check_for_updates", "Check for Updates...").build(handle)?;
     let settings_item = MenuItemBuilder::with_id("file_open_settings", "Settings...")
         .accelerator("CmdOrCtrl+,")
         .build(handle)?;
@@ -76,7 +74,6 @@ pub(crate) fn build_menu<R: tauri::Runtime>(
         true,
         &[
             &about_item,
-            &check_updates_item,
             &settings_item,
             &PredefinedMenuItem::separator(handle)?,
             &PredefinedMenuItem::services(handle, None)?,
@@ -331,9 +328,6 @@ pub(crate) fn handle_menu_event<R: tauri::Runtime>(
                 .inner_size(360.0, 240.0)
                 .center()
                 .build();
-        }
-        "check_for_updates" => {
-            let _ = app.emit("updater-check", ());
         }
         "file_new_agent" => emit_menu_event(app, "menu-new-agent"),
         "file_new_worktree_agent" => emit_menu_event(app, "menu-new-worktree-agent"),
