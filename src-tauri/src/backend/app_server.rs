@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -823,14 +823,27 @@ pub(crate) fn set_preferred_model(model: &str) -> Result<bool, String> {
 }
 
 fn find_executable_on_path(name: &str) -> Option<PathBuf> {
-    let path = env::var("PATH").ok()?;
-    for dir in path.split(':') {
-        if dir.trim().is_empty() {
-            continue;
+    let path_var = env::var_os("PATH")?;
+    let mut candidates = vec![name.to_string()];
+    #[cfg(windows)]
+    {
+        let has_extension = Path::new(name).extension().is_some();
+        if !has_extension {
+            // Prefer Windows launchable shims over extensionless npm scripts.
+            candidates = vec![
+                format!("{name}.cmd"),
+                format!("{name}.exe"),
+                format!("{name}.bat"),
+                name.to_string(),
+            ];
         }
-        let candidate = PathBuf::from(dir).join(name);
-        if candidate.is_file() {
-            return Some(candidate);
+    }
+    for dir in env::split_paths(&path_var) {
+        for candidate_name in &candidates {
+            let candidate = dir.join(candidate_name);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
         }
     }
     None
@@ -851,13 +864,33 @@ fn resolve_micode_cli_bundle_path(agent_bin: Option<&str>) -> Option<PathBuf> {
     {
         return Some(canonical);
     }
+    if let Some(parent) = canonical.parent() {
+        let sibling_bundle = parent
+            .join("node_modules")
+            .join("@mi")
+            .join("mi-code-cli")
+            .join("dist")
+            .join("cli.js");
+        if sibling_bundle.is_file() {
+            return Some(sibling_bundle);
+        }
+    }
     if let Ok(raw) = std::fs::read_to_string(&canonical) {
-        if let Some(token) = raw
-            .split_whitespace()
-            .find(|part| part.contains("@mi/mi-code-cli/dist/cli.js"))
-        {
-            let cleaned = token.trim_matches(|ch| ch == '"' || ch == '\'' || ch == ';');
-            let candidate = PathBuf::from(cleaned);
+        if let Some(token) = raw.split_whitespace().find(|part| {
+            part.contains("@mi/mi-code-cli/dist/cli.js")
+                || part.contains("@mi\\mi-code-cli\\dist\\cli.js")
+        }) {
+            let mut cleaned = token
+                .trim_matches(|ch| ch == '"' || ch == '\'' || ch == ';')
+                .to_string();
+            if cleaned.contains("%dp0%") || cleaned.contains("%~dp0") {
+                if let Some(parent) = canonical.parent() {
+                    let parent = parent.to_string_lossy();
+                    cleaned = cleaned.replace("%~dp0", &parent).replace("%dp0%", &parent);
+                }
+            }
+            let normalized = cleaned.replace('\\', "/");
+            let candidate = PathBuf::from(normalized);
             if candidate.is_file() {
                 return Some(candidate);
             }
@@ -2166,12 +2199,8 @@ impl WorkspaceSession {
 }
 
 pub(crate) fn build_micode_path_env(agent_bin: Option<&str>) -> Option<String> {
-    let mut paths: Vec<String> = env::var("PATH")
-        .unwrap_or_default()
-        .split(':')
-        .filter(|value| !value.is_empty())
-        .map(|value| value.to_string())
-        .collect();
+    let path_var = env::var_os("PATH").unwrap_or_default();
+    let mut paths: Vec<PathBuf> = env::split_paths(&path_var).collect();
     let mut extras = vec![
         "/opt/homebrew/bin",
         "/usr/local/bin",
@@ -2181,17 +2210,26 @@ pub(crate) fn build_micode_path_env(agent_bin: Option<&str>) -> Option<String> {
         "/sbin",
     ]
     .into_iter()
-    .map(|value| value.to_string())
-    .collect::<Vec<String>>();
+    .map(PathBuf::from)
+    .collect::<Vec<PathBuf>>();
     if let Ok(home) = env::var("HOME") {
-        extras.push(format!("{home}/.local/bin"));
-        extras.push(format!("{home}/.local/share/mise/shims"));
-        extras.push(format!("{home}/.cargo/bin"));
-        extras.push(format!("{home}/.bun/bin"));
+        extras.push(PathBuf::from(format!("{home}/.local/bin")));
+        extras.push(PathBuf::from(format!("{home}/.local/share/mise/shims")));
+        extras.push(PathBuf::from(format!("{home}/.cargo/bin")));
+        extras.push(PathBuf::from(format!("{home}/.bun/bin")));
+    }
+    #[cfg(windows)]
+    {
+        if let Ok(user_profile) = env::var("USERPROFILE") {
+            extras.push(PathBuf::from(format!(r"{user_profile}\.cargo\bin")));
+        }
+        if let Ok(app_data) = env::var("APPDATA") {
+            extras.push(PathBuf::from(format!(r"{app_data}\npm")));
+        }
     }
     if let Some(bin_path) = agent_bin.filter(|value| !value.trim().is_empty()) {
         if let Some(parent) = Path::new(bin_path).parent() {
-            extras.push(parent.to_string_lossy().to_string());
+            extras.push(parent.to_path_buf());
         }
     }
     for extra in extras {
@@ -2202,15 +2240,51 @@ pub(crate) fn build_micode_path_env(agent_bin: Option<&str>) -> Option<String> {
     if paths.is_empty() {
         None
     } else {
-        Some(paths.join(":"))
+        env::join_paths(paths)
+            .ok()
+            .map(|joined| joined.to_string_lossy().to_string())
     }
 }
 
 pub(crate) fn build_micode_command_with_bin(agent_bin: Option<String>) -> Command {
-    let bin = agent_bin
+    let mut resolved_bin = agent_bin
         .clone()
         .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| "micode".into());
+        .map(|value| value.trim().to_string());
+    #[cfg(windows)]
+    if resolved_bin.is_none() {
+        if let Some(found) = find_executable_on_path("micode")
+            .or_else(|| find_executable_on_path("micode.cmd"))
+            .or_else(|| {
+                env::var("APPDATA").ok().and_then(|app_data| {
+                    let candidate = PathBuf::from(app_data).join("npm").join("micode.cmd");
+                    if candidate.is_file() {
+                        Some(candidate)
+                    } else {
+                        None
+                    }
+                })
+            })
+        {
+            resolved_bin = Some(found.to_string_lossy().to_string());
+        }
+    }
+    let bin = resolved_bin.unwrap_or_else(|| "micode".into());
+    #[cfg(windows)]
+    let mut command = {
+        let ext = Path::new(&bin)
+            .extension()
+            .and_then(|value| value.to_str())
+            .map(|value| value.to_ascii_lowercase());
+        if matches!(ext.as_deref(), Some("cmd" | "bat")) {
+            let mut command = tokio_command("cmd");
+            command.arg("/C").arg(bin.clone());
+            command
+        } else {
+            tokio_command(bin.clone())
+        }
+    };
+    #[cfg(not(windows))]
     let mut command = tokio_command(bin);
     if let Some(path_env) = build_micode_path_env(agent_bin.as_deref()) {
         command.env("PATH", path_env);
@@ -2221,49 +2295,91 @@ pub(crate) fn build_micode_command_with_bin(agent_bin: Option<String>) -> Comman
 pub(crate) async fn check_micode_installation(
     agent_bin: Option<String>,
 ) -> Result<Option<String>, String> {
-    let mut command = build_micode_command_with_bin(agent_bin);
-    command.arg("--version");
-    command.stdout(std::process::Stdio::piped());
-    command.stderr(std::process::Stdio::piped());
+    let explicit_bin = agent_bin
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| value.trim().to_string());
+    let mut candidates: Vec<String> = Vec::new();
+    if let Some(bin) = explicit_bin {
+        candidates.push(bin);
+    } else {
+        candidates.push("micode".to_string());
+        #[cfg(windows)]
+        {
+            candidates.push("micode.cmd".to_string());
+            candidates.push("micode.exe".to_string());
+            if let Some(path) = find_executable_on_path("micode")
+                .or_else(|| find_executable_on_path("micode.cmd"))
+            {
+                candidates.push(path.to_string_lossy().to_string());
+            }
+            if let Ok(app_data) = env::var("APPDATA") {
+                candidates.push(format!(r"{app_data}\npm\micode.cmd"));
+            }
+        }
+    }
 
-    let output = match timeout(Duration::from_secs(5), command.output()).await {
-        Ok(result) => result.map_err(|e| {
-            if e.kind() == ErrorKind::NotFound {
-                "MiCode CLI not found. Install micode and ensure `micode` is on your PATH."
+    let mut dedup = HashSet::new();
+    let mut last_spawn_error: Option<String> = None;
+    for bin in candidates {
+        if !dedup.insert(bin.to_ascii_lowercase()) {
+            continue;
+        }
+        let mut command = build_micode_command_with_bin(Some(bin));
+        command.arg("--version");
+        command.stdout(std::process::Stdio::piped());
+        command.stderr(std::process::Stdio::piped());
+
+        let output = match timeout(Duration::from_secs(5), command.output()).await {
+            Ok(result) => match result {
+                Ok(output) => output,
+                Err(err) => {
+                    if err.kind() == ErrorKind::NotFound {
+                        continue;
+                    }
+                    last_spawn_error = Some(err.to_string());
+                    continue;
+                }
+            },
+            Err(_) => {
+                return Err(
+                    "Timed out while checking MiCode CLI. Make sure `micode --version` runs in Terminal."
+                        .to_string(),
+                );
+            }
+        };
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let detail = if stderr.trim().is_empty() {
+                stdout.trim()
+            } else {
+                stderr.trim()
+            };
+            return Err(if detail.is_empty() {
+                "MiCode CLI failed to start. Try running `micode --version` in Terminal."
                     .to_string()
             } else {
-                e.to_string()
-            }
-        })?,
-        Err(_) => {
-            return Err(
-                "Timed out while checking MiCode CLI. Make sure `micode --version` runs in Terminal."
-                    .to_string(),
-            );
+                format!("MiCode CLI failed to start: {detail}")
+            });
         }
-    };
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let detail = if stderr.trim().is_empty() {
-            stdout.trim()
+        let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        return Ok(if version.is_empty() {
+            None
         } else {
-            stderr.trim()
-        };
-        return Err(if detail.is_empty() {
-            "MiCode CLI failed to start. Try running `micode --version` in Terminal.".to_string()
-        } else {
-            format!("MiCode CLI failed to start: {detail}")
+            Some(version)
         });
     }
 
-    let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    Ok(if version.is_empty() {
-        None
+    if let Some(error) = last_spawn_error {
+        Err(format!(
+            "MiCode CLI failed to start. Try running `micode --version` in Terminal. ({error})"
+        ))
     } else {
-        Some(version)
-    })
+        Err("MiCode CLI not found. Install micode and ensure `micode` is on your PATH.".to_string())
+    }
 }
 
 pub(crate) async fn check_acp_handshake(

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const strict = process.argv.includes("--strict");
@@ -15,6 +15,34 @@ function hasCommand(command) {
         join("C:\\", "Program Files (x86)", "CMake", "bin", "cmake.exe"),
       ];
       return commonInstallPaths.some((path) => existsSync(path));
+    }
+
+    if (command.toLowerCase() === "link") {
+      const vsRoots = [
+        join("C:\\", "Program Files (x86)", "Microsoft Visual Studio", "2022", "BuildTools"),
+        join("C:\\", "Program Files (x86)", "Microsoft Visual Studio", "2022", "Community"),
+        join("C:\\", "Program Files (x86)", "Microsoft Visual Studio", "2022", "Professional"),
+        join("C:\\", "Program Files (x86)", "Microsoft Visual Studio", "2022", "Enterprise"),
+      ];
+
+      for (const root of vsRoots) {
+        const msvcRoot = join(root, "VC", "Tools", "MSVC");
+        if (!existsSync(msvcRoot)) continue;
+
+        const versions = readdirSync(msvcRoot, { withFileTypes: true })
+          .filter((entry) => entry.isDirectory())
+          .map((entry) => entry.name);
+
+        for (const version of versions) {
+          const linkPaths = [
+            join(msvcRoot, version, "bin", "Hostx64", "x64", "link.exe"),
+            join(msvcRoot, version, "bin", "Hostx86", "x86", "link.exe"),
+          ];
+          if (linkPaths.some((path) => existsSync(path))) return true;
+        }
+      }
+
+      return false;
     }
 
     return false;
