@@ -9,7 +9,6 @@
     "opener:default",
     "dialog:default",
     "process:default",
-    "updater:default",
     "window-state:default",
     "liquid-glass:default",
     "notification:default",

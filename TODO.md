@@ -78,6 +78,7 @@
 - [x] Point updater endpoint to fork release feed (`EasonYan7/micode_monitor`)
 - [x] Fix release workflow updater artifacts/URLs to fork naming (`MiCodeMonitor*` + `latest.json`) and document release steps in EN/CN README
 - [x] Disable in-app updater entry/flow (remove menu check-updates item and force updater controller idle/no-op)
+- [x] Disable updater at build/runtime config level (remove updater plugin/permission and turn off updater artifacts in `tauri.conf.json`)
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
