@@ -2,7 +2,8 @@
 
 [English](README.md) | [中文](README.zh-CN.md)
 
-![MiCodeMonitor](screenshot.png)
+![MiCodeMonitor](screenshot.png) <img width="1225" height="831" alt="image" src="https://github.com/user-attachments/assets/bb4342a2-c7b0-405c-832f-3e3389ec2435" />
+
 
 MiCodeMonitor is a Tauri desktop app for orchestrating multiple MiCode agents across local workspaces.
 
