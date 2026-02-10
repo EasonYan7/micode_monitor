@@ -74,6 +74,8 @@
 - [x] Split README into standalone EN/CN versions (`README.md` + `README.zh-CN.md`) with language switch links and MiCode install guide
 - [x] Update README install section with official MiCode one-click install commands (macOS/Linux and Windows)
 - [x] Sync EN/CN README sections describing feature removals and behavior changes from original CodexMonitor
+- [x] Update About panel branding/links (remove Twitter, point GitHub to EasonYan7/micode_monitor, update footer credit)
+- [x] Point updater endpoint to fork release feed (`EasonYan7/micode_monitor`)
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
