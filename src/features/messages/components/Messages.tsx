@@ -207,14 +207,12 @@ function stripInternalJsonPreamble(text: string) {
   let remaining = text;
   // Some MiCode flows prepend internal routing JSON in fenced blocks.
   // Hide those blocks in the chat transcript for end users.
-  while (true) {
-    const match = remaining.match(/^\s*```json\s*\n([\s\S]*?)\n```\s*/i);
-    if (!match) {
-      return remaining;
-    }
+  let match = remaining.match(/^\s*```json\s*\n([\s\S]*?)\n```\s*/i);
+  while (match) {
     const rawJson = match[1]?.trim();
     if (!rawJson) {
       remaining = remaining.slice(match[0].length);
+      match = remaining.match(/^\s*```json\s*\n([\s\S]*?)\n```\s*/i);
       continue;
     }
     let parsed: unknown = null;
@@ -226,6 +224,7 @@ function stripInternalJsonPreamble(text: string) {
         lowerRaw.includes("\"workspace\""));
     if (looksLikeInternalRoutingBlock) {
       remaining = remaining.slice(match[0].length);
+      match = remaining.match(/^\s*```json\s*\n([\s\S]*?)\n```\s*/i);
       continue;
     }
     try {
@@ -240,7 +239,9 @@ function stripInternalJsonPreamble(text: string) {
       return remaining;
     }
     remaining = remaining.slice(match[0].length);
+    match = remaining.match(/^\s*```json\s*\n([\s\S]*?)\n```\s*/i);
   }
+  return remaining;
 }
 
 function parseReasoning(item: Extract<ConversationItem, { kind: "reasoning" }>) {
