@@ -110,6 +110,14 @@ npm run tauri:build:win
 
 产物目录位于：`src-tauri/target/release/bundle/`。
 
+### Windows 用户下载方式
+
+Windows 安装包由 `windows-main` 分支的 GitHub Actions 构建产出。
+
+1. 打开工作流页面：[Build Windows](https://github.com/EasonYan7/micode_monitor/actions/workflows/build-windows.yml)
+2. 按分支筛选 `windows-main`
+3. 打开最近一次成功构建，下载产物 `windows-bundle-*`
+
 说明：当前 Fork 已关闭应用内自动更新，升级请通过 GitHub Releases 手动下载安装。
 
 ## 五、常用校验命令

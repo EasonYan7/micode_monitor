@@ -97,6 +97,14 @@ npm run tauri:build:win
 
 Artifacts are generated under `src-tauri/target/release/bundle/`.
 
+### Windows Download (for end users)
+
+Windows builds are produced from branch `windows-main` via GitHub Actions.
+
+1. Open Actions workflow: [Build Windows](https://github.com/EasonYan7/micode_monitor/actions/workflows/build-windows.yml)
+2. Filter runs by branch `windows-main`
+3. Open the latest successful run and download artifact `windows-bundle-*`
+
 Note: In-app auto-update is currently disabled in this fork. Use GitHub Releases for manual upgrades.
 
 ## Validation Commands
