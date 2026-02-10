@@ -110,7 +110,27 @@ npm run tauri:build:win
 
 产物目录位于：`src-tauri/target/release/bundle/`。
 
-## 五、常用校验命令
+## 五、自动更新发布链路
+
+MiCodeMonitor 使用 Tauri updater，当前更新源为：
+
+- `https://github.com/EasonYan7/micode_monitor/releases/latest/download/latest.json`
+
+要让应用内更新完整可用，请按以下步骤执行：
+
+1. 在仓库中配置 `.github/workflows/release.yml` 依赖的 Secrets / Variables：
+   - 必需：`TAURI_SIGNING_PRIVATE_KEY_B64`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+   - macOS 签名与公证：`APPLE_CERTIFICATE_P12`、`APPLE_CERTIFICATE_PASSWORD`、`APPLE_API_KEY_ID`、`APPLE_API_ISSUER_ID`、`APPLE_API_PRIVATE_KEY_B64`
+   - Variables：`CODESIGN_IDENTITY`、`NOTARY_PROFILE_NAME`、`APPLE_TEAM_ID`
+2. 同步提升版本号：`package.json` 与 `src-tauri/tauri.conf.json`。
+3. 在 GitHub Actions 手动触发 `Release` 工作流（`workflow_dispatch`）。
+4. 确认 Release 附件包含：
+   - `MiCodeMonitor.app.tar.gz`
+   - `MiCodeMonitor.app.tar.gz.sig`
+   - `latest.json`
+5. Release 发布完成后，客户端即可通过“检查更新”下载并安装。
+
+## 六、常用校验命令
 
 ```bash
 npm run typecheck
@@ -118,14 +138,14 @@ npm test
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
-## 六、数据与配置路径
+## 七、数据与配置路径
 
 - 工作区元数据：应用数据目录 `workspaces.json`
 - 应用设置：应用数据目录 `settings.json`
 - MiCode Home：通常为 `~/.micode`（部分链路兼容 `~/.codex`）
 - 本地线程缓存：工作区 `.micodemonitor/` + MiCode tmp/session 数据
 
-## 七、迁移说明
+## 八、迁移说明
 
 可从以下位置查看详细实现与迁移内容：
 

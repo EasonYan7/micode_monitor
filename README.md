@@ -97,6 +97,26 @@ npm run tauri:build:win
 
 Artifacts are generated under `src-tauri/target/release/bundle/`.
 
+## Auto-Update Release Flow
+
+MiCodeMonitor uses Tauri updater with this endpoint:
+
+- `https://github.com/EasonYan7/micode_monitor/releases/latest/download/latest.json`
+
+To make in-app update work end-to-end:
+
+1. Set GitHub repository secrets/variables used by `.github/workflows/release.yml`:
+   - Required: `TAURI_SIGNING_PRIVATE_KEY_B64`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+   - macOS signing/notarization: `APPLE_CERTIFICATE_P12`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`, `APPLE_API_PRIVATE_KEY_B64`
+   - Variables: `CODESIGN_IDENTITY`, `NOTARY_PROFILE_NAME`, `APPLE_TEAM_ID`
+2. Bump version in both `package.json` and `src-tauri/tauri.conf.json`.
+3. Trigger the `Release` workflow manually from GitHub Actions (`workflow_dispatch`).
+4. Confirm release assets include:
+   - `MiCodeMonitor.app.tar.gz`
+   - `MiCodeMonitor.app.tar.gz.sig`
+   - `latest.json`
+5. After release is published, app clients can click `Check for updates` and install directly.
+
 ## Validation Commands
 
 ```bash

@@ -76,6 +76,7 @@
 - [x] Sync EN/CN README sections describing feature removals and behavior changes from original CodexMonitor
 - [x] Update About panel branding/links (remove Twitter, point GitHub to EasonYan7/micode_monitor, update footer credit)
 - [x] Point updater endpoint to fork release feed (`EasonYan7/micode_monitor`)
+- [x] Fix release workflow updater artifacts/URLs to fork naming (`MiCodeMonitor*` + `latest.json`) and document release steps in EN/CN README
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
