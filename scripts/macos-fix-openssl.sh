@@ -45,7 +45,8 @@ libssl="${openssl_prefix}/lib/libssl.3.dylib"
 libcrypto="${openssl_prefix}/lib/libcrypto.3.dylib"
 frameworks_dir="${app_path}/Contents/Frameworks"
 bin_path="${app_path}/Contents/MacOS/micode-monitor"
-daemon_path="${app_path}/Contents/MacOS/micode_monitor_daemon"
+daemon_path_primary="${app_path}/Contents/MacOS/codex_monitor_daemon"
+daemon_path_legacy="${app_path}/Contents/MacOS/micode_monitor_daemon"
 
 if [[ ! -f "${libssl}" || ! -f "${libcrypto}" ]]; then
   echo "OpenSSL dylibs not found at ${openssl_prefix}/lib"
@@ -91,8 +92,10 @@ fi
 codesign --force --options runtime --timestamp --sign "${identity}" "${frameworks_dir}/libcrypto.3.dylib"
 codesign --force --options runtime --timestamp --sign "${identity}" "${frameworks_dir}/libssl.3.dylib"
 codesign --force --options runtime --timestamp --sign "${identity}" "${codesign_entitlements[@]}" "${bin_path}"
-if [[ -f "${daemon_path}" ]]; then
-  codesign --force --options runtime --timestamp --sign "${identity}" "${codesign_entitlements[@]}" "${daemon_path}"
+if [[ -f "${daemon_path_primary}" ]]; then
+  codesign --force --options runtime --timestamp --sign "${identity}" "${codesign_entitlements[@]}" "${daemon_path_primary}"
+elif [[ -f "${daemon_path_legacy}" ]]; then
+  codesign --force --options runtime --timestamp --sign "${identity}" "${codesign_entitlements[@]}" "${daemon_path_legacy}"
 fi
 codesign --force --options runtime --timestamp --sign "${identity}" "${codesign_entitlements[@]}" "${app_path}"
 

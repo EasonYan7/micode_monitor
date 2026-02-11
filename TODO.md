@@ -84,6 +84,7 @@
 - [x] Suppress workspace file index debug payload logs (`files/list` request/response) to keep Debug panel clean
 - [x] Review temporary docs (`TODO 2.md`/`TODO 3.md`/`abc.md`) and keep `TODO.md` as canonical tracker
 - [x] Reduce tool-event debug noise by truncating oversized `item/started|completed` payload fields and add fallback assistant completion hint after tool-only turn end
+- [x] Fix macOS re-sign script daemon binary target (`codex_monitor_daemon`) with legacy fallback
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
