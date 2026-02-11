@@ -217,6 +217,7 @@ export function useThreads({
   const threadHandlers = useThreadEventHandlers({
     activeThreadId,
     dispatch,
+    itemsByThread: state.itemsByThread,
     planByThreadRef,
     getCustomName,
     isThreadHidden,

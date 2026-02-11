@@ -11,6 +11,7 @@ import type { ThreadAction } from "./useThreadsReducer";
 type ThreadEventHandlersOptions = {
   activeThreadId: string | null;
   dispatch: Dispatch<ThreadAction>;
+  itemsByThread: Record<string, { kind: string; status?: string }[]>;
   planByThreadRef: MutableRefObject<Record<string, TurnPlan | null>>;
   getCustomName: (workspaceId: string, threadId: string) => string | undefined;
   isThreadHidden: (workspaceId: string, threadId: string) => boolean;
@@ -35,9 +36,67 @@ type ThreadEventHandlersOptions = {
   pendingInterruptsRef: MutableRefObject<Set<string>>;
 };
 
+const DEBUG_MAX_STRING_LENGTH = 1200;
+const DEBUG_MAX_ARRAY_ITEMS = 32;
+
+function truncateDebugString(value: string) {
+  if (value.length <= DEBUG_MAX_STRING_LENGTH) {
+    return value;
+  }
+  return `${value.slice(0, DEBUG_MAX_STRING_LENGTH)}... [truncated ${value.length - DEBUG_MAX_STRING_LENGTH} chars]`;
+}
+
+function sanitizeDebugEvent(event: AppServerEvent): AppServerEvent {
+  const method = getAppServerRawMethod(event);
+  if (!method) {
+    return event;
+  }
+  const message = event.message ?? {};
+  const params =
+    message && typeof message === "object" && !Array.isArray(message)
+      ? ((message as Record<string, unknown>).params as Record<string, unknown> | undefined)
+      : undefined;
+  if (!params || (method !== "item/started" && method !== "item/completed")) {
+    return event;
+  }
+  const item =
+    params.item && typeof params.item === "object" && !Array.isArray(params.item)
+      ? (params.item as Record<string, unknown>)
+      : null;
+  if (!item) {
+    return event;
+  }
+  const nextItem: Record<string, unknown> = { ...item };
+  const result = nextItem.result;
+  if (typeof result === "string") {
+    nextItem.result = truncateDebugString(result);
+  }
+  const error = nextItem.error;
+  if (typeof error === "string") {
+    nextItem.error = truncateDebugString(error);
+  }
+  const args = nextItem.arguments;
+  if (Array.isArray(args) && args.length > DEBUG_MAX_ARRAY_ITEMS) {
+    nextItem.arguments = [
+      ...args.slice(0, DEBUG_MAX_ARRAY_ITEMS),
+      `... [truncated ${args.length - DEBUG_MAX_ARRAY_ITEMS} items]`,
+    ];
+  }
+  const nextParams: Record<string, unknown> = { ...params, item: nextItem };
+  const nextMessage: Record<string, unknown> = {
+    ...(message as Record<string, unknown>),
+    params: nextParams,
+  };
+  return {
+    ...event,
+    message: nextMessage,
+  };
+}
+
 export function useThreadEventHandlers({
   activeThreadId,
   dispatch,
+  itemsByThread,
   planByThreadRef,
   getCustomName,
   isThreadHidden,
@@ -95,6 +154,7 @@ export function useThreadEventHandlers({
     onTurnError,
   } = useThreadTurnEvents({
     dispatch,
+    itemsByThread,
     planByThreadRef,
     getCustomName,
     isThreadHidden,
@@ -119,14 +179,15 @@ export function useThreadEventHandlers({
 
   const onAppServerEvent = useCallback(
     (event: AppServerEvent) => {
-      const method = getAppServerRawMethod(event) ?? "";
+      const sanitizedEvent = sanitizeDebugEvent(event);
+      const method = getAppServerRawMethod(sanitizedEvent) ?? "";
       const inferredSource = method === "micode/stderr" ? "stderr" : "event";
       onDebug?.({
         id: `${Date.now()}-server-event`,
         timestamp: Date.now(),
         source: inferredSource,
         label: method || "event",
-        payload: event,
+        payload: sanitizedEvent,
       });
     },
     [onDebug],

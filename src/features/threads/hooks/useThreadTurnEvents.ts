@@ -13,6 +13,7 @@ import type { ThreadAction } from "./useThreadsReducer";
 
 type UseThreadTurnEventsOptions = {
   dispatch: Dispatch<ThreadAction>;
+  itemsByThread: Record<string, { kind: string; status?: string }[]>;
   planByThreadRef: MutableRefObject<Record<string, TurnPlan | null>>;
   getCustomName: (workspaceId: string, threadId: string) => string | undefined;
   isThreadHidden: (workspaceId: string, threadId: string) => boolean;
@@ -27,6 +28,7 @@ type UseThreadTurnEventsOptions = {
 
 export function useThreadTurnEvents({
   dispatch,
+  itemsByThread,
   planByThreadRef,
   getCustomName,
   isThreadHidden,
@@ -128,6 +130,18 @@ export function useThreadTurnEvents({
 
   const onTurnCompleted = useCallback(
     (_workspaceId: string, threadId: string, turnId: string) => {
+      const threadItems = itemsByThread[threadId] ?? [];
+      const latestItem = threadItems[threadItems.length - 1] ?? null;
+      const shouldAddCompletionHint =
+        latestItem?.kind === "tool" &&
+        (latestItem.status === undefined || latestItem.status === "completed");
+      if (shouldAddCompletionHint) {
+        dispatch({
+          type: "addAssistantMessage",
+          threadId,
+          text: "已完成工具执行。",
+        });
+      }
       markProcessing(threadId, false);
       setActiveTurnId(threadId, null);
       pendingInterruptsRef.current.delete(threadId);
@@ -136,6 +150,7 @@ export function useThreadTurnEvents({
       }
     },
     [
+      itemsByThread,
       dispatch,
       markProcessing,
       pendingInterruptsRef,

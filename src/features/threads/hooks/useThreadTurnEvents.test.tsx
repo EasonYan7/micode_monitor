@@ -25,6 +25,7 @@ vi.mock("../utils/threadNormalize", () => ({
 type SetupOverrides = {
   pendingInterrupts?: string[];
   planByThread?: Record<string, TurnPlan | null>;
+  itemsByThread?: Record<string, { kind: string; status?: string }[]>;
 };
 
 const makeOptions = (overrides: SetupOverrides = {}) => {
@@ -43,10 +44,12 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
   const planByThreadRef = {
     current: overrides.planByThread ?? {},
   };
+  const itemsByThread = overrides.itemsByThread ?? {};
 
   const { result } = renderHook(() =>
     useThreadTurnEvents({
       dispatch,
+      itemsByThread,
       planByThreadRef,
       getCustomName,
       isThreadHidden,
@@ -246,6 +249,24 @@ describe("useThreadTurnEvents", () => {
     expect(pendingInterruptsRef.current.has("thread-1")).toBe(false);
   });
 
+  it("adds a completion hint when a turn ends on a completed tool item", () => {
+    const { result, dispatch } = makeOptions({
+      itemsByThread: {
+        "thread-1": [{ kind: "tool", status: "completed" }],
+      },
+    });
+
+    act(() => {
+      result.current.onTurnCompleted("ws-1", "thread-1", "turn-1");
+    });
+
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "addAssistantMessage",
+      threadId: "thread-1",
+      text: "已完成工具执行。",
+    });
+  });
+
   it("clears the active plan when all plan steps are completed", () => {
     const { result, dispatch } = makeOptions({
       planByThread: {
@@ -326,10 +347,12 @@ describe("useThreadTurnEvents", () => {
     const planByThreadRef = {
       current: {} as Record<string, TurnPlan | null>,
     };
+    const itemsByThread = {};
 
     const { result, rerender } = renderHook(() =>
       useThreadTurnEvents({
         dispatch,
+        itemsByThread,
         planByThreadRef,
         getCustomName,
         isThreadHidden,
