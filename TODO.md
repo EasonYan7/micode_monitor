@@ -86,6 +86,7 @@
 - [x] Reduce tool-event debug noise by truncating oversized `item/started|completed` payload fields and add fallback assistant completion hint after tool-only turn end
 - [x] Fix macOS re-sign script daemon binary target (`codex_monitor_daemon`) with legacy fallback
 - [x] Fix macOS bundle dylib relocation: embed `libgit2/libssh2/openssl` into app and rewrite `micode-monitor` linkage to `@rpath` (remove `/opt/homebrew/...` runtime deps)
+- [x] Add release CI guard to fail macOS build if binary linkage still contains `/opt/homebrew` or `/usr/local/opt` absolute dylib paths
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

@@ -96,6 +96,16 @@ jobs:
           CODESIGN_IDENTITY="$CODESIGN_IDENTITY" \
             scripts/macos-fix-openssl.sh
 
+      - name: Verify macOS dylib linkage
+        run: |
+          set -euo pipefail
+          APP_BIN="src-tauri/target/release/bundle/macos/MiCode Monitor.app/Contents/MacOS/micode-monitor"
+          otool -L "$APP_BIN" | tee /tmp/micode-monitor-otool.txt
+          if rg -q '/opt/homebrew|/usr/local/opt' /tmp/micode-monitor-otool.txt; then
+            echo "Found non-portable absolute dylib paths in app binary"
+            exit 1
+          fi
+
       - name: Notarize and staple
         run: |
           set -euo pipefail
