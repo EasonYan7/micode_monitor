@@ -53,22 +53,8 @@ export function useWorkspaceFiles({
     inFlight.current = workspaceId;
     const requestWorkspaceId = workspaceId;
     setIsLoading(true);
-    onDebug?.({
-      id: `${Date.now()}-client-files-list`,
-      timestamp: Date.now(),
-      source: "client",
-      label: "files/list",
-      payload: { workspaceId: requestWorkspaceId },
-    });
     try {
       const response = await getWorkspaceFiles(requestWorkspaceId);
-      onDebug?.({
-        id: `${Date.now()}-server-files-list`,
-        timestamp: Date.now(),
-        source: "server",
-        label: "files/list response",
-        payload: response,
-      });
       if (requestWorkspaceId === workspaceId) {
         const nextFiles = Array.isArray(response) ? response : [];
         setFiles((prev) => (areStringArraysEqual(prev, nextFiles) ? prev : nextFiles));

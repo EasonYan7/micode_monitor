@@ -81,6 +81,7 @@
 - [x] Disable updater at build/runtime config level (remove updater plugin/permission and turn off updater artifacts in `tauri.conf.json`)
 - [x] Add GitHub Actions Windows build workflow (`build-windows.yml`) for `windows-main` branch + manual dispatch + artifact upload
 - [x] Update EN/CN README with Windows end-user download flow from `windows-main` Actions artifacts
+- [x] Suppress workspace file index debug payload logs (`files/list` request/response) to keep Debug panel clean
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
