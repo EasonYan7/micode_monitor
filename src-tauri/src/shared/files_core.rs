@@ -3,10 +3,10 @@ use std::path::PathBuf;
 
 use tokio::sync::Mutex;
 
-use crate::micode::home as agent_home;
 use crate::files::io::TextFileResponse;
 use crate::files::ops::{read_with_policy, write_with_policy};
 use crate::files::policy::{policy_for, FileKind, FileScope};
+use crate::micode::home as agent_home;
 use crate::types::WorkspaceEntry;
 
 fn resolve_default_micode_home() -> Result<PathBuf, String> {
