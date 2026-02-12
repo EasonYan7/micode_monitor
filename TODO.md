@@ -95,6 +95,7 @@
 - [x] Ignore and untrack local runtime workspace data (`.micodemonitor/`) to avoid leaking local sessions/rules into repository history
 - [x] Remove duplicate shadow files (`* 2.*` / `* 3.*`) that are not part of active compile chain
 - [x] Add bootstrap scripts for beginners (`bootstrap:mac`, `bootstrap:win`) and package-manager fallback guidance (`brew`/`winget`/`choco`)
+- [x] Rewrite README for beginner onboarding: make Chinese default on homepage (`README.md`) and swap English guide to `README.zh-CN.md`, with step-by-step download/install/build/config flow
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

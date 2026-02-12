@@ -1,156 +1,119 @@
-# MiCodeMonitor
+# MiCodeMonitor（新手版中文说明）
 
-[English](README.md) | [中文](README.zh-CN.md)
+[English](README.zh-CN.md) | [中文](README.md)
 
-![MiCodeMonitor](screenshot.png) <img width="1225" height="831" alt="image" src="https://github.com/user-attachments/assets/bb4342a2-c7b0-405c-832f-3e3389ec2435" />
+![MiCodeMonitor](screenshot.png)
 
+MiCodeMonitor 是一个基于 Tauri 的桌面应用，用于在本地工作区里使用 MiCode。
 
-MiCodeMonitor is a Tauri desktop app for orchestrating multiple MiCode agents across local workspaces.
+## 当前发布策略（先看这个）
 
-## Current Distribution Policy
+- 当前仓库以**源码分发**为主，适合团队内测。
+- GitHub `Release` 工作流默认是暂停状态（需要手动确认才会跑正式发布）。
+- 如果你是第一次使用，先按下面“快速上手（小白路径）”走。
 
-- This repository currently uses **source-first distribution** for team testing.
-- The `Release` workflow is **paused by default** and requires manual confirmation input.
-- Use local build instructions: [`BUILD_LOCAL.md`](BUILD_LOCAL.md).
+## 快速上手（小白路径）
 
-## Origin & Attribution
+### 0. 下载源码
 
-- This project is derived from [Dimillian/CodexMonitor](https://github.com/Dimillian/CodexMonitor).
-- The migration history and rationale are tracked in [`TODO.md`](TODO.md).
-- Thanks to the original CodexMonitor maintainers for the architecture baseline.
+1. 打开仓库主页：<https://github.com/EasonYan7/micode_monitor>
+2. 点击 `Code` -> `Download ZIP`（或 `git clone`）
+3. 解压后进入项目目录
 
-## Why This Fork
+### 1. 一键安装依赖并启动（推荐）
 
-- Align GUI behavior with MiCode CLI behavior.
-- Improve Chinese localization and settings stability.
-- Improve thread/history/token usage persistence and recovery.
-- Add practical project operations (for example: clear project conversation history).
-
-## Key Differences vs Upstream CodexMonitor
-
-| Area | CodexMonitor (upstream) | MiCodeMonitor (this repo) |
-|---|---|---|
-| Runtime | `codex app-server` | MiCode ACP / app-server compatibility path |
-| Slash behavior | Codex-oriented | MiCode CLI parity (`/mcp list`, routing/fallback fixes) |
-| MCP visibility | Runtime-only | Added settings fallback + routing fixes |
-| Localization | Mostly English | Extended Chinese coverage + i18n fixes |
-| Persistence | Baseline | Enhanced history/tool timeline/token usage persistence |
-| Usage source | Baseline | Reads MiCode `tmp/*/chats/session-*.json` |
-| Workspace actions | Baseline | Adds clear conversation history action |
-
-## What Was Removed / Changed in This Fork
-
-The following adjustments were made on top of the original CodexMonitor behavior:
-
-- Removed legacy/low-value UI entries:
-  - Removed sidebar bottom-left account button.
-  - Removed `New Clone Agent` flow and related menu/shortcut path.
-  - Simplified creation menu naming and semantics (`New Conversation`, `New Worktree Agent`).
-- Removed settings items that were confusing for current target users:
-  - Removed experimental feature toggles from settings surface.
-  - Removed remote backend host/token inputs from settings surface.
-- Changed slash behavior to match MiCode CLI expectations:
-  - Slash-prefixed input is routed as command-first behavior.
-  - `/mcp` and `/mcp list` behavior aligned with CLI, with settings fallback when runtime status is empty.
-- Changed localization behavior:
-  - Expanded Chinese coverage.
-  - Forced date/relative-time rendering by app language (`en-US` / `zh-CN`) instead of system locale.
-- Changed data lifecycle behavior:
-  - Added “Clear conversation history” at workspace/worktree level.
-  - Enhanced thread history/tool timeline/token usage persistence and restoration.
-
-## Requirements
-
-- Node.js + npm
-- Rust stable toolchain
-- CMake (required by native dependencies)
-- MiCode CLI available in `PATH`
-- Git CLI
-- `gh` (optional, for GitHub panel workflows)
-
-If MiCode is missing from your environment, run:
-
-Mac
-``` 
-bash -c "$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)"
-```
-
-Windows
-``` 
-powershell -ExecutionPolicy Bypass -Command "iwr -useb https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.ps1 | iex"
-``` 
-
-## Quick Start
+macOS：
 
 ```bash
-npm install
-npm run doctor:strict
+npm run bootstrap:mac
 npm run tauri:dev
 ```
 
-If your machine is missing dependencies, run:
+Windows（PowerShell）：
+
+```powershell
+npm run bootstrap:win
+npm run tauri:dev:win
+```
+
+### 2. 如果一键失败，用这个排查
+
+```bash
+npm run doctor:strict
+```
+
+自动修复依赖：
 
 ```bash
 npm run doctor:install
 ```
 
-Or run full bootstrap:
+Windows 自动修复：
 
-```bash
-npm run bootstrap:mac
+```powershell
+npm run doctor:win:install
 ```
 
-## Build
+## 打包安装包
 
-### macOS
+macOS：
 
 ```bash
 npm run tauri:build
 ```
 
-### Windows
+Windows：
 
-```bash
+```powershell
 npm run tauri:build:win
 ```
 
-Artifacts are generated under `src-tauri/target/release/bundle/`.
+产物目录：`src-tauri/target/release/bundle/`
 
-### Windows Download (for end users)
+## 同事拿到代码后最短流程
 
-Windows builds are produced from branch `windows-main` via GitHub Actions.
+1. 安装 Node.js（含 npm）
+2. 安装 Rust（rustup）
+3. 执行 `npm run bootstrap:mac` 或 `npm run bootstrap:win`
+4. 执行 `npm run tauri:dev`（Windows 用 `npm run tauri:dev:win`）
 
-1. Open Actions workflow: [Build Windows](https://github.com/EasonYan7/micode_monitor/actions/workflows/build-windows.yml)
-2. Filter runs by branch `windows-main`
-3. Open the latest successful run and download artifact `windows-bundle-*`
+## 需要重点参考的文件
 
-Note: In-app auto-update is currently disabled in this fork. For now, prefer source-based local build/testing.
+- 新手本地构建：`BUILD_LOCAL.zh-CN.md`
+- 英文构建说明：`BUILD_LOCAL.md`
+- 迁移与改造记录：`TODO.md`
+- 关键后端入口：`src-tauri/src/lib.rs`
+- ACP/会话核心：`src-tauri/src/backend/app_server.rs`
 
-## Validation Commands
+## 常见问题
+
+### Q1：报 `micode: command not found`
+
+执行：
 
 ```bash
-npm run typecheck
-npm test
-cargo check --manifest-path src-tauri/Cargo.toml
+bash -c "$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)"
 ```
 
-## Data & Config Paths
+Windows：
 
-- Workspace metadata: app data `workspaces.json`
-- App settings: app data `settings.json`
-- MiCode home: usually `~/.micode` (with compatibility fallback to `~/.codex` in some flows)
-- Local thread cache/history: workspace `.micodemonitor/` and MiCode tmp/session data
+```powershell
+powershell -ExecutionPolicy Bypass -Command "iwr -useb https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.ps1 | iex"
+```
 
-## Migration Notes
+### Q2：macOS 报没有 `brew`
 
-For migration milestones and implementation details, see:
+`npm run doctor:install` 会尝试自动安装 Homebrew，然后继续安装依赖。
 
-- [`TODO.md`](TODO.md)
-- `src-tauri/src/lib.rs`
-- `src-tauri/src/bin/codex_monitor_daemon.rs`
-- `src-tauri/src/shared/`
-- `src/features/`
+### Q3：Windows 没有 `winget`
 
-## License
+`npm run doctor:win:install` 会自动尝试回退到 `choco`。
 
-Please follow the upstream repository license and your internal distribution policy.
+### Q4：为什么现在不直接发 dmg 给所有人
+
+因为当前阶段以源码内测为主，等流程稳定后再由有 Apple Developer 账号的同学负责正式签名/公证发布。
+
+## 致谢与来源
+
+- 本项目基于 [Dimillian/CodexMonitor](https://github.com/Dimillian/CodexMonitor) 演进。
+- 感谢原项目维护者提供基础架构。
