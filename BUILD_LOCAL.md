@@ -29,6 +29,12 @@ Auto-install missing dependencies (macOS/Linux):
 npm run doctor:install
 ```
 
+One-command bootstrap (dependency install + npm install):
+
+```bash
+npm run bootstrap:mac
+```
+
 ## 2. macOS (Apple Silicon)
 
 Install dependencies:
@@ -73,6 +79,12 @@ Auto-install missing dependencies (Windows):
 npm run doctor:win:install
 ```
 
+One-command bootstrap (dependency install + npm install):
+
+```powershell
+npm run bootstrap:win
+```
+
 Build and run:
 
 ```powershell
@@ -94,6 +106,10 @@ Output path:
 
 - `Doctor: missing dependencies ...`:
   - Install missing commands first, then rerun `npm run doctor:strict`.
+- macOS without `brew`:
+  - `npm run doctor:install` will try to install Homebrew automatically.
+- Windows without `winget`:
+  - `npm run doctor:win:install` falls back to `choco` if available.
 - Tauri/Rust build errors:
   - Ensure Rust toolchain is installed and shell is restarted.
 - MiCode command not found:

@@ -29,6 +29,12 @@ npm run doctor:strict
 npm run doctor:install
 ```
 
+一键引导（自动装依赖 + npm install）：
+
+```bash
+npm run bootstrap:mac
+```
+
 ## 2. macOS（Apple Silicon）
 
 安装依赖：
@@ -73,6 +79,12 @@ powershell -ExecutionPolicy Bypass -Command "iwr -useb https://cnbj1-fds.api.xia
 npm run doctor:win:install
 ```
 
+一键引导（自动装依赖 + npm install）：
+
+```powershell
+npm run bootstrap:win
+```
+
 开发运行：
 
 ```powershell
@@ -94,6 +106,10 @@ npm run tauri:build:win
 
 - `Doctor: missing dependencies ...`：
   - 先安装缺失依赖，再执行 `npm run doctor:strict`。
+- macOS 没有 `brew`：
+  - `npm run doctor:install` 会尝试自动安装 Homebrew。
+- Windows 没有 `winget`：
+  - `npm run doctor:win:install` 会自动回退到 `choco`（若可用）。
 - Tauri/Rust 编译报错：
   - 确认 Rust 工具链已安装，并重开终端。
 - 找不到 `micode` 命令：

@@ -54,13 +54,32 @@ install_micode_unix() {
   sh -c "$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)"
 }
 
+install_homebrew_if_missing() {
+  if command -v brew >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "Auto-install failed: curl is required to install Homebrew."
+    return 1
+  fi
+  echo "Homebrew not found. Installing Homebrew first..."
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || return 1
+  if [ -x /opt/homebrew/bin/brew ]; then
+    PATH="/opt/homebrew/bin:$PATH"
+  elif [ -x /usr/local/bin/brew ]; then
+    PATH="/usr/local/bin:$PATH"
+  fi
+  export PATH
+  command -v brew >/dev/null 2>&1
+}
+
 if [ "$INSTALL" -eq 1 ]; then
   case "$(uname -s)" in
     Darwin)
-      if ! command -v brew >/dev/null 2>&1; then
-        echo "Auto-install failed: Homebrew is required on macOS."
+      install_homebrew_if_missing || {
+        echo "Auto-install failed: Homebrew install did not complete."
         exit 1
-      fi
+      }
       base_pkgs=""
       if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
         base_pkgs="$base_pkgs node"

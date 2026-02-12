@@ -16,6 +16,8 @@
     "doctor:install": "sh scripts/doctor.sh --install --strict",
     "doctor:win": "node scripts/doctor.mjs --strict",
     "doctor:win:install": "node scripts/doctor.mjs --install --strict",
+    "bootstrap:mac": "sh scripts/bootstrap-macos.sh",
+    "bootstrap:win": "powershell -ExecutionPolicy Bypass -File scripts/bootstrap-windows.ps1",
     "lint": "eslint . --ext .ts,.tsx",
     "test": "vitest run",
     "test:watch": "vitest",

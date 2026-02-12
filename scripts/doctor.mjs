@@ -34,13 +34,20 @@ console.log("Required: node npm rustc cargo cmake git micode");
 
 if (install) {
   if (process.platform === "win32") {
+    const installer = hasCommand("winget") ? "winget" : (hasCommand("choco") ? "choco" : "");
+    if (!installer) {
+      console.log("Auto-install failed: neither winget nor choco is available.");
+      console.log("Install winget: https://aka.ms/getwinget");
+      console.log("Install choco: https://chocolatey.org/install");
+      process.exit(1);
+    }
     const installMap = [
-      ["node", ["winget", ["install", "--id", "OpenJS.NodeJS", "-e"]]],
-      ["npm", ["winget", ["install", "--id", "OpenJS.NodeJS", "-e"]]],
-      ["rustc", ["winget", ["install", "--id", "Rustlang.Rustup", "-e"]]],
-      ["cargo", ["winget", ["install", "--id", "Rustlang.Rustup", "-e"]]],
-      ["cmake", ["winget", ["install", "--id", "Kitware.CMake", "-e"]]],
-      ["git", ["winget", ["install", "--id", "Git.Git", "-e"]]],
+      ["node", installer === "winget" ? ["winget", ["install", "--id", "OpenJS.NodeJS", "-e"]] : ["choco", ["install", "-y", "nodejs"]]],
+      ["npm", installer === "winget" ? ["winget", ["install", "--id", "OpenJS.NodeJS", "-e"]] : ["choco", ["install", "-y", "nodejs"]]],
+      ["rustc", installer === "winget" ? ["winget", ["install", "--id", "Rustlang.Rustup", "-e"]] : ["choco", ["install", "-y", "rustup.install"]]],
+      ["cargo", installer === "winget" ? ["winget", ["install", "--id", "Rustlang.Rustup", "-e"]] : ["choco", ["install", "-y", "rustup.install"]]],
+      ["cmake", installer === "winget" ? ["winget", ["install", "--id", "Kitware.CMake", "-e"]] : ["choco", ["install", "-y", "cmake"]]],
+      ["git", installer === "winget" ? ["winget", ["install", "--id", "Git.Git", "-e"]] : ["choco", ["install", "-y", "git"]]],
     ];
     const planned = new Set();
     for (const [cmd, [installer, args]] of installMap) {
@@ -48,7 +55,7 @@ if (install) {
         const key = `${installer} ${args.join(" ")}`;
         if (planned.has(key)) continue;
         planned.add(key);
-        console.log(`Installing ${cmd} via winget...`);
+        console.log(`Installing ${cmd} via ${installer}...`);
         if (!run(installer, args)) {
           console.log(`Install failed for ${cmd}. Please run manually.`);
           process.exit(1);
@@ -91,11 +98,13 @@ switch (process.platform) {
     console.log('MiCode: bash -c "$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)"');
     break;
   case "win32":
-    console.log("Install with winget/choco:");
+    console.log("Install with winget (preferred):");
     console.log("  winget install OpenJS.NodeJS");
     console.log("  winget install Rustlang.Rustup");
     console.log("  winget install Kitware.CMake");
     console.log("  winget install Git.Git");
+    console.log("Or with choco:");
+    console.log("  choco install -y nodejs rustup.install cmake git");
     console.log("MiCode (PowerShell):");
     console.log('  powershell -ExecutionPolicy Bypass -Command "iwr -useb https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.ps1 | iex"');
     break;

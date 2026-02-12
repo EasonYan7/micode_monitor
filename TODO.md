@@ -92,6 +92,9 @@
 - [x] Expand doctor checks (`node/npm/rustc/cargo/cmake/git/micode`) and update install hints for macOS/Windows/Linux
 - [x] Update README EN/CN to explicitly state source-first distribution and local build flow
 - [x] Add optional doctor auto-install mode (`npm run doctor:install`, `npm run doctor:win:install`) to reduce teammate setup friction
+- [x] Ignore and untrack local runtime workspace data (`.micodemonitor/`) to avoid leaking local sessions/rules into repository history
+- [x] Remove duplicate shadow files (`* 2.*` / `* 3.*`) that are not part of active compile chain
+- [x] Add bootstrap scripts for beginners (`bootstrap:mac`, `bootstrap:win`) and package-manager fallback guidance (`brew`/`winget`/`choco`)
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

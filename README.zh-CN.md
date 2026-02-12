@@ -107,6 +107,12 @@ npm run tauri:dev
 npm run doctor:install
 ```
 
+或者直接执行一键引导：
+
+```bash
+npm run bootstrap:mac
+```
+
 ## 四、打包
 
 ### macOS

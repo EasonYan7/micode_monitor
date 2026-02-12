@@ -94,6 +94,12 @@ If your machine is missing dependencies, run:
 npm run doctor:install
 ```
 
+Or run full bootstrap:
+
+```bash
+npm run bootstrap:mac
+```
+
 ## Build
 
 ### macOS
