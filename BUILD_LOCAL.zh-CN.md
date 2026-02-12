@@ -23,6 +23,12 @@
 npm run doctor:strict
 ```
 
+自动安装缺失依赖（macOS/Linux）：
+
+```bash
+npm run doctor:install
+```
+
 ## 2. macOS（Apple Silicon）
 
 安装依赖：
@@ -59,6 +65,12 @@ winget install Rustlang.Rustup
 winget install Kitware.CMake
 winget install Git.Git
 powershell -ExecutionPolicy Bypass -Command "iwr -useb https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.ps1 | iex"
+```
+
+自动安装缺失依赖（Windows）：
+
+```powershell
+npm run doctor:win:install
 ```
 
 开发运行：

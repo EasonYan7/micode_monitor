@@ -101,6 +101,12 @@ npm run doctor:strict
 npm run tauri:dev
 ```
 
+如果缺少依赖，可执行自动安装：
+
+```bash
+npm run doctor:install
+```
+
 ## 四、打包
 
 ### macOS

@@ -23,6 +23,12 @@ Quick check:
 npm run doctor:strict
 ```
 
+Auto-install missing dependencies (macOS/Linux):
+
+```bash
+npm run doctor:install
+```
+
 ## 2. macOS (Apple Silicon)
 
 Install dependencies:
@@ -59,6 +65,12 @@ winget install Rustlang.Rustup
 winget install Kitware.CMake
 winget install Git.Git
 powershell -ExecutionPolicy Bypass -Command "iwr -useb https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.ps1 | iex"
+```
+
+Auto-install missing dependencies (Windows):
+
+```powershell
+npm run doctor:win:install
 ```
 
 Build and run:

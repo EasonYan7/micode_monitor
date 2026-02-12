@@ -88,6 +88,12 @@ npm run doctor:strict
 npm run tauri:dev
 ```
 
+If your machine is missing dependencies, run:
+
+```bash
+npm run doctor:install
+```
+
 ## Build
 
 ### macOS

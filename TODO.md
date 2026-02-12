@@ -91,6 +91,7 @@
 - [x] Add local build guides for team testing (`BUILD_LOCAL.md` and `BUILD_LOCAL.zh-CN.md`)
 - [x] Expand doctor checks (`node/npm/rustc/cargo/cmake/git/micode`) and update install hints for macOS/Windows/Linux
 - [x] Update README EN/CN to explicitly state source-first distribution and local build flow
+- [x] Add optional doctor auto-install mode (`npm run doctor:install`, `npm run doctor:win:install`) to reduce teammate setup friction
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

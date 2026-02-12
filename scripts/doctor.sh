@@ -2,9 +2,18 @@
 set -u
 
 STRICT=0
-if [ "${1:-}" = "--strict" ]; then
-  STRICT=1
-fi
+INSTALL=0
+
+for arg in "$@"; do
+  case "$arg" in
+    --strict)
+      STRICT=1
+      ;;
+    --install)
+      INSTALL=1
+      ;;
+  esac
+done
 
 MISSING=""
 add_missing() {
@@ -36,6 +45,69 @@ fi
 
 echo "Doctor: missing dependencies: $MISSING"
 echo "Required: node npm rustc cargo cmake git micode"
+
+install_micode_unix() {
+  if command -v micode >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "Installing MiCode CLI..."
+  sh -c "$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)"
+}
+
+if [ "$INSTALL" -eq 1 ]; then
+  case "$(uname -s)" in
+    Darwin)
+      if ! command -v brew >/dev/null 2>&1; then
+        echo "Auto-install failed: Homebrew is required on macOS."
+        exit 1
+      fi
+      base_pkgs=""
+      if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+        base_pkgs="$base_pkgs node"
+      fi
+      if ! command -v rustc >/dev/null 2>&1 || ! command -v cargo >/dev/null 2>&1; then
+        base_pkgs="$base_pkgs rust"
+      fi
+      if ! command -v cmake >/dev/null 2>&1; then
+        base_pkgs="$base_pkgs cmake"
+      fi
+      if ! command -v git >/dev/null 2>&1; then
+        base_pkgs="$base_pkgs git"
+      fi
+      if [ -n "$base_pkgs" ]; then
+        # shellcheck disable=SC2086
+        brew install $base_pkgs
+      fi
+      install_micode_unix
+      ;;
+    Linux)
+      if command -v apt-get >/dev/null 2>&1; then
+        sudo apt-get update
+        sudo apt-get install -y nodejs npm rustc cargo cmake git
+      elif command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y nodejs npm rust cargo cmake git
+      elif command -v pacman >/dev/null 2>&1; then
+        sudo pacman -Sy --noconfirm nodejs npm rust cmake git
+      else
+        echo "Auto-install failed: unsupported Linux package manager."
+        exit 1
+      fi
+      install_micode_unix
+      ;;
+    *)
+      echo "Auto-install is only supported on macOS/Linux in this script."
+      echo "Windows: use npm run doctor:win:install"
+      exit 1
+      ;;
+  esac
+
+  # Re-check after installation.
+  if [ "$STRICT" -eq 1 ]; then
+    exec "$0" --strict
+  else
+    exec "$0"
+  fi
+fi
 
 case "$(uname -s)" in
   Darwin)
