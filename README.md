@@ -7,6 +7,12 @@
 
 MiCodeMonitor is a Tauri desktop app for orchestrating multiple MiCode agents across local workspaces.
 
+## Current Distribution Policy
+
+- This repository currently uses **source-first distribution** for team testing.
+- The `Release` workflow is **paused by default** and requires manual confirmation input.
+- Use local build instructions: [`BUILD_LOCAL.md`](BUILD_LOCAL.md).
+
 ## Origin & Attribution
 
 - This project is derived from [Dimillian/CodexMonitor](https://github.com/Dimillian/CodexMonitor).
@@ -78,6 +84,7 @@ powershell -ExecutionPolicy Bypass -Command "iwr -useb https://cnbj1-fds.api.xia
 
 ```bash
 npm install
+npm run doctor:strict
 npm run tauri:dev
 ```
 
@@ -105,7 +112,7 @@ Windows builds are produced from branch `windows-main` via GitHub Actions.
 2. Filter runs by branch `windows-main`
 3. Open the latest successful run and download artifact `windows-bundle-*`
 
-Note: In-app auto-update is currently disabled in this fork. Use GitHub Releases for manual upgrades.
+Note: In-app auto-update is currently disabled in this fork. For now, prefer source-based local build/testing.
 
 ## Validation Commands
 

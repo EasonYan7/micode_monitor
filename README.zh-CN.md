@@ -6,6 +6,12 @@
 
 MiCodeMonitor 是一个基于 Tauri 的桌面应用，用于在本地多个项目中统一编排与管理 MiCode 智能体会话。
 
+## 当前分发策略
+
+- 当前阶段采用**源码优先分发**用于团队内测。
+- `Release` 工作流默认**不执行正式发布**，需手动确认输入后才会运行。
+- 本地构建请优先参考：[`BUILD_LOCAL.zh-CN.md`](BUILD_LOCAL.zh-CN.md)。
+
 ## 来源与引用
 
 - 本项目基于 [Dimillian/CodexMonitor](https://github.com/Dimillian/CodexMonitor) 演进。
@@ -91,6 +97,7 @@ npm run doctor
 
 ```bash
 npm install
+npm run doctor:strict
 npm run tauri:dev
 ```
 
@@ -118,7 +125,7 @@ Windows 安装包由 `windows-main` 分支的 GitHub Actions 构建产出。
 2. 按分支筛选 `windows-main`
 3. 打开最近一次成功构建，下载产物 `windows-bundle-*`
 
-说明：当前 Fork 已关闭应用内自动更新，升级请通过 GitHub Releases 手动下载安装。
+说明：当前 Fork 已关闭应用内自动更新；现阶段建议以源码本地构建/运行为主。
 
 ## 五、常用校验命令
 

@@ -2,13 +2,30 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_release:
+        description: "Confirm to run full release pipeline (build/sign/notarize/publish)"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
+  release_disabled_notice:
+    if: ${{ inputs.confirm_release != true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Release is paused by default
+        run: |
+          echo "Release workflow is intentionally paused by default."
+          echo "Set 'confirm_release=true' when you are ready for a real release."
+          echo "For team testing, prefer local source build instructions in BUILD_LOCAL docs."
+
   build_macos:
+    if: ${{ inputs.confirm_release == true }}
     runs-on: macos-latest
     environment: release
     env:
@@ -171,6 +188,7 @@ jobs:
             release-artifacts/MiCodeMonitor.app.tar.gz.sig
 
   build_linux:
+    if: ${{ inputs.confirm_release == true }}
     name: linux bundles (${{ matrix.arch }})
     runs-on: ${{ matrix.platform }}
     environment: release
@@ -246,6 +264,7 @@ jobs:
             src-tauri/target/release/bundle/rpm/*.rpm
 
   release:
+    if: ${{ inputs.confirm_release == true }}
     runs-on: ubuntu-latest
     environment: release
     needs:
