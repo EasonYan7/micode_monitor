@@ -96,6 +96,7 @@
 - [x] Remove duplicate shadow files (`* 2.*` / `* 3.*`) that are not part of active compile chain
 - [x] Add bootstrap scripts for beginners (`bootstrap:mac`, `bootstrap:win`) and package-manager fallback guidance (`brew`/`winget`/`choco`)
 - [x] Rewrite README for beginner onboarding: make Chinese default on homepage (`README.md`) and swap English guide to `README.zh-CN.md`, with step-by-step download/install/build/config flow
+- [x] Make plain filename references (for example `*.pdf`) clickable in chat markdown and route clicks through existing file opener flow
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

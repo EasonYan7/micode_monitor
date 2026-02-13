@@ -1,12 +1,21 @@
 const FILE_LINK_PROTOCOL = "micode-file:";
 const FILE_LINE_SUFFIX_PATTERN = "(?::\\d+(?::\\d+)?)?";
+const FILE_NAME_EXTENSION_PATTERN =
+  "(?:pdf|docx?|xlsx?|csv|txt|md|json|ya?ml|png|jpe?g|gif|webp|zip|tgz|tar\\.gz)";
 
 const FILE_PATH_PATTERN =
   new RegExp(
     `(\\/[^\\s\\\`"'<>]+|~\\/[^\\s\\\`"'<>]+|\\.{1,2}\\/[^\\s\\\`"'<>]+|[A-Za-z0-9._-]+(?:\\/[A-Za-z0-9._-]+)+)${FILE_LINE_SUFFIX_PATTERN}`,
     "g",
   );
-const FILE_PATH_MATCH = new RegExp(`^${FILE_PATH_PATTERN.source}$`);
+const FILE_NAME_PATTERN = new RegExp(
+  `[\\p{L}\\p{N}_\\-()\\[\\]{}]+(?:\\.[\\p{L}\\p{N}_\\-()\\[\\]{}]+)*\\.${FILE_NAME_EXTENSION_PATTERN}${FILE_LINE_SUFFIX_PATTERN}`,
+  "gu",
+);
+const FILE_REFERENCE_MATCH = new RegExp(
+  `^(?:${FILE_PATH_PATTERN.source}|${FILE_NAME_PATTERN.source})$`,
+  "u",
+);
 
 const TRAILING_PUNCTUATION = new Set([".", ",", ";", ":", "!", "?", ")", "]", "}"]);
 const RELATIVE_ALLOWED_PREFIXES = [
@@ -58,6 +67,29 @@ function isPathCandidate(
   return RELATIVE_ALLOWED_PREFIXES.some((prefix) => value.startsWith(prefix));
 }
 
+function isFileNameCandidate(
+  value: string,
+  leadingContext: string,
+  previousChar: string,
+  nextChar: string,
+) {
+  if (!value || value.includes("/") || value.includes("\\")) {
+    return false;
+  }
+  if (leadingContext.endsWith("://")) {
+    return false;
+  }
+  if (previousChar && /[@A-Za-z0-9_.-]/.test(previousChar)) {
+    return false;
+  }
+  if (nextChar && /[A-Za-z0-9_.-]/.test(nextChar)) {
+    return false;
+  }
+  return /\.(pdf|docx?|xlsx?|csv|txt|md|json|ya?ml|png|jpe?g|gif|webp|zip|tgz|tar\.gz)(?::\d+(?::\d+)?)?$/i.test(
+    value,
+  );
+}
+
 function splitTrailingPunctuation(value: string) {
   let end = value.length;
   while (end > 0 && TRAILING_PUNCTUATION.has(value[end - 1])) {
@@ -75,21 +107,56 @@ export function toFileLink(path: string) {
 
 function linkifyText(value: string) {
   FILE_PATH_PATTERN.lastIndex = 0;
+  FILE_NAME_PATTERN.lastIndex = 0;
   const nodes: MarkdownNode[] = [];
   let lastIndex = 0;
   let hasLink = false;
+  const matches: Array<{ index: number; raw: string }> = [];
 
   for (const match of value.matchAll(FILE_PATH_PATTERN)) {
-    const matchIndex = match.index ?? 0;
-    const raw = match[0];
+    matches.push({
+      index: match.index ?? 0,
+      raw: match[0],
+    });
+  }
+  for (const match of value.matchAll(FILE_NAME_PATTERN)) {
+    matches.push({
+      index: match.index ?? 0,
+      raw: match[0],
+    });
+  }
+  matches.sort((a, b) => a.index - b.index || b.raw.length - a.raw.length);
+  const deduped: Array<{ index: number; raw: string }> = [];
+  for (const current of matches) {
+    const overlaps = deduped.some((existing) => {
+      const existingEnd = existing.index + existing.raw.length;
+      const currentEnd = current.index + current.raw.length;
+      return current.index < existingEnd && existing.index < currentEnd;
+    });
+    if (!overlaps) {
+      deduped.push(current);
+    }
+  }
+
+  for (const entry of deduped) {
+    const matchIndex = entry.index;
+    const raw = entry.raw;
+    if (matchIndex < lastIndex) {
+      continue;
+    }
     if (matchIndex > lastIndex) {
       nodes.push({ type: "text", value: value.slice(lastIndex, matchIndex) });
     }
-
     const leadingContext = value.slice(Math.max(0, matchIndex - 3), matchIndex);
     const previousChar = matchIndex > 0 ? value[matchIndex - 1] : "";
+    const nextCharIndex = matchIndex + raw.length;
+    const nextChar = nextCharIndex < value.length ? value[nextCharIndex] : "";
     const { path, trailing } = splitTrailingPunctuation(raw);
-    if (path && isPathCandidate(path, leadingContext, previousChar)) {
+    const canLink =
+      path &&
+      (isPathCandidate(path, leadingContext, previousChar) ||
+        isFileNameCandidate(path, leadingContext, previousChar, nextChar));
+    if (canLink) {
       nodes.push({
         type: "link",
         url: toFileLink(path),
@@ -151,10 +218,10 @@ export function isLinkableFilePath(value: string) {
   if (!trimmed) {
     return false;
   }
-  if (!FILE_PATH_MATCH.test(trimmed)) {
+  if (!FILE_REFERENCE_MATCH.test(trimmed)) {
     return false;
   }
-  return isPathCandidate(trimmed, "", "");
+  return isPathCandidate(trimmed, "", "") || isFileNameCandidate(trimmed, "", "", "");
 }
 
 export function isFileLinkUrl(url: string) {

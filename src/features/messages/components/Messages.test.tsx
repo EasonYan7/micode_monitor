@@ -189,6 +189,36 @@ describe("Messages", () => {
     );
   });
 
+  it("auto-links plain filename references and opens them", () => {
+    const items: ConversationItem[] = [
+      {
+        id: "msg-filename-link",
+        kind: "message",
+        role: "assistant",
+        text: "PDF报告已生成：租房合同财务分析报告.pdf",
+      },
+    ];
+
+    const { container } = render(
+      <Messages
+        items={items}
+        threadId="thread-1"
+        workspaceId="ws-1"
+        isThinking={false}
+        openTargets={[]}
+        selectedOpenAppId=""
+      />,
+    );
+
+    const fileLinkName = screen.getByText("租房合同财务分析报告.pdf");
+    const fileLink = container.querySelector(".message-file-link");
+    expect(fileLinkName).toBeTruthy();
+    expect(fileLink).toBeTruthy();
+
+    fireEvent.click(fileLink as Element);
+    expect(openFileLinkMock).toHaveBeenCalledWith("租房合同财务分析报告.pdf");
+  });
+
   it("does not re-render messages while typing when message props stay stable", () => {
     const items: ConversationItem[] = [
       {
