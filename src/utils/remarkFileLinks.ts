@@ -2,6 +2,8 @@ const FILE_LINK_PROTOCOL = "micode-file:";
 const FILE_LINE_SUFFIX_PATTERN = "(?::\\d+(?::\\d+)?)?";
 const FILE_NAME_EXTENSION_PATTERN =
   "(?:pdf|docx?|xlsx?|csv|txt|md|json|ya?ml|png|jpe?g|gif|webp|zip|tgz|tar\\.gz)";
+const FILE_NAME_SEGMENT_PATTERN =
+  "[A-Za-z0-9_\\u3400-\\u4DBF\\u4E00-\\u9FFF\\u3040-\\u30FF\\uAC00-\\uD7AF\\-()\\[\\]{}]+";
 
 const FILE_PATH_PATTERN =
   new RegExp(
@@ -9,12 +11,12 @@ const FILE_PATH_PATTERN =
     "g",
   );
 const FILE_NAME_PATTERN = new RegExp(
-  `[\\p{L}\\p{N}_\\-()\\[\\]{}]+(?:\\.[\\p{L}\\p{N}_\\-()\\[\\]{}]+)*\\.${FILE_NAME_EXTENSION_PATTERN}${FILE_LINE_SUFFIX_PATTERN}`,
-  "gu",
+  `(?:${FILE_NAME_SEGMENT_PATTERN}\\.)+${FILE_NAME_EXTENSION_PATTERN}${FILE_LINE_SUFFIX_PATTERN}`,
+  "gi",
 );
 const FILE_REFERENCE_MATCH = new RegExp(
   `^(?:${FILE_PATH_PATTERN.source}|${FILE_NAME_PATTERN.source})$`,
-  "u",
+  "i",
 );
 
 const TRAILING_PUNCTUATION = new Set([".", ",", ";", ":", "!", "?", ")", "]", "}"]);
