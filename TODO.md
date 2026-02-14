@@ -171,6 +171,7 @@
 - Home usage fallback fix: when local usage snapshot is empty, synthesize usage cards/charts from persisted `tokenUsageByThread` (workspace/all-workspace scope).
 - Tool detail fix: preserve `mcpToolCall` `arguments/result/error` in adapter cache, realtime events, and persisted thread items so expand details shows meaningful content.
 - Dev startup reliability fix (2026-02-14): `scripts/tauri-dev.sh` now auto-releases occupied dev ports `1420/1421` before `tauri dev` so stale Vite processes no longer cause blank Tauri window (frontend unreachable).
+- Dev stability tweak (2026-02-14): default `tauri dev` to `--no-watch` (override with `MICODE_TAURI_NO_WATCH=0`) to avoid repeated app restarts caused by noisy file-change events in `src-tauri`.
 - ACP capability probe (2026-02-09): `session/load` / `session/resume` / `session/history` / `session/get` all return `Method not found`; initialize reports `agentCapabilities.loadSession=false`. Keep synthetic resume for now and revisit after MiCode ACP upgrade.
 - i18n scope (phase 1): Display language switch is connected and homepage core copy is bilingual; full-app copy sweep remains for a future pass.
 - Re-validated after fix:

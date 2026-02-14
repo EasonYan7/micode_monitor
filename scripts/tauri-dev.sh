@@ -32,4 +32,9 @@ fi
 cleanup_port 1420
 cleanup_port 1421
 
+if [ "${MICODE_TAURI_NO_WATCH:-1}" = "1" ]; then
+  echo "[tauri-dev] Rust watcher disabled (--no-watch). Set MICODE_TAURI_NO_WATCH=0 to enable."
+  set -- --no-watch "$@"
+fi
+
 exec tauri dev "$@"
