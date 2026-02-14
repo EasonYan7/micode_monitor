@@ -170,6 +170,7 @@
 - Tool bubble split fix v4: ACP adapter now also bumps assistant segment on `tool_call_update` (completion boundary), so post-tool text starts a fresh bubble even when permission/tool events arrive out of order.
 - Home usage fallback fix: when local usage snapshot is empty, synthesize usage cards/charts from persisted `tokenUsageByThread` (workspace/all-workspace scope).
 - Tool detail fix: preserve `mcpToolCall` `arguments/result/error` in adapter cache, realtime events, and persisted thread items so expand details shows meaningful content.
+- Dev startup reliability fix (2026-02-14): `scripts/tauri-dev.sh` now auto-releases occupied dev ports `1420/1421` before `tauri dev` so stale Vite processes no longer cause blank Tauri window (frontend unreachable).
 - ACP capability probe (2026-02-09): `session/load` / `session/resume` / `session/history` / `session/get` all return `Method not found`; initialize reports `agentCapabilities.loadSession=false`. Keep synthetic resume for now and revisit after MiCode ACP upgrade.
 - i18n scope (phase 1): Display language switch is connected and homepage core copy is bilingual; full-app copy sweep remains for a future pass.
 - Re-validated after fix:
