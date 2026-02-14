@@ -99,6 +99,7 @@
 - [x] Make plain filename references (for example `*.pdf`) clickable in chat markdown and route clicks through existing file opener flow
 - [x] Fix WebKit startup crash in `remarkFileLinks` by removing unsupported Unicode property escapes and keeping CJK filename auto-link support
 - [x] Prevent macOS `tauri dev/build` hangs on Desktop/iCloud file locks by pinning `CARGO_TARGET_DIR` to `~/.cache/micode-target` via wrapper scripts
+- [x] Harden teammate onboarding run/build path: ignore `src-tauri/target`, add smart `npm run tauri dev|build` routing, and document cache-based bundle output locations
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
@@ -174,6 +175,10 @@
 - Dev startup reliability fix (2026-02-14): `scripts/tauri-dev.sh` now auto-releases occupied dev ports `1420/1421` before `tauri dev` so stale Vite processes no longer cause blank Tauri window (frontend unreachable).
 - Dev stability tweak (2026-02-14): default `tauri dev` to `--no-watch` (override with `MICODE_TAURI_NO_WATCH=0`) to avoid repeated app restarts caused by noisy file-change events in `src-tauri`.
 - Dev runtime fix (2026-02-14): replace `remarkFileLinks` filename regex Unicode property escapes (`\p{...}`) with WebKit-safe explicit character ranges to prevent frontend boot crash (`Invalid regular expression`) while preserving Chinese/Japanese/Korean filename linking.
+- Team run/build hardening (2026-02-14): add `scripts/tauri-cli.mjs` so `npm run tauri dev|build` auto-routes to guarded scripts (`tauri:dev`/`tauri:build` or Windows variants), preventing command misuse.
+- Build cache portability tweak (2026-02-14): `scripts/tauri-dev.sh` and `scripts/tauri-build.sh` now default `CARGO_TARGET_DIR` to `${XDG_CACHE_HOME:-~/.cache}/micode-target` on macOS/Linux and improve port cleanup with force-kill fallback.
+- Repo hygiene tweak (2026-02-14): ignore `src-tauri/target/` to prevent local Rust cache artifacts and stale absolute-path metadata from leaking into shared workflows.
+- Docs sync (2026-02-14): README + BUILD_LOCAL EN/CN now document cache-based bundle output path and safe equivalent commands (`npm run tauri dev|build`).
 - ACP capability probe (2026-02-09): `session/load` / `session/resume` / `session/history` / `session/get` all return `Method not found`; initialize reports `agentCapabilities.loadSession=false`. Keep synthetic resume for now and revisit after MiCode ACP upgrade.
 - i18n scope (phase 1): Display language switch is connected and homepage core copy is bilingual; full-app copy sweep remains for a future pass.
 - Re-validated after fix:

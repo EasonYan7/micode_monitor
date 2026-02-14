@@ -28,3 +28,4 @@ CodexMonitor.zip
 .codexmonitor/
 .micodemonitor/
 public/assets/material-icons/
+src-tauri/target/

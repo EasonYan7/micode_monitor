@@ -27,6 +27,7 @@ macOS：
 ```bash
 npm run bootstrap:mac
 npm run tauri:dev
+# 等价安全写法：npm run tauri dev
 ```
 
 Windows（PowerShell）：
@@ -60,6 +61,7 @@ macOS：
 
 ```bash
 npm run tauri:build
+# 等价安全写法：npm run tauri build
 ```
 
 Windows：
@@ -68,7 +70,11 @@ Windows：
 npm run tauri:build:win
 ```
 
-产物目录：`src-tauri/target/release/bundle/`
+产物目录：
+
+- macOS/Linux：`~/.cache/micode-target/release/bundle/`
+- Windows：`src-tauri/target/release/bundle/`
+- 以构建日志最后输出的 `Finished 2 bundles at:` 为准
 
 ## 同事拿到代码后最短流程
 

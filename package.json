@@ -23,7 +23,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "tauri": "tauri",
+    "tauri": "node scripts/tauri-cli.mjs",
     "pretauri:dev": "npm run sync:material-icons",
     "tauri:dev": "npm run doctor:strict && sh scripts/tauri-dev.sh",
     "pretauri:build": "npm run sync:material-icons",

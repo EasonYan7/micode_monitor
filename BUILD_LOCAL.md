@@ -59,7 +59,8 @@ npm run tauri:build
 
 Output path:
 
-- `src-tauri/target/release/bundle/macos/`
+- `~/.cache/micode-target/release/bundle/macos/` (default)
+- Trust the final `Finished 2 bundles at:` lines in build logs
 
 ## 3. Windows
 

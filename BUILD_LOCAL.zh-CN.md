@@ -59,7 +59,8 @@ npm run tauri:build
 
 产物目录：
 
-- `src-tauri/target/release/bundle/macos/`
+- `~/.cache/micode-target/release/bundle/macos/`（默认）
+- 以构建日志最后的 `Finished 2 bundles at:` 为准
 
 ## 3. Windows
 

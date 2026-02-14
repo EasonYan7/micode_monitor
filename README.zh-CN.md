@@ -27,6 +27,7 @@ macOS:
 ```bash
 npm run bootstrap:mac
 npm run tauri:dev
+# Safe equivalent: npm run tauri dev
 ```
 
 Windows (PowerShell):
@@ -60,6 +61,7 @@ macOS:
 
 ```bash
 npm run tauri:build
+# Safe equivalent: npm run tauri build
 ```
 
 Windows:
@@ -68,7 +70,11 @@ Windows:
 npm run tauri:build:win
 ```
 
-Build output: `src-tauri/target/release/bundle/`
+Build output:
+
+- macOS/Linux: `~/.cache/micode-target/release/bundle/`
+- Windows: `src-tauri/target/release/bundle/`
+- Use the final `Finished 2 bundles at:` lines from build logs as source of truth
 
 ## Minimal Onboarding Flow for Teammates
 
