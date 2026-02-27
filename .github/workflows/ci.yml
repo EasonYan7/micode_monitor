@@ -91,4 +91,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Tauri debug build
+        env:
+          MICODE_DOCTOR_SKIP_MICODE: "1"
         run: npm run tauri -- build --debug --no-bundle

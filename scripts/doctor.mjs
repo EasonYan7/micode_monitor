@@ -2,6 +2,9 @@ import { spawnSync } from "node:child_process";
 
 const strict = process.argv.includes("--strict");
 const install = process.argv.includes("--install");
+const skipMicode = ["1", "true", "yes"].includes(
+  (process.env.MICODE_DOCTOR_SKIP_MICODE ?? "").toLowerCase(),
+);
 
 function hasCommand(command) {
   const checker = process.platform === "win32" ? "where" : "command";
@@ -22,7 +25,12 @@ if (!hasCommand("rustc")) missing.push("rustc");
 if (!hasCommand("cargo")) missing.push("cargo");
 if (!hasCommand("cmake")) missing.push("cmake");
 if (!hasCommand("git")) missing.push("git");
-if (!hasCommand("micode")) missing.push("micode");
+if (!skipMicode && !hasCommand("micode")) missing.push("micode");
+
+const requiredTools = ["node", "npm", "rustc", "cargo", "cmake", "git"];
+if (!skipMicode) {
+  requiredTools.push("micode");
+}
 
 if (missing.length === 0) {
   console.log("Doctor: OK");
@@ -30,7 +38,10 @@ if (missing.length === 0) {
 }
 
 console.log(`Doctor: missing dependencies: ${missing.join(" ")}`);
-console.log("Required: node npm rustc cargo cmake git micode");
+console.log(`Required: ${requiredTools.join(" ")}`);
+if (skipMicode) {
+  console.log("Doctor: MICODE_DOCTOR_SKIP_MICODE=1, skipping micode check.");
+}
 
 if (install) {
   if (process.platform === "win32") {
@@ -62,7 +73,7 @@ if (install) {
         }
       }
     }
-    if (missing.includes("micode")) {
+    if (!skipMicode && missing.includes("micode")) {
       console.log("Installing micode...");
       if (!run("powershell", ["-ExecutionPolicy", "Bypass", "-Command", "iwr -useb https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.ps1 | iex"])) {
         console.log("Install failed for micode. Please run manually.");
@@ -89,13 +100,17 @@ if (install) {
 switch (process.platform) {
   case "darwin":
     console.log("Install: brew install node rust cmake git");
-    console.log('MiCode: bash -c "$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)"');
+    if (!skipMicode) {
+      console.log('MiCode: bash -c "$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)"');
+    }
     break;
   case "linux":
     console.log("Ubuntu/Debian: sudo apt-get install -y nodejs npm rustc cargo cmake git");
     console.log("Fedora: sudo dnf install -y nodejs npm rust cargo cmake git");
     console.log("Arch: sudo pacman -S nodejs npm rust cmake git");
-    console.log('MiCode: bash -c "$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)"');
+    if (!skipMicode) {
+      console.log('MiCode: bash -c "$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)"');
+    }
     break;
   case "win32":
     console.log("Install with winget (preferred):");
@@ -105,8 +120,10 @@ switch (process.platform) {
     console.log("  winget install Git.Git");
     console.log("Or with choco:");
     console.log("  choco install -y nodejs rustup.install cmake git");
-    console.log("MiCode (PowerShell):");
-    console.log('  powershell -ExecutionPolicy Bypass -Command "iwr -useb https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.ps1 | iex"');
+    if (!skipMicode) {
+      console.log("MiCode (PowerShell):");
+      console.log('  powershell -ExecutionPolicy Bypass -Command "iwr -useb https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.ps1 | iex"');
+    }
     break;
   default:
     console.log("Install the missing tools with your package manager.");

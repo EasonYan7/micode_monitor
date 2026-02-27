@@ -3,6 +3,13 @@ set -u
 
 STRICT=0
 INSTALL=0
+SKIP_MICODE=0
+
+case "${MICODE_DOCTOR_SKIP_MICODE:-0}" in
+  1|true|TRUE|yes|YES)
+    SKIP_MICODE=1
+    ;;
+esac
 
 for arg in "$@"; do
   case "$arg" in
@@ -36,7 +43,14 @@ check_cmd rustc
 check_cmd cargo
 check_cmd cmake
 check_cmd git
-check_cmd micode
+if [ "$SKIP_MICODE" -eq 0 ]; then
+  check_cmd micode
+fi
+
+REQUIRED_TOOLS="node npm rustc cargo cmake git"
+if [ "$SKIP_MICODE" -eq 0 ]; then
+  REQUIRED_TOOLS="$REQUIRED_TOOLS micode"
+fi
 
 if [ -z "$MISSING" ]; then
   echo "Doctor: OK"
@@ -44,7 +58,10 @@ if [ -z "$MISSING" ]; then
 fi
 
 echo "Doctor: missing dependencies: $MISSING"
-echo "Required: node npm rustc cargo cmake git micode"
+echo "Required: $REQUIRED_TOOLS"
+if [ "$SKIP_MICODE" -eq 1 ]; then
+  echo "Doctor: MICODE_DOCTOR_SKIP_MICODE=1, skipping micode check."
+fi
 
 install_micode_unix() {
   if command -v micode >/dev/null 2>&1; then
@@ -97,7 +114,9 @@ if [ "$INSTALL" -eq 1 ]; then
         # shellcheck disable=SC2086
         brew install $base_pkgs
       fi
-      install_micode_unix
+      if [ "$SKIP_MICODE" -eq 0 ]; then
+        install_micode_unix
+      fi
       ;;
     Linux)
       if command -v apt-get >/dev/null 2>&1; then
@@ -111,7 +130,9 @@ if [ "$INSTALL" -eq 1 ]; then
         echo "Auto-install failed: unsupported Linux package manager."
         exit 1
       fi
-      install_micode_unix
+      if [ "$SKIP_MICODE" -eq 0 ]; then
+        install_micode_unix
+      fi
       ;;
     *)
       echo "Auto-install is only supported on macOS/Linux in this script."
@@ -132,14 +153,18 @@ case "$(uname -s)" in
   Darwin)
     echo "macOS install hints:"
     echo "  brew install node rust cmake git"
-    echo "  MiCode: bash -c \"\$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)\""
+    if [ "$SKIP_MICODE" -eq 0 ]; then
+      echo "  MiCode: bash -c \"\$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)\""
+    fi
     ;;
   Linux)
     echo "Linux install hints:"
     echo "  Ubuntu/Debian: sudo apt-get install -y nodejs npm rustc cargo cmake git"
     echo "  Fedora: sudo dnf install -y nodejs npm rust cargo cmake git"
     echo "  Arch: sudo pacman -S nodejs npm rust cmake git"
-    echo "  MiCode: bash -c \"\$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)\""
+    if [ "$SKIP_MICODE" -eq 0 ]; then
+      echo "  MiCode: bash -c \"\$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)\""
+    fi
     ;;
   MINGW*|MSYS*|CYGWIN*)
     echo "Windows hints: use npm run doctor:win"

@@ -105,6 +105,7 @@ jobs:
           set -euo pipefail
           export TAURI_SIGNING_PRIVATE_KEY
           TAURI_SIGNING_PRIVATE_KEY="$(cat "$HOME/.tauri/micodemonitor.key")"
+          export MICODE_DOCTOR_SKIP_MICODE=1
           npm run tauri -- build --bundles app
 
       - name: Bundle OpenSSL and re-sign
@@ -239,6 +240,7 @@ jobs:
           set -euo pipefail
           export TAURI_SIGNING_PRIVATE_KEY
           TAURI_SIGNING_PRIVATE_KEY="$(cat "$HOME/.tauri/micodemonitor.key")"
+          export MICODE_DOCTOR_SKIP_MICODE=1
           npm run tauri -- build --bundles appimage,rpm
 
       - name: Validate Linux bundle outputs

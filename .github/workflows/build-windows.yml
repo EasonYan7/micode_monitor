@@ -29,6 +29,8 @@ jobs:
         run: npm ci
 
       - name: Build Windows app
+        env:
+          MICODE_DOCTOR_SKIP_MICODE: "1"
         run: npm run tauri:build:win
 
       - name: Upload Windows bundle
