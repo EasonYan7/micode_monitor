@@ -179,6 +179,7 @@
 - Build cache portability tweak (2026-02-14): `scripts/tauri-dev.sh` and `scripts/tauri-build.sh` now default `CARGO_TARGET_DIR` to `${XDG_CACHE_HOME:-~/.cache}/micode-target` on macOS/Linux and improve port cleanup with force-kill fallback.
 - Repo hygiene tweak (2026-02-14): ignore `src-tauri/target/` to prevent local Rust cache artifacts and stale absolute-path metadata from leaking into shared workflows.
 - Docs sync (2026-02-14): README + BUILD_LOCAL EN/CN now document cache-based bundle output path and safe equivalent commands (`npm run tauri dev|build`).
+- Full project health check (2026-02-27): verified `npm run doctor:strict`, `npm run lint`, `npm run typecheck`, `npm run test`, `cargo check` (`src-tauri`), and `npm run tauri:dev` startup smoke (`http://localhost:1420` reachable + app process launched).
 - ACP capability probe (2026-02-09): `session/load` / `session/resume` / `session/history` / `session/get` all return `Method not found`; initialize reports `agentCapabilities.loadSession=false`. Keep synthetic resume for now and revisit after MiCode ACP upgrade.
 - i18n scope (phase 1): Display language switch is connected and homepage core copy is bilingual; full-app copy sweep remains for a future pass.
 - Re-validated after fix:
