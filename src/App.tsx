@@ -59,6 +59,7 @@ import { useWorkspaceRestore } from "./features/workspaces/hooks/useWorkspaceRes
 import { useRenameWorktreePrompt } from "./features/workspaces/hooks/useRenameWorktreePrompt";
 import { useLayoutController } from "./features/app/hooks/useLayoutController";
 import { useWindowLabel } from "./features/layout/hooks/useWindowLabel";
+import { useStartupViewportSync } from "./features/layout/hooks/useStartupViewportSync";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   SidebarCollapseButton,
@@ -300,6 +301,8 @@ const GitHubPanelData = lazy(() =>
 
 
 function MainApp() {
+  useStartupViewportSync();
+
   const {
     appSettings,
     setAppSettings,
