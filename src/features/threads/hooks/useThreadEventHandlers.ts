@@ -1,7 +1,7 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type { Dispatch, MutableRefObject } from "react";
 import type { AppServerEvent, DebugEntry, TurnPlan } from "../../../types";
-import { getAppServerRawMethod } from "../../../utils/appServerEvents";
+import { getAppServerParams, getAppServerRawMethod } from "../../../utils/appServerEvents";
 import { useThreadApprovalEvents } from "./useThreadApprovalEvents";
 import { useThreadItemEvents } from "./useThreadItemEvents";
 import { useThreadTurnEvents } from "./useThreadTurnEvents";
@@ -38,6 +38,44 @@ type ThreadEventHandlersOptions = {
 
 const DEBUG_MAX_STRING_LENGTH = 1200;
 const DEBUG_MAX_ARRAY_ITEMS = 32;
+
+type StreamedAssistantDebugEntry = {
+  text: string;
+  chunkCount: number;
+};
+
+function buildAssistantStreamDebugId(workspaceId: string, threadId: string, itemId: string) {
+  return `stream:${workspaceId}:${threadId}:${itemId}`;
+}
+
+function buildAssistantStreamDebugKey(workspaceId: string, threadId: string, itemId: string) {
+  return `${workspaceId}:${threadId}:${itemId}`;
+}
+
+function mergeStreamingDebugText(existing: string, delta: string) {
+  if (!delta) {
+    return existing;
+  }
+  if (!existing) {
+    return delta;
+  }
+  if (delta === existing) {
+    return existing;
+  }
+  if (delta.startsWith(existing)) {
+    return delta;
+  }
+  if (existing.startsWith(delta)) {
+    return existing;
+  }
+  const maxOverlap = Math.min(existing.length, delta.length);
+  for (let length = maxOverlap; length > 0; length -= 1) {
+    if (existing.endsWith(delta.slice(0, length))) {
+      return `${existing}${delta.slice(length)}`;
+    }
+  }
+  return `${existing}${delta}`;
+}
 
 function truncateDebugString(value: string) {
   if (value.length <= DEBUG_MAX_STRING_LENGTH) {
@@ -113,6 +151,7 @@ export function useThreadEventHandlers({
   approvalAllowlistRef,
   pendingInterruptsRef,
 }: ThreadEventHandlersOptions) {
+  const assistantStreamDebugRef = useRef<Record<string, StreamedAssistantDebugEntry>>({});
   const onApprovalRequest = useThreadApprovalEvents({
     dispatch,
     approvalAllowlistRef,
@@ -182,6 +221,85 @@ export function useThreadEventHandlers({
       const sanitizedEvent = sanitizeDebugEvent(event);
       const method = getAppServerRawMethod(sanitizedEvent) ?? "";
       const inferredSource = method === "micode/stderr" ? "stderr" : "event";
+      const params = getAppServerParams(sanitizedEvent);
+      const threadId = String(params.threadId ?? params.thread_id ?? "");
+      const itemId = String(params.itemId ?? params.item_id ?? "");
+
+      if (method === "item/agentMessage/delta") {
+        const delta = String(params.delta ?? "");
+        if (threadId && itemId && delta) {
+          const streamKey = buildAssistantStreamDebugKey(
+            sanitizedEvent.workspace_id,
+            threadId,
+            itemId,
+          );
+          const previous = assistantStreamDebugRef.current[streamKey] ?? {
+            text: "",
+            chunkCount: 0,
+          };
+          const nextText = mergeStreamingDebugText(previous.text, delta);
+          const nextChunkCount = previous.chunkCount + 1;
+          assistantStreamDebugRef.current[streamKey] = {
+            text: nextText,
+            chunkCount: nextChunkCount,
+          };
+          onDebug?.({
+            id: buildAssistantStreamDebugId(sanitizedEvent.workspace_id, threadId, itemId),
+            timestamp: Date.now(),
+            source: inferredSource,
+            label: "item/agentMessage/stream",
+            payload: {
+              workspaceId: sanitizedEvent.workspace_id,
+              threadId,
+              itemId,
+              chunkCount: nextChunkCount,
+              text: truncateDebugString(nextText),
+            },
+          });
+          return;
+        }
+      }
+
+      if (method === "item/completed") {
+        const item =
+          params.item && typeof params.item === "object" && !Array.isArray(params.item)
+            ? (params.item as Record<string, unknown>)
+            : null;
+        const completedType = String(item?.type ?? "");
+        const completedItemId = String(item?.id ?? itemId);
+        if (threadId && completedItemId && completedType === "agentMessage") {
+          const streamKey = buildAssistantStreamDebugKey(
+            sanitizedEvent.workspace_id,
+            threadId,
+            completedItemId,
+          );
+          const streamed = assistantStreamDebugRef.current[streamKey] ?? null;
+          const completedText = String(item?.text ?? "");
+          const mergedText = streamed
+            ? mergeStreamingDebugText(streamed.text, completedText)
+            : completedText;
+          delete assistantStreamDebugRef.current[streamKey];
+          onDebug?.({
+            id: buildAssistantStreamDebugId(
+              sanitizedEvent.workspace_id,
+              threadId,
+              completedItemId,
+            ),
+            timestamp: Date.now(),
+            source: inferredSource,
+            label: "item/agentMessage/final",
+            payload: {
+              workspaceId: sanitizedEvent.workspace_id,
+              threadId,
+              itemId: completedItemId,
+              chunkCount: streamed?.chunkCount ?? 0,
+              text: truncateDebugString(mergedText),
+            },
+          });
+          return;
+        }
+      }
+
       onDebug?.({
         id: `${Date.now()}-server-event`,
         timestamp: Date.now(),

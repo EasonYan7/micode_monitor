@@ -42,7 +42,16 @@ export function useDebugLog() {
       if (isAlertEntry(entry)) {
         setHasDebugAlerts(true);
       }
-      setDebugEntries((prev) => [...prev, entry].slice(-MAX_DEBUG_ENTRIES));
+      setDebugEntries((prev) => {
+        const existingIndex = prev.findIndex((candidate) => candidate.id === entry.id);
+        if (existingIndex === -1) {
+          return [...prev, entry].slice(-MAX_DEBUG_ENTRIES);
+        }
+        const next = [...prev];
+        next.splice(existingIndex, 1);
+        next.push(entry);
+        return next.slice(-MAX_DEBUG_ENTRIES);
+      });
     },
     [isAlertEntry, shouldStoreEntry],
   );
