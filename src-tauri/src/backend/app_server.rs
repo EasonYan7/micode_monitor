@@ -853,13 +853,99 @@ fn find_executable_on_path(name: &str) -> Option<PathBuf> {
     None
 }
 
+fn canonicalize_if_file(path: PathBuf) -> Option<PathBuf> {
+    if !path.is_file() {
+        return None;
+    }
+    std::fs::canonicalize(&path).ok().or(Some(path))
+}
+
+fn resolve_cli_bundle_near_bin(bin_path: &Path) -> Option<PathBuf> {
+    let parent = bin_path.parent()?;
+    let candidates = [
+        parent
+            .join("node_modules")
+            .join("@mi")
+            .join("mi-code-cli")
+            .join("dist")
+            .join("cli.js"),
+        parent
+            .join("..")
+            .join("node_modules")
+            .join("@mi")
+            .join("mi-code-cli")
+            .join("dist")
+            .join("cli.js"),
+        parent
+            .join("..")
+            .join("..")
+            .join("node_modules")
+            .join("@mi")
+            .join("mi-code-cli")
+            .join("dist")
+            .join("cli.js"),
+    ];
+    for candidate in candidates {
+        if let Some(found) = canonicalize_if_file(candidate) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+fn normalize_wrapper_cli_token(token: &str, wrapper_path: &Path) -> Option<PathBuf> {
+    let trimmed = token.trim_matches(|ch| ch == '"' || ch == '\'' || ch == ';' || ch == '`');
+    if trimmed.is_empty() {
+        return None;
+    }
+    let normalized = trimmed.replace('\\', "/");
+    if !normalized.contains("mi-code-cli") || !normalized.contains("cli.js") {
+        return None;
+    }
+    let parent = wrapper_path.parent()?;
+    let candidate = if trimmed.to_ascii_lowercase().contains("%~dp0") {
+        let mut suffix_raw = trimmed.to_string();
+        for marker in ["%~dp0", "%~DP0", "%~Dp0", "%~dP0"] {
+            if suffix_raw.contains(marker) {
+                suffix_raw = suffix_raw.replacen(marker, "", 1);
+                break;
+            }
+        }
+        let suffix = suffix_raw
+            .replace('\\', "/")
+            .trim_start_matches(['\\', '/'])
+            .to_string();
+        parent.join(suffix)
+    } else {
+        let token_path = PathBuf::from(trimmed);
+        if token_path.is_absolute() {
+            token_path
+        } else {
+            let normalized = trimmed
+                .replace('\\', "/")
+                .trim_start_matches(['\\', '/'])
+                .to_string();
+            parent.join(normalized)
+        }
+    };
+    canonicalize_if_file(candidate)
+}
+
 fn resolve_micode_cli_bundle_path(agent_bin: Option<&str>) -> Option<PathBuf> {
     let resolved_bin = agent_bin
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
+        .and_then(|value| {
+            if !value.contains('/') && !value.contains('\\') {
+                find_executable_on_path(value).or_else(|| Some(PathBuf::from(value)))
+            } else {
+                Some(PathBuf::from(value))
+            }
+        })
         .or_else(|| find_executable_on_path("micode"))?;
-    let canonical = std::fs::canonicalize(&resolved_bin).ok()?;
+    let canonical = std::fs::canonicalize(&resolved_bin)
+        .ok()
+        .unwrap_or(resolved_bin);
     if canonical
         .file_name()
         .and_then(|v| v.to_str())
@@ -868,15 +954,16 @@ fn resolve_micode_cli_bundle_path(agent_bin: Option<&str>) -> Option<PathBuf> {
     {
         return Some(canonical);
     }
+    if let Some(nearby_bundle) = resolve_cli_bundle_near_bin(&canonical) {
+        return Some(nearby_bundle);
+    }
     if let Ok(raw) = std::fs::read_to_string(&canonical) {
-        if let Some(token) = raw
-            .split_whitespace()
-            .find(|part| part.contains("@mi/mi-code-cli/dist/cli.js"))
-        {
-            let cleaned = token.trim_matches(|ch| ch == '"' || ch == '\'' || ch == ';');
-            let candidate = PathBuf::from(cleaned);
-            if candidate.is_file() {
-                return Some(candidate);
+        let mut tokens: Vec<&str> = raw.split_whitespace().collect();
+        tokens.extend(raw.split('"').skip(1).step_by(2));
+        tokens.extend(raw.split('\'').skip(1).step_by(2));
+        for token in tokens {
+            if let Some(found) = normalize_wrapper_cli_token(token, &canonical) {
+                return Some(found);
             }
         }
     }
@@ -2913,7 +3000,8 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
 mod tests {
     use super::{
         build_initialize_params, extract_approval_command,
-        load_thread_token_usage_for_session_in_home, translate_acp_update, ActivePromptContext,
+        load_thread_token_usage_for_session_in_home, normalize_wrapper_cli_token,
+        resolve_cli_bundle_near_bin, translate_acp_update, ActivePromptContext,
         ToolCallPresentation, WorkspaceSession,
     };
     use serde_json::{json, Value};
@@ -3185,6 +3273,62 @@ mod tests {
                 .and_then(|v| v.get("totalTokens"))
                 .and_then(|v| v.as_i64()),
             Some(48)
+        );
+
+        let _ = std::fs::remove_dir_all(PathBuf::from(&root));
+    }
+
+    #[test]
+    fn resolve_cli_bundle_near_bin_finds_npm_layout() {
+        let root = std::env::temp_dir().join(format!("micode-cli-near-bin-{}", Uuid::new_v4()));
+        let bin = root.join("bin");
+        let bundle = bin
+            .join("node_modules")
+            .join("@mi")
+            .join("mi-code-cli")
+            .join("dist")
+            .join("cli.js");
+        std::fs::create_dir_all(bundle.parent().expect("bundle parent"))
+            .expect("create bundle dir");
+        std::fs::write(&bundle, "var AVAILABLE_MODELS = [];").expect("write cli bundle");
+        let wrapper = bin.join("micode.cmd");
+        std::fs::write(&wrapper, "@echo off").expect("write wrapper");
+
+        let resolved = resolve_cli_bundle_near_bin(&wrapper);
+        assert!(resolved.is_some());
+        assert!(
+            resolved
+                .and_then(|path| path.file_name().map(|name| name == "cli.js"))
+                .unwrap_or(false)
+        );
+
+        let _ = std::fs::remove_dir_all(PathBuf::from(&root));
+    }
+
+    #[test]
+    fn normalize_wrapper_cli_token_expands_windows_dp0_path() {
+        let root = std::env::temp_dir().join(format!("micode-cli-token-{}", Uuid::new_v4()));
+        let bundle = root
+            .join("node_modules")
+            .join("@mi")
+            .join("mi-code-cli")
+            .join("dist")
+            .join("cli.js");
+        std::fs::create_dir_all(bundle.parent().expect("bundle parent"))
+            .expect("create bundle dir");
+        std::fs::write(&bundle, "var AVAILABLE_MODELS = [];").expect("write cli bundle");
+        let wrapper = root.join("micode.cmd");
+        std::fs::write(&wrapper, "@echo off").expect("write wrapper");
+
+        let resolved = normalize_wrapper_cli_token(
+            "%~dp0\\node_modules\\@mi\\mi-code-cli\\dist\\cli.js",
+            &wrapper,
+        );
+        assert!(resolved.is_some());
+        assert!(
+            resolved
+                .and_then(|path| path.file_name().map(|name| name == "cli.js"))
+                .unwrap_or(false)
         );
 
         let _ = std::fs::remove_dir_all(PathBuf::from(&root));
