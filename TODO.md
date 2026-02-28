@@ -103,6 +103,7 @@
 - [x] Fix startup first-paint layout issue where window content fully renders only after dragging (startup viewport sync + `100dvh` fallback)
 - [x] Aggregate assistant streaming debug logs into a single rolling entry (replace per-delta spam with stream/final snapshots)
 - [x] Make CI/release builds resilient without MiCode CLI preinstall (allow doctor skip via `MICODE_DOCTOR_SKIP_MICODE=1` in GitHub Actions)
+- [x] Fix Windows build/runtime portability: move `sha2` to cross-platform dependency and make MiCode PATH discovery Windows-aware (`;` PATH, win shim dirs, `.exe/.cmd`)
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
@@ -186,6 +187,7 @@
 - Startup layout fix (2026-02-27): add `useStartupViewportSync` (emit staged `resize` events on first mount) and root `100dvh` height fallback to avoid macOS overlay window first-frame partial render until manual drag/move.
 - Debug UX fix (2026-02-27): aggregate `item/agentMessage/delta` logs by `workspace/thread/item` and upsert same debug entry id, then emit `item/agentMessage/final` on completion to keep log readable.
 - CI reliability fix (2026-02-27): add `MICODE_DOCTOR_SKIP_MICODE` support in doctor scripts and enable it in CI/release/workflow build steps so Tauri compile jobs don't fail on runners missing `micode`.
+- Windows portability fix (2026-02-28): `sha2` is now a common Rust dependency (not non-Windows-only), and MiCode path resolution now uses cross-platform PATH parsing (`env::split_paths/join_paths`) plus Windows fallback dirs (`WinGet\\Links`, `%APPDATA%\\npm`, `%USERPROFILE%\\.cargo\\bin`) and executable suffix probing.
 - ACP capability probe (2026-02-09): `session/load` / `session/resume` / `session/history` / `session/get` all return `Method not found`; initialize reports `agentCapabilities.loadSession=false`. Keep synthetic resume for now and revisit after MiCode ACP upgrade.
 - i18n scope (phase 1): Display language switch is connected and homepage core copy is bilingual; full-app copy sweep remains for a future pass.
 - Re-validated after fix:

@@ -823,14 +823,31 @@ pub(crate) fn set_preferred_model(model: &str) -> Result<bool, String> {
 }
 
 fn find_executable_on_path(name: &str) -> Option<PathBuf> {
-    let path = env::var("PATH").ok()?;
-    for dir in path.split(':') {
-        if dir.trim().is_empty() {
+    let path = env::var_os("PATH")?;
+    let names: Vec<String> = if cfg!(windows) {
+        let trimmed = name.trim();
+        if Path::new(trimmed).extension().is_some() {
+            vec![trimmed.to_string()]
+        } else {
+            vec![
+                format!("{trimmed}.exe"),
+                format!("{trimmed}.cmd"),
+                format!("{trimmed}.bat"),
+                trimmed.to_string(),
+            ]
+        }
+    } else {
+        vec![name.to_string()]
+    };
+    for dir in env::split_paths(&path) {
+        if dir.as_os_str().is_empty() {
             continue;
         }
-        let candidate = PathBuf::from(dir).join(name);
-        if candidate.is_file() {
-            return Some(candidate);
+        for candidate_name in &names {
+            let candidate = dir.join(candidate_name);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
         }
     }
     None
@@ -2166,44 +2183,96 @@ impl WorkspaceSession {
 }
 
 pub(crate) fn build_micode_path_env(agent_bin: Option<&str>) -> Option<String> {
-    let mut paths: Vec<String> = env::var("PATH")
-        .unwrap_or_default()
-        .split(':')
-        .filter(|value| !value.is_empty())
-        .map(|value| value.to_string())
-        .collect();
-    let mut extras = vec![
-        "/opt/homebrew/bin",
-        "/usr/local/bin",
-        "/usr/bin",
-        "/bin",
-        "/usr/sbin",
-        "/sbin",
-    ]
-    .into_iter()
-    .map(|value| value.to_string())
-    .collect::<Vec<String>>();
-    if let Ok(home) = env::var("HOME") {
-        extras.push(format!("{home}/.local/bin"));
-        extras.push(format!("{home}/.local/share/mise/shims"));
-        extras.push(format!("{home}/.cargo/bin"));
-        extras.push(format!("{home}/.bun/bin"));
-    }
-    if let Some(bin_path) = agent_bin.filter(|value| !value.trim().is_empty()) {
-        if let Some(parent) = Path::new(bin_path).parent() {
-            extras.push(parent.to_string_lossy().to_string());
+    let mut paths: Vec<PathBuf> = env::var_os("PATH")
+        .map(|value| env::split_paths(&value).collect())
+        .unwrap_or_default();
+    let mut extras: Vec<PathBuf> = Vec::new();
+
+    if cfg!(windows) {
+        if let Ok(user_profile) = env::var("USERPROFILE") {
+            extras.push(PathBuf::from(&user_profile).join(".cargo").join("bin"));
+            extras.push(PathBuf::from(&user_profile).join(".local").join("bin"));
+            extras.push(PathBuf::from(&user_profile).join(".micode").join("bin"));
+            extras.push(
+                PathBuf::from(&user_profile)
+                    .join("AppData")
+                    .join("Roaming")
+                    .join("npm"),
+            );
+        }
+        if let Ok(local_app_data) = env::var("LOCALAPPDATA") {
+            extras.push(
+                PathBuf::from(&local_app_data)
+                    .join("Microsoft")
+                    .join("WinGet")
+                    .join("Links"),
+            );
+            extras.push(
+                PathBuf::from(&local_app_data)
+                    .join("Programs")
+                    .join("MiCode")
+                    .join("bin"),
+            );
+            extras.push(
+                PathBuf::from(&local_app_data)
+                    .join("Programs")
+                    .join("micode")
+                    .join("bin"),
+            );
+        }
+    } else {
+        extras.extend(
+            [
+                "/opt/homebrew/bin",
+                "/usr/local/bin",
+                "/usr/bin",
+                "/bin",
+                "/usr/sbin",
+                "/sbin",
+            ]
+            .iter()
+            .map(PathBuf::from),
+        );
+        if let Ok(home) = env::var("HOME") {
+            extras.push(PathBuf::from(&home).join(".local").join("bin"));
+            extras.push(
+                PathBuf::from(&home)
+                    .join(".local")
+                    .join("share")
+                    .join("mise")
+                    .join("shims"),
+            );
+            extras.push(PathBuf::from(&home).join(".cargo").join("bin"));
+            extras.push(PathBuf::from(&home).join(".bun").join("bin"));
         }
     }
+
+    if let Some(bin_path) = agent_bin.filter(|value| !value.trim().is_empty()) {
+        if let Some(parent) = Path::new(bin_path).parent() {
+            extras.push(parent.to_path_buf());
+        }
+    }
+
+    let mut seen = std::collections::HashSet::new();
     for extra in extras {
-        if !paths.contains(&extra) {
+        if extra.as_os_str().is_empty() {
+            continue;
+        }
+        let key = if cfg!(windows) {
+            extra.to_string_lossy().to_ascii_lowercase()
+        } else {
+            extra.to_string_lossy().to_string()
+        };
+        if seen.insert(key) && !paths.iter().any(|existing| existing == &extra) {
             paths.push(extra);
         }
     }
+
     if paths.is_empty() {
-        None
-    } else {
-        Some(paths.join(":"))
+        return None;
     }
+    let joined = env::join_paths(paths).ok()?;
+    Some(joined.to_string_lossy().to_string())
 }
 
 pub(crate) fn build_micode_command_with_bin(agent_bin: Option<String>) -> Command {
