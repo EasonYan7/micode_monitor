@@ -19,9 +19,9 @@
         "minWidth": 360,
         "minHeight": 600,
         "dragDropEnabled": true,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true,
-        "transparent": true,
+        "titleBarStyle": "Visible",
+        "hiddenTitle": false,
+        "transparent": false,
         "devtools": true
       }
     ],
@@ -51,5 +51,12 @@
       "infoPlist": "./Info.plist"
     }
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/EasonYan7/micode_monitor/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk0RjNFMkU0QjZENDY1MjUKUldRbFpkUzI1T0x6bEV4NG1Wbk5Ha01uNVEwY0psTTBlNHNLVkxDSldCa2t6RmducWZiVWNEa28K"
+    }
+  }
 }
