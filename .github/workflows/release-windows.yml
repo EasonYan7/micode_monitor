@@ -1,0 +1,171 @@
+name: Release Windows
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    runs-on: windows-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY_B64: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_B64 }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare updater signing key
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY_B64)) {
+            throw "Missing secret: TAURI_SIGNING_PRIVATE_KEY_B64"
+          }
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)) {
+            throw "Missing secret: TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+          }
+
+          $tauriDir = Join-Path $env:USERPROFILE ".tauri"
+          New-Item -ItemType Directory -Force -Path $tauriDir | Out-Null
+          $keyPath = Join-Path $tauriDir "micode-monitor-updater.key"
+
+          [System.IO.File]::WriteAllBytes(
+            $keyPath,
+            [Convert]::FromBase64String($env:TAURI_SIGNING_PRIVATE_KEY_B64)
+          )
+
+          $keyText = Get-Content -Path $keyPath -Raw
+          @"
+TAURI_SIGNING_PRIVATE_KEY<<EOF
+$keyText
+EOF
+TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+"@ | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build Windows release bundles
+        env:
+          MICODE_DOCTOR_SKIP_MICODE: "1"
+        run: |
+          npm run doctor:win
+          npx tauri build --config src-tauri/tauri.windows.release.conf.json
+
+      - name: Build latest.json
+        shell: pwsh
+        run: |
+          $version = (Get-Content "src-tauri/tauri.conf.json" -Raw | ConvertFrom-Json).version
+          $tag = if ($env:GITHUB_REF_TYPE -eq "tag" -and -not [string]::IsNullOrWhiteSpace($env:GITHUB_REF_NAME)) {
+            $env:GITHUB_REF_NAME
+          } else {
+            "v$version"
+          }
+
+          $bundleRoot = Resolve-Path "src-tauri/target/release/bundle"
+          $sigFiles = Get-ChildItem -Path $bundleRoot -Recurse -File -Filter *.sig
+          if (-not $sigFiles) {
+            throw "No updater signature artifact (*.sig) was generated."
+          }
+
+          $pairs = foreach ($sig in $sigFiles) {
+            $artifactPath = Join-Path $sig.DirectoryName $sig.BaseName
+            if (-not (Test-Path $artifactPath)) { continue }
+            [PSCustomObject]@{
+              Artifact = Get-Item $artifactPath
+              Sig = $sig
+            }
+          }
+          if (-not $pairs) {
+            throw "No updater artifact/signature pair found."
+          }
+
+          $updater = $pairs |
+            Where-Object { $_.Artifact.Name -like "*-setup.exe" } |
+            Select-Object -First 1
+          if (-not $updater) {
+            $updater = $pairs |
+              Where-Object { $_.Artifact.Extension -ieq ".msi" } |
+              Select-Object -First 1
+          }
+          if (-not $updater) {
+            $updater = $pairs |
+              Where-Object { $_.Artifact.Extension -ieq ".zip" } |
+              Select-Object -First 1
+          }
+          if (-not $updater) {
+            $updater = $pairs | Select-Object -First 1
+          }
+
+          $signature = (Get-Content -Path $updater.Sig.FullName -Raw).Trim()
+          if ([string]::IsNullOrWhiteSpace($signature)) {
+            throw "Updater signature file is empty: $($updater.Sig.FullName)"
+          }
+
+          $notes = "Windows release $version."
+          $latest = @{
+            version = $version
+            notes = $notes
+            pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = $signature
+                url = "https://github.com/EasonYan7/micode_monitor/releases/download/$tag/$($updater.Artifact.Name)"
+              }
+            }
+          }
+
+          $releaseDir = Join-Path $PWD "release-artifacts"
+          New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
+          $latestPath = Join-Path $releaseDir "latest.json"
+          $latest | ConvertTo-Json -Depth 8 | Set-Content -Path $latestPath -Encoding utf8
+
+          $installerFiles = @()
+          $installerFiles += Get-ChildItem -Path "$bundleRoot/msi" -Recurse -File -Filter *.msi -ErrorAction SilentlyContinue
+          $installerFiles += Get-ChildItem -Path "$bundleRoot/nsis" -Recurse -File -Filter *-setup.exe -ErrorAction SilentlyContinue
+          if (-not $installerFiles) {
+            throw "No MSI/NSIS installers found under $bundleRoot"
+          }
+
+          $uploadList = @($updater.Artifact.FullName, $updater.Sig.FullName, $latestPath) + ($installerFiles | Select-Object -ExpandProperty FullName)
+          $uploadList | Set-Content -Path (Join-Path $releaseDir "upload-list.txt")
+
+          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Create or update GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = $env:RELEASE_TAG
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            throw "Missing RELEASE_TAG from previous step."
+          }
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --title $tag --notes "Windows release $tag" --target $env:GITHUB_SHA
+          }
+
+          $uploadFiles = Get-Content "release-artifacts/upload-list.txt"
+          foreach ($file in $uploadFiles) {
+            gh release upload $tag $file --clobber
+          }
