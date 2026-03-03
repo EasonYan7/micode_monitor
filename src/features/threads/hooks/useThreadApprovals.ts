@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react";
 import type { Dispatch } from "react";
-import type { ApprovalRequest, DebugEntry } from "../../../types";
+import type { ApprovalDecision, ApprovalRequest, DebugEntry } from "../../../types";
 import { normalizeCommandTokens } from "../../../utils/approvalRules";
 import {
   rememberApprovalRule,
@@ -36,7 +36,7 @@ export function useThreadApprovals({ dispatch, onDebug }: UseThreadApprovalsOpti
   }, []);
 
   const handleApprovalDecision = useCallback(
-    async (request: ApprovalRequest, decision: "accept" | "decline") => {
+    async (request: ApprovalRequest, decision: ApprovalDecision) => {
       await respondToServerRequest(
         request.workspace_id,
         request.request_id,
@@ -70,7 +70,7 @@ export function useThreadApprovals({ dispatch, onDebug }: UseThreadApprovalsOpti
       await respondToServerRequest(
         request.workspace_id,
         request.request_id,
-        "accept",
+        "accept_always",
       );
       dispatch({
         type: "removeApproval",

@@ -100,7 +100,21 @@ export function FilePreviewPopover({
       {isLoading ? (
         <div className="file-preview-status">Loading file...</div>
       ) : error ? (
-        <div className="file-preview-status file-preview-error">{error}</div>
+        <div className="file-preview-body">
+          <div className="file-preview-toolbar">
+            <span className="file-preview-selection">{selectionLabel}</span>
+            <div className="file-preview-actions">
+              <OpenAppMenu
+                path={absolutePath}
+                openTargets={openTargets}
+                selectedOpenAppId={selectedOpenAppId}
+                onSelectOpenAppId={onSelectOpenAppId}
+                iconById={openAppIconById}
+              />
+            </div>
+          </div>
+          <div className="file-preview-status file-preview-error">{error}</div>
+        </div>
       ) : isImagePreview ? (
         <div className="file-preview-body file-preview-body--image">
           <div className="file-preview-toolbar">

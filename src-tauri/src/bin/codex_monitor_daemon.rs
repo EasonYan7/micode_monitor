@@ -726,6 +726,18 @@ impl DaemonState {
         micode_core::remember_approval_rule_core(&self.workspaces, workspace_id, command).await
     }
 
+    async fn list_approval_rules(&self, workspace_id: String) -> Result<Value, String> {
+        micode_core::list_approval_rules_core(&self.workspaces, workspace_id).await
+    }
+
+    async fn remove_approval_rule(
+        &self,
+        workspace_id: String,
+        command: Vec<String>,
+    ) -> Result<Value, String> {
+        micode_core::remove_approval_rule_core(&self.workspaces, workspace_id, command).await
+    }
+
     async fn get_config_model(&self, workspace_id: String) -> Result<Value, String> {
         micode_core::get_config_model_core(&self.workspaces, workspace_id).await
     }
@@ -1332,6 +1344,15 @@ async fn handle_rpc_request(
             let workspace_id = parse_string(&params, "workspaceId")?;
             let command = parse_string_array(&params, "command")?;
             state.remember_approval_rule(workspace_id, command).await
+        }
+        "list_approval_rules" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            state.list_approval_rules(workspace_id).await
+        }
+        "remove_approval_rule" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let command = parse_string_array(&params, "command")?;
+            state.remove_approval_rule(workspace_id, command).await
         }
         _ => Err(format!("unknown method: {method}")),
     }

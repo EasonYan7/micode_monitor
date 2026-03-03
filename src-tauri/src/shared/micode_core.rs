@@ -565,6 +565,44 @@ pub(crate) async fn remember_approval_rule_core(
     }))
 }
 
+pub(crate) async fn list_approval_rules_core(
+    workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
+    workspace_id: String,
+) -> Result<Value, String> {
+    let agent_home = resolve_micode_home_for_workspace_core(workspaces, &workspace_id).await?;
+    let rules_path = rules::default_rules_path(&agent_home);
+    let rules = rules::list_prefix_rules(&rules_path)?;
+    Ok(json!({
+        "rules": rules,
+        "rulesPath": rules_path,
+    }))
+}
+
+pub(crate) async fn remove_approval_rule_core(
+    workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
+    workspace_id: String,
+    command: Vec<String>,
+) -> Result<Value, String> {
+    let command = command
+        .into_iter()
+        .map(|item| item.trim().to_string())
+        .filter(|item| !item.is_empty())
+        .collect::<Vec<_>>();
+    if command.is_empty() {
+        return Err("empty command".to_string());
+    }
+
+    let agent_home = resolve_micode_home_for_workspace_core(workspaces, &workspace_id).await?;
+    let rules_path = rules::default_rules_path(&agent_home);
+    let removed = rules::remove_prefix_rule(&rules_path, &command)?;
+
+    Ok(json!({
+        "ok": true,
+        "removed": removed,
+        "rulesPath": rules_path,
+    }))
+}
+
 pub(crate) async fn get_config_model_core(
     workspaces: &Mutex<HashMap<String, WorkspaceEntry>>,
     workspace_id: String,

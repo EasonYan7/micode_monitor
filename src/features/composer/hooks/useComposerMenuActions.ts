@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { AccessMode } from "../../../types";
 import { useTauriEvent } from "../../app/hooks/useTauriEvent";
+import { pushErrorToast } from "../../../services/toasts";
 import {
   subscribeMenuCycleAccessMode,
   subscribeMenuCycleCollaborationMode,
@@ -47,6 +48,10 @@ export function useComposerMenuActions({
     () => ({
       cycleModel() {
         if (models.length === 0) {
+          pushErrorToast({
+            title: "Composer action unavailable",
+            message: "No models are available for the current workspace.",
+          });
           return;
         }
         const currentIndex = models.findIndex((model) => model.id === selectedModelId);
@@ -69,6 +74,10 @@ export function useComposerMenuActions({
       },
       cycleCollaborationMode() {
         if (collaborationModes.length === 0) {
+          pushErrorToast({
+            title: "Composer action unavailable",
+            message: "No collaboration modes are available.",
+          });
           return;
         }
         const currentIndex = collaborationModes.findIndex(
@@ -86,6 +95,10 @@ export function useComposerMenuActions({
       },
       cycleReasoning() {
         if (!reasoningSupported || reasoningOptions.length === 0) {
+          pushErrorToast({
+            title: "Composer action unavailable",
+            message: "Reasoning mode is not available for the current model.",
+          });
           return;
         }
         const currentIndex = reasoningOptions.indexOf(selectedEffort ?? "");

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { ask, open } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
@@ -17,6 +17,7 @@ import FlaskConical from "lucide-react/dist/esm/icons/flask-conical";
 import ExternalLink from "lucide-react/dist/esm/icons/external-link";
 import Layers from "lucide-react/dist/esm/icons/layers";
 import type {
+  ApprovalRule,
   AppSettings,
   MiCodeDoctorResult,
   DictationModelStatus,
@@ -32,7 +33,11 @@ import {
   getDefaultInterruptShortcut,
 } from "../../../utils/shortcuts";
 import { clampUiScale } from "../../../utils/uiScale";
-import { getMiCodeConfigPath } from "../../../services/tauri";
+import {
+  getMiCodeConfigPath,
+  listApprovalRules,
+  removeApprovalRule,
+} from "../../../services/tauri";
 import { pushErrorToast } from "../../../services/toasts";
 import {
   DEFAULT_CODE_FONT_FAMILY,
@@ -45,6 +50,7 @@ import {
 } from "../../../utils/fonts";
 import { DEFAULT_OPEN_APP_ID, OPEN_APP_STORAGE_KEY } from "../../app/constants";
 import { GENERIC_APP_ICON, getKnownOpenAppIcon } from "../../app/utils/openAppIcons";
+import { getFileManagerName } from "../../app/utils/fileManager";
 import { useGlobalAgentsMd } from "../hooks/useGlobalAgentsMd";
 import { useGlobalMiCodeConfigToml } from "../hooks/useGlobalMiCodeConfigToml";
 import { FileEditorCard } from "../../shared/components/FileEditorCard";
@@ -138,6 +144,99 @@ const buildWorkspaceOverrideDrafts = (
     next[workspace.id] = existing ?? getValue(workspace) ?? "";
   });
   return next;
+};
+
+type ApprovalRuleGroup = {
+  type: string;
+  rules: ApprovalRule[];
+};
+
+const inferApprovalRuleType = (command: string[]): string => {
+  const joined = command.join(" ").trim().toLowerCase();
+  if (!joined) return "other";
+  if (
+    joined.startsWith("fetching") ||
+    joined.startsWith("fetch ") ||
+    joined.startsWith("抓取") ||
+    joined.startsWith("获取网页") ||
+    joined.startsWith("获取内容")
+  ) {
+    return "fetch";
+  }
+  if (
+    joined.startsWith("writing") ||
+    joined.startsWith("write ") ||
+    joined.startsWith("写入") ||
+    joined.startsWith("写")
+  ) {
+    return "write";
+  }
+  if (
+    joined.startsWith("reading") ||
+    joined.startsWith("read ") ||
+    joined.startsWith("读取")
+  ) {
+    return "read";
+  }
+  if (
+    joined.startsWith("running") ||
+    joined.startsWith("executing") ||
+    joined.startsWith("execute ") ||
+    joined.startsWith("run ") ||
+    joined.startsWith("执行")
+  ) {
+    return "run";
+  }
+  if (
+    joined.startsWith("searching") ||
+    joined.startsWith("search ") ||
+    joined.startsWith("搜索")
+  ) {
+    return "search";
+  }
+  if (
+    joined.startsWith("use skill") ||
+    joined.startsWith("using skill") ||
+    joined.startsWith("技能")
+  ) {
+    return "skill";
+  }
+  return "other";
+};
+
+const formatApprovalRuleType = (
+  type: string,
+  t: (en: string, zh: string) => string,
+) => {
+  switch (type) {
+    case "fetch":
+      return t("Fetch", "抓取");
+    case "write":
+      return t("Write", "写入");
+    case "read":
+      return t("Read", "读取");
+    case "run":
+      return t("Run", "执行");
+    case "search":
+      return t("Search", "搜索");
+    case "skill":
+      return t("Skill", "技能");
+    default:
+      return t("Other", "其他");
+  }
+};
+
+const groupApprovalRulesByType = (rules: ApprovalRule[]): ApprovalRuleGroup[] => {
+  const grouped = new Map<string, ApprovalRule[]>();
+  rules.forEach((rule) => {
+    const type = inferApprovalRuleType(rule.command);
+    const current = grouped.get(type) ?? [];
+    current.push(rule);
+    grouped.set(type, current);
+  });
+  return Array.from(grouped.entries())
+    .map(([type, typeRules]) => ({ type, rules: typeRules }))
+    .sort((a, b) => b.rules.length - a.rules.length || a.type.localeCompare(b.type));
 };
 
 export type SettingsViewProps = {
@@ -287,13 +386,6 @@ const isOpenAppTargetComplete = (target: OpenAppTarget) => {
   return true;
 };
 
-const createOpenAppId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `open-app-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-};
-
 export function SettingsView({
   workspaceGroups,
   groupedWorkspaces,
@@ -329,6 +421,7 @@ export function SettingsView({
     (en: string, zh: string) => (isZh ? zh : en),
     [isZh],
   );
+  const fileManagerName = getFileManagerName();
   const [activeSection, setActiveSection] = useState<MiCodeSection>("projects");
   const [environmentWorkspaceId, setEnvironmentWorkspaceId] = useState<string | null>(
     null,
@@ -402,6 +495,17 @@ export function SettingsView({
   } = useGlobalMiCodeConfigToml();
   const [openConfigError, setOpenConfigError] = useState<string | null>(null);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [approvalRulesByWorkspace, setApprovalRulesByWorkspace] = useState<
+    Record<
+      string,
+      {
+        loading: boolean;
+        error: string | null;
+        rulesPath: string | null;
+        rules: ApprovalRule[];
+      }
+    >
+  >({});
   const [shortcutDrafts, setShortcutDrafts] = useState({
     model: appSettings.composerModelShortcut ?? "",
     access: appSettings.composerAccessShortcut ?? "",
@@ -424,39 +528,43 @@ export function SettingsView({
   const dictationReady = dictationModelStatus?.state === "ready";
   const dictationProgress = dictationModelStatus?.progress ?? null;
   const globalAgentsStatus = globalAgentsLoading
-    ? "Loading…"
+    ? t("Loading…", "加载中…")
     : globalAgentsSaving
-      ? "Saving…"
+      ? t("Saving…", "保存中…")
       : globalAgentsExists
         ? ""
-        : "Not found";
+        : t("Not found", "未找到");
   const globalAgentsMetaParts: string[] = [];
   if (globalAgentsStatus) {
     globalAgentsMetaParts.push(globalAgentsStatus);
   }
   if (globalAgentsTruncated) {
-    globalAgentsMetaParts.push("Truncated");
+    globalAgentsMetaParts.push(t("Truncated", "已截断"));
   }
   const globalAgentsMeta = globalAgentsMetaParts.join(" · ");
-  const globalAgentsSaveLabel = globalAgentsExists ? "Save" : "Create";
+  const globalAgentsSaveLabel = globalAgentsExists
+    ? t("Save", "保存")
+    : t("Create", "创建");
   const globalAgentsSaveDisabled = globalAgentsLoading || globalAgentsSaving || !globalAgentsDirty;
   const globalAgentsRefreshDisabled = globalAgentsLoading || globalAgentsSaving;
   const globalConfigStatus = globalConfigLoading
-    ? "Loading…"
+    ? t("Loading…", "加载中…")
     : globalConfigSaving
-      ? "Saving…"
+      ? t("Saving…", "保存中…")
       : globalConfigExists
         ? ""
-        : "Not found";
+        : t("Not found", "未找到");
   const globalConfigMetaParts: string[] = [];
   if (globalConfigStatus) {
     globalConfigMetaParts.push(globalConfigStatus);
   }
   if (globalConfigTruncated) {
-    globalConfigMetaParts.push("Truncated");
+    globalConfigMetaParts.push(t("Truncated", "已截断"));
   }
   const globalConfigMeta = globalConfigMetaParts.join(" · ");
-  const globalConfigSaveLabel = globalConfigExists ? "Save" : "Create";
+  const globalConfigSaveLabel = globalConfigExists
+    ? t("Save", "保存")
+    : t("Create", "创建");
   const globalConfigSaveDisabled = globalConfigLoading || globalConfigSaving || !globalConfigDirty;
   const globalConfigRefreshDisabled = globalConfigLoading || globalConfigSaving;
   const selectedDictationModel = useMemo(() => {
@@ -635,6 +743,79 @@ export function SettingsView({
       ),
     );
   }, [projects]);
+
+  useEffect(() => {
+    if (activeSection !== "micode") {
+      return;
+    }
+    const workspaces = projects.filter((workspace) => (workspace.kind ?? "main") !== "worktree");
+    if (workspaces.length === 0) {
+      return;
+    }
+
+    workspaces.forEach((workspace) => {
+      setApprovalRulesByWorkspace((prev) => ({
+        ...prev,
+        [workspace.id]: {
+          loading: true,
+          error: null,
+          rulesPath: prev[workspace.id]?.rulesPath ?? null,
+          rules: prev[workspace.id]?.rules ?? [],
+        },
+      }));
+
+      void listApprovalRules(workspace.id)
+        .then((result) => {
+          setApprovalRulesByWorkspace((prev) => ({
+            ...prev,
+            [workspace.id]: {
+              loading: false,
+              error: null,
+              rulesPath: result.rulesPath ?? null,
+              rules: result.rules,
+            },
+          }));
+        })
+        .catch((error) => {
+          setApprovalRulesByWorkspace((prev) => ({
+            ...prev,
+            [workspace.id]: {
+              loading: false,
+              error: error instanceof Error ? error.message : String(error),
+              rulesPath: prev[workspace.id]?.rulesPath ?? null,
+              rules: prev[workspace.id]?.rules ?? [],
+            },
+          }));
+        });
+    });
+  }, [activeSection, projects]);
+
+  const handleRemoveApprovalRuleType = useCallback(
+    async (workspaceId: string, rules: ApprovalRule[]) => {
+      try {
+        await Promise.all(
+          rules.map((rule) => removeApprovalRule(workspaceId, rule.command)),
+        );
+        const refreshed = await listApprovalRules(workspaceId);
+        setApprovalRulesByWorkspace((prev) => ({
+          ...prev,
+          [workspaceId]: {
+            loading: false,
+            error: null,
+            rulesPath: refreshed.rulesPath ?? null,
+            rules: refreshed.rules,
+          },
+        }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        pushErrorToast({
+          title: t("Couldn’t remove approval rule type", "无法删除该类型的审批规则"),
+          message,
+        });
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     setGroupDrafts((prev) => {
@@ -832,79 +1013,6 @@ export function SettingsView({
     ],
   );
 
-  const handleOpenAppDraftChange = (
-    index: number,
-    updates: Partial<OpenAppDraft>,
-  ) => {
-    setOpenAppDrafts((prev) => {
-      const next = [...prev];
-      const current = next[index];
-      if (!current) {
-        return prev;
-      }
-      next[index] = { ...current, ...updates };
-      return next;
-    });
-  };
-
-  const handleOpenAppKindChange = (index: number, kind: OpenAppTarget["kind"]) => {
-    setOpenAppDrafts((prev) => {
-      const next = [...prev];
-      const current = next[index];
-      if (!current) {
-        return prev;
-      }
-      next[index] = {
-        ...current,
-        kind,
-        appName: kind === "app" ? current.appName ?? "" : null,
-        command: kind === "command" ? current.command ?? "" : null,
-        argsText: kind === "finder" ? "" : current.argsText,
-      };
-      void handleCommitOpenApps(next);
-      return next;
-    });
-  };
-
-  const handleMoveOpenApp = (index: number, direction: "up" | "down") => {
-    const nextIndex = direction === "up" ? index - 1 : index + 1;
-    if (nextIndex < 0 || nextIndex >= openAppDrafts.length) {
-      return;
-    }
-    const next = [...openAppDrafts];
-    const [moved] = next.splice(index, 1);
-    next.splice(nextIndex, 0, moved);
-    setOpenAppDrafts(next);
-    void handleCommitOpenApps(next);
-  };
-
-  const handleDeleteOpenApp = (index: number) => {
-    if (openAppDrafts.length <= 1) {
-      return;
-    }
-    const removed = openAppDrafts[index];
-    const next = openAppDrafts.filter((_, draftIndex) => draftIndex !== index);
-    const nextSelected =
-      removed?.id === openAppSelectedId ? next[0]?.id ?? DEFAULT_OPEN_APP_ID : openAppSelectedId;
-    setOpenAppDrafts(next);
-    void handleCommitOpenApps(next, nextSelected);
-  };
-
-  const handleAddOpenApp = () => {
-    const newTarget: OpenAppDraft = {
-      id: createOpenAppId(),
-      label: "New App",
-      kind: "app",
-      appName: "",
-      command: null,
-      args: [],
-      argsText: "",
-    };
-    const next = [...openAppDrafts, newTarget];
-    setOpenAppDrafts(next);
-    void handleCommitOpenApps(next, newTarget.id);
-  };
-
   const handleSelectOpenAppDefault = (id: string) => {
     const selectedTarget = openAppDrafts.find((target) => target.id === id);
     if (selectedTarget && !isOpenAppDraftComplete(selectedTarget)) {
@@ -1085,15 +1193,18 @@ export function SettingsView({
       groupedWorkspaces.find((entry) => entry.id === group.id)?.workspaces ?? [];
     const detail =
       groupProjects.length > 0
-        ? `\n\nProjects in this group will move to "${ungroupedLabel}".`
+        ? `\n\n${t(
+            `Projects in this group will move to "${ungroupedLabel}".`,
+            `该分组下的项目将移动到“${ungroupedLabel}”。`,
+          )}`
         : "";
     const confirmed = await ask(
-      `Delete "${group.name}"?${detail}`,
+      `${t("Delete", "删除")} "${group.name}"?${detail}`,
       {
-        title: "Delete Group",
+        title: t("Delete Group", "删除分组"),
         kind: "warning",
-        okLabel: "Delete",
-        cancelLabel: "Cancel",
+        okLabel: t("Delete", "删除"),
+        cancelLabel: t("Cancel", "取消"),
       },
     );
     if (!confirmed) {
@@ -1112,12 +1223,12 @@ export function SettingsView({
       <div className="settings-backdrop" onClick={onClose} />
       <div className="settings-window">
         <div className="settings-titlebar">
-          <div className="settings-title">Settings</div>
+          <div className="settings-title">{t("Settings", "设置")}</div>
           <button
             type="button"
             className="ghost icon-button settings-close"
             onClick={onClose}
-            aria-label="Close settings"
+            aria-label={t("Close settings", "关闭设置")}
           >
             <X aria-hidden />
           </button>
@@ -1186,7 +1297,7 @@ export function SettingsView({
               onClick={() => setActiveSection("git")}
             >
               <GitBranch aria-hidden />
-              Git
+              {t("Git", "Git")}
             </button>
             <button
               type="button"
@@ -1194,7 +1305,7 @@ export function SettingsView({
               onClick={() => setActiveSection("micode")}
             >
               <TerminalSquare aria-hidden />
-              MiCode
+              {t("MiCode", "MiCode")}
             </button>
             <button
               type="button"
@@ -2167,24 +2278,24 @@ export function SettingsView({
                     }
                   >
                     <option value="">{t("Auto-detect only", "仅自动识别")}</option>
-                    <option value="en">English</option>
-                    <option value="es">Spanish</option>
-                    <option value="fr">French</option>
-                    <option value="de">German</option>
-                    <option value="it">Italian</option>
-                    <option value="pt">Portuguese</option>
-                    <option value="nl">Dutch</option>
-                    <option value="sv">Swedish</option>
-                    <option value="no">Norwegian</option>
-                    <option value="da">Danish</option>
-                    <option value="fi">Finnish</option>
-                    <option value="pl">Polish</option>
-                    <option value="tr">Turkish</option>
-                    <option value="ru">Russian</option>
-                    <option value="uk">Ukrainian</option>
-                    <option value="ja">Japanese</option>
-                    <option value="ko">Korean</option>
-                    <option value="zh">Chinese</option>
+                    <option value="en">{t("English", "英语")}</option>
+                    <option value="es">{t("Spanish", "西班牙语")}</option>
+                    <option value="fr">{t("French", "法语")}</option>
+                    <option value="de">{t("German", "德语")}</option>
+                    <option value="it">{t("Italian", "意大利语")}</option>
+                    <option value="pt">{t("Portuguese", "葡萄牙语")}</option>
+                    <option value="nl">{t("Dutch", "荷兰语")}</option>
+                    <option value="sv">{t("Swedish", "瑞典语")}</option>
+                    <option value="no">{t("Norwegian", "挪威语")}</option>
+                    <option value="da">{t("Danish", "丹麦语")}</option>
+                    <option value="fi">{t("Finnish", "芬兰语")}</option>
+                    <option value="pl">{t("Polish", "波兰语")}</option>
+                    <option value="tr">{t("Turkish", "土耳其语")}</option>
+                    <option value="ru">{t("Russian", "俄语")}</option>
+                    <option value="uk">{t("Ukrainian", "乌克兰语")}</option>
+                    <option value="ja">{t("Japanese", "日语")}</option>
+                    <option value="ko">{t("Korean", "韩语")}</option>
+                    <option value="zh">{t("Chinese", "中文")}</option>
                   </select>
                   <div className="settings-help">
                     {t(
@@ -2740,36 +2851,30 @@ export function SettingsView({
                 <div className="settings-section-title">{t("Open in", "打开方式")}</div>
                 <div className="settings-section-subtitle">
                   {t(
-                    "Customize the Open in menu shown in the title bar and file previews.",
-                    "自定义标题栏和文件预览中的“打开方式”菜单。",
+                    "Windows build uses fixed Open in targets. Choose the default target below.",
+                    "Windows 版本使用固定“打开方式”目标。请在下方选择默认目标。",
                   )}
                 </div>
                 <div className="settings-open-apps">
-                  {openAppDrafts.map((target, index) => {
+                  {openAppDrafts.map((target) => {
                     const iconSrc =
                       getKnownOpenAppIcon(target.id) ??
                       openAppIconById[target.id] ??
                       GENERIC_APP_ICON;
-                    const labelValid = isOpenAppLabelValid(target.label);
-                    const appNameValid =
-                      target.kind !== "app" || Boolean(target.appName?.trim());
-                    const commandValid =
-                      target.kind !== "command" || Boolean(target.command?.trim());
-                    const isComplete = labelValid && appNameValid && commandValid;
-                    const incompleteHint = !labelValid
-                      ? t("Label required", "名称必填")
-                      : target.kind === "app"
-                        ? t("App name required", "应用名必填")
-                        : target.kind === "command"
-                          ? t("Command required", "命令必填")
-                          : t("Complete required fields", "请补全必填项");
+                    const displayName =
+                      target.kind === "finder"
+                        ? fileManagerName
+                        : target.kind === "default"
+                          ? t("Default App", "系统默认应用")
+                          : target.label;
+                    const typeName =
+                      target.kind === "finder"
+                        ? fileManagerName
+                        : target.kind === "default"
+                          ? t("System", "系统")
+                          : t("Editor", "编辑器");
                     return (
-                      <div
-                        key={target.id}
-                        className={`settings-open-app-row${
-                          isComplete ? "" : " is-incomplete"
-                        }`}
-                      >
+                      <div key={target.id} className="settings-open-app-row">
                         <div className="settings-open-app-icon-wrap" aria-hidden>
                           <img
                             className="settings-open-app-icon"
@@ -2780,169 +2885,62 @@ export function SettingsView({
                           />
                         </div>
                         <div className="settings-open-app-fields">
-                          <label className="settings-open-app-field settings-open-app-field--label">
-                              <span className="settings-visually-hidden">{t("Label", "名称")}</span>
+                          <label className="settings-open-app-field settings-open-app-field--appname">
+                              <span className="settings-visually-hidden">{t("Target", "目标")}</span>
                             <input
-                              className="settings-input settings-input--compact settings-open-app-input settings-open-app-input--label"
-                              value={target.label}
-                              placeholder={t("Label", "名称")}
-                              onChange={(event) =>
-                                handleOpenAppDraftChange(index, {
-                                  label: event.target.value,
-                                })
-                              }
-                              onBlur={() => {
-                                void handleCommitOpenApps(openAppDrafts);
-                              }}
-                              aria-label={`Open app label ${index + 1}`}
-                              data-invalid={!labelValid || undefined}
+                              className="settings-input settings-input--compact settings-open-app-input settings-open-app-input--appname"
+                              value={displayName}
+                              readOnly
+                              aria-label={displayName}
+                              title={displayName}
                             />
                           </label>
-                          <label className="settings-open-app-field settings-open-app-field--type">
-                              <span className="settings-visually-hidden">{t("Type", "类型")}</span>
-                            <select
-                              className="settings-select settings-select--compact settings-open-app-kind"
-                              value={target.kind}
-                              onChange={(event) =>
-                                handleOpenAppKindChange(
-                                  index,
-                                  event.target.value as OpenAppTarget["kind"],
-                                )
-                              }
-                              aria-label={`Open app type ${index + 1}`}
-                            >
-                              <option value="app">{t("App", "应用")}</option>
-                              <option value="command">{t("Command", "命令")}</option>
-                              <option value="finder">Finder</option>
-                            </select>
+                          <label className="settings-open-app-field settings-open-app-field--label">
+                            <span className="settings-visually-hidden">{t("Type", "类型")}</span>
+                            <input
+                              className="settings-input settings-input--compact settings-open-app-input settings-open-app-input--label"
+                              value={typeName}
+                              readOnly
+                              aria-label={t("Type", "类型")}
+                              title={t("Type", "类型")}
+                            />
                           </label>
-                          {target.kind === "app" && (
-                            <label className="settings-open-app-field settings-open-app-field--appname">
-                              <span className="settings-visually-hidden">{t("App name", "应用名")}</span>
-                              <input
-                                className="settings-input settings-input--compact settings-open-app-input settings-open-app-input--appname"
-                                value={target.appName ?? ""}
-                                placeholder={t("App name", "应用名")}
-                                onChange={(event) =>
-                                  handleOpenAppDraftChange(index, {
-                                    appName: event.target.value,
-                                  })
-                                }
-                                onBlur={() => {
-                                  void handleCommitOpenApps(openAppDrafts);
-                                }}
-                                aria-label={`Open app name ${index + 1}`}
-                                data-invalid={!appNameValid || undefined}
-                              />
-                            </label>
-                          )}
-                          {target.kind === "command" && (
-                            <label className="settings-open-app-field settings-open-app-field--command">
-                              <span className="settings-visually-hidden">{t("Command", "命令")}</span>
-                              <input
-                                className="settings-input settings-input--compact settings-open-app-input settings-open-app-input--command"
-                                value={target.command ?? ""}
-                                placeholder={t("Command", "命令")}
-                                onChange={(event) =>
-                                  handleOpenAppDraftChange(index, {
-                                    command: event.target.value,
-                                  })
-                                }
-                                onBlur={() => {
-                                  void handleCommitOpenApps(openAppDrafts);
-                                }}
-                                aria-label={`Open app command ${index + 1}`}
-                                data-invalid={!commandValid || undefined}
-                              />
-                            </label>
-                          )}
-                          {target.kind !== "finder" && (
-                            <label className="settings-open-app-field settings-open-app-field--args">
-                              <span className="settings-visually-hidden">{t("Args", "参数")}</span>
-                              <input
-                                className="settings-input settings-input--compact settings-open-app-input settings-open-app-input--args"
-                                value={target.argsText}
-                                placeholder={t("Args", "参数")}
-                                onChange={(event) =>
-                                  handleOpenAppDraftChange(index, {
-                                    argsText: event.target.value,
-                                  })
-                                }
-                                onBlur={() => {
-                                  void handleCommitOpenApps(openAppDrafts);
-                                }}
-                                aria-label={`Open app args ${index + 1}`}
-                              />
-                            </label>
-                          )}
-                        </div>
-                        <div className="settings-open-app-actions">
-                          {!isComplete && (
-                            <span
-                              className="settings-open-app-status"
-                              title={incompleteHint}
-                              aria-label={incompleteHint}
-                            >
-                              {t("Incomplete", "未完成")}
-                            </span>
-                          )}
                           <label className="settings-open-app-default">
                             <input
                               type="radio"
                               name="open-app-default"
                               checked={target.id === openAppSelectedId}
                               onChange={() => handleSelectOpenAppDefault(target.id)}
-                              disabled={!isComplete}
                             />
                             {t("Default", "默认")}
                           </label>
-                          <div className="settings-open-app-order">
-                            <button
-                              type="button"
-                              className="ghost icon-button"
-                              onClick={() => handleMoveOpenApp(index, "up")}
-                              disabled={index === 0}
-                              aria-label={t("Move up", "上移")}
+                        </div>
+                        <div className="settings-open-app-actions">
+                          {target.id === openAppSelectedId ? (
+                            <span
+                              className="settings-open-app-status"
+                              aria-label={t("Selected as default", "已设为默认")}
+                              title={t("Selected as default", "已设为默认")}
                             >
-                              <ChevronUp aria-hidden />
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost icon-button"
-                              onClick={() => handleMoveOpenApp(index, "down")}
-                              disabled={index === openAppDrafts.length - 1}
-                              aria-label={t("Move down", "下移")}
-                            >
-                              <ChevronDown aria-hidden />
-                            </button>
-                          </div>
-                          <button
-                            type="button"
-                            className="ghost icon-button"
-                            onClick={() => handleDeleteOpenApp(index)}
-                            disabled={openAppDrafts.length <= 1}
-                            aria-label={t("Remove app", "移除应用")}
-                            title={t("Remove app", "移除应用")}
-                          >
-                            <Trash2 aria-hidden />
-                          </button>
+                              {t("Selected", "已选中")}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     );
                   })}
                 </div>
                 <div className="settings-open-app-footer">
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={handleAddOpenApp}
-                  >
-                    {t("Add app", "添加应用")}
-                  </button>
                   <div className="settings-help">
                     {t(
-                      "Commands receive the selected path as the final argument. Apps use macOS open with optional args.",
-                      "命令会将当前路径作为最后一个参数；应用会使用 macOS open 并附加可选参数。",
+                      "Fixed targets in this build: VS Code and file manager.",
+                      "此版本固定目标为：VS Code 与系统文件管理器。",
+                    )}
+                  </div>
+                  <div className="settings-help">
+                    {t(
+                      "File manager uses Explorer on Windows and Finder on macOS.",
+                      "文件管理器在 Windows 显示为 Explorer，在 macOS 显示为 Finder。",
                     )}
                   </div>
                 </div>
@@ -2950,7 +2948,7 @@ export function SettingsView({
             )}
             {activeSection === "git" && (
               <section className="settings-section">
-                <div className="settings-section-title">Git</div>
+                <div className="settings-section-title">{t("Git", "Git")}</div>
                 <div className="settings-section-subtitle">
                   {t("Manage how diffs are loaded in the Git sidebar.", "管理 Git 侧栏中 Diff 的加载方式。")}
                 </div>
@@ -3000,7 +2998,7 @@ export function SettingsView({
             )}
             {activeSection === "micode" && (
               <section className="settings-section">
-                <div className="settings-section-title">MiCode</div>
+                <div className="settings-section-title">{t("MiCode", "MiCode")}</div>
                 <div className="settings-section-subtitle">
                   {t("Configure the MiCode CLI used by this app and validate the install.", "配置本应用使用的 MiCode CLI，并校验安装状态。")}
                 </div>
@@ -3114,6 +3112,74 @@ export function SettingsView({
                   </div>
                 )}
               </div>
+
+                <div className="settings-field">
+                  <div className="settings-field-label">
+                    {t("Always approve rules", "始终批准规则")}
+                  </div>
+                  <div className="settings-help">
+                    {t(
+                      "Saved approvals are grouped by command type per workspace.",
+                      "已保存审批将按工作区、按命令类型分组显示。",
+                    )}
+                  </div>
+                  <div className="settings-approval-rules">
+                    {mainWorkspaces.map((workspace) => {
+                      const ruleState = approvalRulesByWorkspace[workspace.id];
+                      const rules = ruleState?.rules ?? [];
+                      const groupedRules = groupApprovalRulesByType(rules);
+                      return (
+                        <div key={workspace.id} className="settings-approval-workspace">
+                          <div className="settings-approval-workspace-name">
+                            {workspace.name}
+                          </div>
+                          {ruleState?.rulesPath ? (
+                            <div className="settings-help settings-approval-path">
+                              {ruleState.rulesPath}
+                            </div>
+                          ) : null}
+                          {ruleState?.loading ? (
+                            <div className="settings-help">{t("Loading rules...", "正在加载规则...")}</div>
+                          ) : null}
+                          {!ruleState?.loading && ruleState?.error ? (
+                            <div className="settings-help settings-approval-error">
+                              {ruleState.error}
+                            </div>
+                          ) : null}
+                          {!ruleState?.loading && !ruleState?.error && groupedRules.length === 0 ? (
+                            <div className="settings-help">{t("No saved rules.", "暂无已保存规则。")}</div>
+                          ) : null}
+                          {!ruleState?.loading && !ruleState?.error && groupedRules.length > 0 ? (
+                            <div className="settings-approval-rule-list">
+                              {groupedRules.map((group) => (
+                                <div
+                                  key={`${workspace.id}:${group.type}`}
+                                  className="settings-approval-rule-row"
+                                >
+                                  <code className="settings-approval-rule-command">
+                                    {`${formatApprovalRuleType(group.type, t)} (${group.rules.length})`}
+                                  </code>
+                                  <button
+                                    type="button"
+                                    className="ghost settings-button-compact"
+                                    onClick={() =>
+                                      void handleRemoveApprovalRuleType(workspace.id, group.rules)
+                                    }
+                                  >
+                                    {t("Remove", "删除")}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                    {mainWorkspaces.length === 0 ? (
+                      <div className="settings-help">{t("No workspaces yet.", "暂无工作区。")}</div>
+                    ) : null}
+                  </div>
+                </div>
 
                 <div className="settings-field">
                   <label className="settings-field-label" htmlFor="default-access">
@@ -3304,7 +3370,7 @@ export function SettingsView({
                                 await onUpdateWorkspaceMiCodeBin(workspace.id, null);
                               }}
                             >
-                              Clear
+                              {t("Clear", "清空")}
                             </button>
                           </div>
                           <div className="settings-override-field">
@@ -3350,7 +3416,7 @@ export function SettingsView({
                                 });
                               }}
                             >
-                              Clear
+                              {t("Clear", "清空")}
                             </button>
                           </div>
                           <div className="settings-override-field">
@@ -3430,11 +3496,14 @@ export function SettingsView({
                   <div>
                     <div className="settings-toggle-title">{t("Config file", "配置文件")}</div>
                     <div className="settings-toggle-subtitle">
-                      {t("Open the agent config in Finder.", "在 Finder 中打开 Agent 配置。")}
+                      {t(
+                        `Open the agent config in ${fileManagerName}.`,
+                        `在 ${fileManagerName} 中打开 Agent 配置。`,
+                      )}
                     </div>
                   </div>
                   <button type="button" className="ghost" onClick={handleOpenConfig}>
-                    {t("Open in Finder", "在 Finder 中打开")}
+                    {t(`Open in ${fileManagerName}`, `在 ${fileManagerName} 中打开`)}
                   </button>
                 </div>
                 {openConfigError && (
@@ -3547,3 +3616,4 @@ export function SettingsView({
     </div>
   );
 }
+

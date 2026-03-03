@@ -50,9 +50,36 @@ async fn get_terminal_session(
 }
 
 fn shell_path() -> String {
-    std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string())
+    #[cfg(windows)]
+    {
+        return std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string());
+    }
+
+    #[cfg(not(windows))]
+    {
+        return std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    }
 }
 
+fn configure_shell_command(_cmd: &mut CommandBuilder) {
+    #[cfg(not(windows))]
+    {
+        _cmd.arg("-i");
+    }
+}
+
+fn apply_terminal_env(_cmd: &mut CommandBuilder) {
+    #[cfg(not(windows))]
+    {
+        _cmd.env("TERM", "xterm-256color");
+        let locale = resolve_locale();
+        _cmd.env("LANG", &locale);
+        _cmd.env("LC_ALL", &locale);
+        _cmd.env("LC_CTYPE", &locale);
+    }
+}
+
+#[cfg(not(windows))]
 fn resolve_locale() -> String {
     let candidate = std::env::var("LC_ALL")
         .or_else(|_| std::env::var("LANG"))
@@ -179,12 +206,8 @@ pub(crate) async fn terminal_open(
 
     let mut cmd = CommandBuilder::new(shell_path());
     cmd.cwd(cwd);
-    cmd.arg("-i");
-    cmd.env("TERM", "xterm-256color");
-    let locale = resolve_locale();
-    cmd.env("LANG", &locale);
-    cmd.env("LC_ALL", &locale);
-    cmd.env("LC_CTYPE", &locale);
+    configure_shell_command(&mut cmd);
+    apply_terminal_env(&mut cmd);
 
     let child = pair
         .slave

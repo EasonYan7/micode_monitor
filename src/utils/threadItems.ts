@@ -42,6 +42,20 @@ function asNumber(value: unknown) {
   return null;
 }
 
+function stringifyToolArguments(value: unknown) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0 ? JSON.stringify(value, null, 2) : "";
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    return entries.length > 0 ? JSON.stringify(value, null, 2) : "";
+  }
+  return JSON.stringify(value, null, 2);
+}
+
 function truncateText(text: string, maxLength = MAX_ITEM_TEXT) {
   if (text.length <= maxLength) {
     return text;
@@ -687,7 +701,7 @@ export function buildConversationItem(
   if (type === "mcpToolCall") {
     const server = asString(item.server ?? "");
     const tool = asString(item.tool ?? "");
-    const args = item.arguments ? JSON.stringify(item.arguments, null, 2) : "";
+    const args = stringifyToolArguments(item.arguments);
     return {
       id,
       kind: "tool",

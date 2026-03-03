@@ -20,6 +20,7 @@ use crate::shared::process_core::tokio_command;
 use crate::types::WorkspaceEntry;
 
 const ACP_PROTOCOL_VERSION: u32 = 1;
+const TURN_START_TIMEOUT: Duration = Duration::from_secs(180);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct LocalThreadRecord {
@@ -263,6 +264,25 @@ impl LocalThreadStore {
         }
         self.persist_thread_items(thread_id, &items);
     }
+
+    fn set_agent_item_token_usage(&self, thread_id: &str, turn_id: &str, token_usage: &Value) {
+        let target_item_id = format!("agent-{thread_id}-{turn_id}");
+        let mut items = self.load_thread_items(thread_id);
+        let Some(index) = items.iter().position(|entry| {
+            entry
+                .get("id")
+                .and_then(Value::as_str)
+                .map(|value| value == target_item_id)
+                .unwrap_or(false)
+        }) else {
+            return;
+        };
+        let Some(item) = items[index].as_object_mut() else {
+            return;
+        };
+        item.insert("tokenUsage".to_string(), token_usage.clone());
+        self.persist_thread_items(thread_id, &items);
+    }
 }
 
 fn now_ts() -> i64 {
@@ -447,7 +467,14 @@ fn resolve_micode_home_path() -> Option<PathBuf> {
             return Some(PathBuf::from(trimmed));
         }
     }
-    let home = env::var("HOME").ok()?;
+    let home = env::var("HOME")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| {
+            env::var("USERPROFILE")
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+        })?;
     Some(PathBuf::from(home).join(".micode"))
 }
 
@@ -853,6 +880,89 @@ fn find_executable_on_path(name: &str) -> Option<PathBuf> {
     None
 }
 
+fn resolve_windows_micode_bin_hint() -> Option<String> {
+    if !cfg!(windows) {
+        return None;
+    }
+
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Ok(app_data) = env::var("APPDATA") {
+        let base = PathBuf::from(app_data).join("npm");
+        candidates.push(base.join("micode.cmd"));
+        candidates.push(base.join("micode.exe"));
+        candidates.push(base.join("micode.bat"));
+    }
+    if let Ok(user_profile) = env::var("USERPROFILE") {
+        let base = PathBuf::from(user_profile);
+        candidates.push(base.join(".micode").join("bin").join("micode.cmd"));
+        candidates.push(base.join(".micode").join("bin").join("micode.exe"));
+        candidates.push(base.join(".local").join("bin").join("micode.cmd"));
+        candidates.push(base.join(".local").join("bin").join("micode.exe"));
+        candidates.push(
+            base.join("AppData")
+                .join("Roaming")
+                .join("npm")
+                .join("micode.cmd"),
+        );
+        candidates.push(
+            base.join("AppData")
+                .join("Roaming")
+                .join("npm")
+                .join("micode.exe"),
+        );
+    }
+    if let Ok(local_app_data) = env::var("LOCALAPPDATA") {
+        let base = PathBuf::from(local_app_data);
+        candidates.push(
+            base.join("Microsoft")
+                .join("WinGet")
+                .join("Links")
+                .join("micode.exe"),
+        );
+        candidates.push(
+            base.join("Microsoft")
+                .join("WinGet")
+                .join("Links")
+                .join("micode.cmd"),
+        );
+        candidates.push(
+            base.join("Programs")
+                .join("MiCode")
+                .join("bin")
+                .join("micode.exe"),
+        );
+        candidates.push(
+            base.join("Programs")
+                .join("MiCode")
+                .join("bin")
+                .join("micode.cmd"),
+        );
+        candidates.push(
+            base.join("Programs")
+                .join("micode")
+                .join("bin")
+                .join("micode.exe"),
+        );
+        candidates.push(
+            base.join("Programs")
+                .join("micode")
+                .join("bin")
+                .join("micode.cmd"),
+        );
+    }
+
+    for candidate in candidates {
+        if candidate.is_file() {
+            return Some(candidate.to_string_lossy().to_string());
+        }
+    }
+
+    find_executable_on_path("micode")
+        .or_else(|| find_executable_on_path("micode.cmd"))
+        .or_else(|| find_executable_on_path("micode.exe"))
+        .map(|path| path.to_string_lossy().to_string())
+}
+
 fn canonicalize_if_file(path: PathBuf) -> Option<PathBuf> {
     if !path.is_file() {
         return None;
@@ -942,7 +1052,13 @@ fn resolve_micode_cli_bundle_path(agent_bin: Option<&str>) -> Option<PathBuf> {
                 Some(PathBuf::from(value))
             }
         })
-        .or_else(|| find_executable_on_path("micode"))?;
+        .or_else(|| {
+            if cfg!(windows) {
+                resolve_windows_micode_bin_hint().map(PathBuf::from)
+            } else {
+                find_executable_on_path("micode")
+            }
+        })?;
     let canonical = std::fs::canonicalize(&resolved_bin)
         .ok()
         .unwrap_or(resolved_bin);
@@ -1250,6 +1366,9 @@ fn extract_tool_presentation_from_update(update: &Value) -> ToolCallPresentation
             .get("arguments")
             .cloned()
             .or_else(|| update.get("rawInput").cloned())
+            .or_else(|| update.get("input").cloned())
+            .or_else(|| update.get("params").cloned())
+            .or_else(|| update.get("command").cloned())
             .or_else(|| update.get("content").cloned()),
         result: update
             .get("result")
@@ -1314,6 +1433,33 @@ fn merge_tool_presentation(
     current: Option<ToolCallPresentation>,
     incoming: ToolCallPresentation,
 ) -> ToolCallPresentation {
+    fn has_meaningful_json(value: &Value) -> bool {
+        match value {
+            Value::Null => false,
+            Value::Bool(_) => true,
+            Value::Number(_) => true,
+            Value::String(text) => !text.trim().is_empty(),
+            Value::Array(items) => items.iter().any(has_meaningful_json),
+            Value::Object(map) => map.values().any(has_meaningful_json),
+        }
+    }
+
+    fn has_meaningful_string(value: Option<&String>) -> bool {
+        value.map(|text| !text.trim().is_empty()).unwrap_or(false)
+    }
+
+    fn should_take_incoming_json(current: Option<&Value>, incoming: Option<&Value>) -> bool {
+        let incoming_has_value = incoming.map(has_meaningful_json).unwrap_or(false);
+        if !incoming_has_value {
+            return false;
+        }
+        !current.map(has_meaningful_json).unwrap_or(false)
+    }
+
+    fn should_take_incoming_string(current: Option<&String>, incoming: Option<&String>) -> bool {
+        has_meaningful_string(incoming) && !has_meaningful_string(current)
+    }
+
     let mut merged = current.unwrap_or_default();
     if merged.server.is_none() {
         merged.server = incoming.server;
@@ -1324,13 +1470,13 @@ fn merge_tool_presentation(
     if merged.title.is_none() {
         merged.title = incoming.title;
     }
-    if merged.arguments.is_none() {
+    if should_take_incoming_json(merged.arguments.as_ref(), incoming.arguments.as_ref()) {
         merged.arguments = incoming.arguments;
     }
-    if merged.result.is_none() {
+    if should_take_incoming_string(merged.result.as_ref(), incoming.result.as_ref()) {
         merged.result = incoming.result;
     }
-    if merged.error.is_none() {
+    if should_take_incoming_string(merged.error.as_ref(), incoming.error.as_ref()) {
         merged.error = incoming.error;
     }
     if merged.server.is_none() && merged.tool.is_some() {
@@ -1503,7 +1649,12 @@ impl WorkspaceSession {
             .await;
     }
 
-    async fn emit_latest_thread_token_usage(&self, thread_id: &str, session_id: &str) {
+    async fn emit_latest_thread_token_usage(
+        &self,
+        thread_id: &str,
+        turn_id: &str,
+        session_id: &str,
+    ) {
         let normalized_session_id = session_id.trim();
         if normalized_session_id.is_empty() {
             return;
@@ -1517,6 +1668,10 @@ impl WorkspaceSession {
             .ok()
             .flatten();
             if let Some(token_usage) = usage {
+                self.thread_store
+                    .lock()
+                    .await
+                    .set_agent_item_token_usage(thread_id, turn_id, &token_usage);
                 self.emit_event(
                     "thread/tokenUsage/updated",
                     json!({
@@ -1894,7 +2049,7 @@ impl WorkspaceSession {
                 self.register_active_prompt(&tracked_session_id, &thread_id, &turn_id)
                     .await;
                 let response = match timeout(
-                    Duration::from_secs(90),
+                    TURN_START_TIMEOUT,
                     self.send_acp_request(
                         "session/prompt",
                         json!({
@@ -1920,7 +2075,11 @@ impl WorkspaceSession {
                                 )
                                 .await;
                                 self.thread_store.lock().await.touch_message(&thread_id);
-                                self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
+                                self.emit_latest_thread_token_usage(
+                                    &thread_id,
+                                    &turn_id,
+                                    &tracked_session_id,
+                                )
                                     .await;
                             }
                             let normalized_turn = json!({
@@ -1943,7 +2102,84 @@ impl WorkspaceSession {
                                 }
                             }));
                         }
-                        return Err("turn/start timed out waiting for MiCode response".to_string());
+                        // Prompt timed out without any streamed output: recreate session once and retry.
+                        let new_session = self.create_session_for_cwd(self.entry.path.clone()).await?;
+                        if is_background_thread {
+                            self.background_threads
+                                .lock()
+                                .await
+                                .insert(thread_id.clone(), new_session.clone());
+                        } else {
+                            self.thread_store
+                                .lock()
+                                .await
+                                .set_session_id(&thread_id, new_session.clone());
+                        }
+                        tracked_session_id = new_session.clone();
+                        self.begin_prompt_tracking(&tracked_session_id).await;
+                        self.register_active_prompt(&tracked_session_id, &thread_id, &turn_id)
+                            .await;
+                        match timeout(
+                            TURN_START_TIMEOUT,
+                            self.send_acp_request(
+                                "session/prompt",
+                                json!({
+                                    "sessionId": new_session,
+                                    "prompt": [{ "type": "text", "text": prompt_text }]
+                                }),
+                            ),
+                        )
+                        .await
+                        {
+                            Ok(result) => {
+                                let _ = self.finish_prompt_lifecycle(&tracked_session_id).await;
+                                result?
+                            }
+                            Err(_) => {
+                                let had_streaming =
+                                    self.finish_prompt_lifecycle(&tracked_session_id).await;
+                                if had_streaming {
+                                    if !is_background_thread {
+                                        self.persist_prompt_agent_item(
+                                            &thread_id,
+                                            &turn_id,
+                                            &tracked_session_id,
+                                        )
+                                        .await;
+                                        self.thread_store.lock().await.touch_message(&thread_id);
+                                        self.emit_latest_thread_token_usage(
+                                            &thread_id,
+                                            &turn_id,
+                                            &tracked_session_id,
+                                        )
+                                        .await;
+                                    }
+                                    let normalized_turn = json!({
+                                        "id": turn_id,
+                                        "threadId": thread_id
+                                    });
+                                    if !is_background_thread {
+                                        self.emit_event(
+                                            "turn/completed",
+                                            json!({
+                                                "threadId": thread_id,
+                                                "turn": normalized_turn
+                                            }),
+                                        );
+                                    }
+                                    return Ok(json!({
+                                        "result": {
+                                            "stopReason": "end_turn",
+                                            "turn": normalized_turn
+                                        }
+                                    }));
+                                }
+                                return Err(
+                                    "turn/start timed out waiting for MiCode response after timeout recovery"
+                                        .to_string(),
+                                );
+                            }
+                        }
                     }
                 };
                 let response = if is_session_not_found_error(&response) {
@@ -1965,7 +2201,7 @@ impl WorkspaceSession {
                     self.register_active_prompt(&tracked_session_id, &thread_id, &turn_id)
                         .await;
                     match timeout(
-                        Duration::from_secs(90),
+                        TURN_START_TIMEOUT,
                         self.send_acp_request(
                             "session/prompt",
                             json!({
@@ -1992,7 +2228,11 @@ impl WorkspaceSession {
                                     )
                                     .await;
                                     self.thread_store.lock().await.touch_message(&thread_id);
-                                    self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
+                                    self.emit_latest_thread_token_usage(
+                                        &thread_id,
+                                        &turn_id,
+                                        &tracked_session_id,
+                                    )
                                         .await;
                                 }
                                 let normalized_turn = json!({
@@ -2034,7 +2274,11 @@ impl WorkspaceSession {
                             )
                             .await;
                             self.thread_store.lock().await.touch_message(&thread_id);
-                            self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
+                            self.emit_latest_thread_token_usage(
+                                &thread_id,
+                                &turn_id,
+                                &tracked_session_id,
+                            )
                                 .await;
                         }
                         let normalized_turn = json!({
@@ -2063,7 +2307,11 @@ impl WorkspaceSession {
                     self.persist_prompt_agent_item(&thread_id, &turn_id, &tracked_session_id)
                         .await;
                     self.thread_store.lock().await.touch_message(&thread_id);
-                    self.emit_latest_thread_token_usage(&thread_id, &tracked_session_id)
+                    self.emit_latest_thread_token_usage(
+                        &thread_id,
+                        &turn_id,
+                        &tracked_session_id,
+                    )
                         .await;
                 }
                 let mut normalized_response = response.clone();
@@ -2230,16 +2478,23 @@ impl WorkspaceSession {
                 .get("decision")
                 .and_then(Value::as_str)
                 .unwrap_or("decline");
-            let preferred = if decision == "accept" {
-                ["allow_once", "allow_always"]
-            } else {
-                ["reject_once", "reject_always"]
+            let explicit_option_id = result
+                .get("optionId")
+                .and_then(Value::as_str)
+                .map(|value| value.to_string());
+            let preferred = match decision {
+                "accept_always" => vec!["allow_always"],
+                "accept_once" => vec!["allow_once"],
+                "decline_always" => vec!["reject_always"],
+                "decline_once" => vec!["reject_once"],
+                "accept" => vec!["allow_once", "allow_always"],
+                _ => vec!["reject_once", "reject_always"],
             };
             let option_id = preferred
-                .iter()
+                .into_iter()
                 .find_map(|kind| {
                     options.iter().find_map(|opt| {
-                        if opt.get("kind").and_then(Value::as_str) == Some(*kind) {
+                        if opt.get("kind").and_then(Value::as_str) == Some(kind) {
                             opt.get("optionId")
                                 .and_then(Value::as_str)
                                 .map(|v| v.to_string())
@@ -2248,6 +2503,7 @@ impl WorkspaceSession {
                         }
                     })
                 })
+                .or(explicit_option_id)
                 .or_else(|| {
                     options.iter().find_map(|opt| {
                         opt.get("optionId")
@@ -2363,10 +2619,19 @@ pub(crate) fn build_micode_path_env(agent_bin: Option<&str>) -> Option<String> {
 }
 
 pub(crate) fn build_micode_command_with_bin(agent_bin: Option<String>) -> Command {
-    let bin = agent_bin
+    let mut bin = agent_bin
         .clone()
         .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| "micode".into());
+        .unwrap_or_else(|| {
+            if cfg!(windows) {
+                resolve_windows_micode_bin_hint().unwrap_or_else(|| "micode.cmd".into())
+            } else {
+                "micode".into()
+            }
+        });
+    if cfg!(windows) && bin.eq_ignore_ascii_case("micode") {
+        bin = "micode.cmd".into();
+    }
     let mut command = tokio_command(bin);
     if let Some(path_env) = build_micode_path_env(agent_bin.as_deref()) {
         command.env("PATH", path_env);
@@ -2999,9 +3264,9 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
 #[cfg(test)]
 mod tests {
     use super::{
-        build_initialize_params, extract_approval_command,
+        build_initialize_params, extract_approval_command, extract_tool_presentation_from_update,
         load_thread_token_usage_for_session_in_home, normalize_wrapper_cli_token,
-        resolve_cli_bundle_near_bin, translate_acp_update, ActivePromptContext,
+        resolve_cli_bundle_near_bin, translate_acp_update, merge_tool_presentation, ActivePromptContext,
         ToolCallPresentation, WorkspaceSession,
     };
     use serde_json::{json, Value};
@@ -3184,6 +3449,57 @@ mod tests {
             item.get("result").and_then(Value::as_str),
             Some("Configured MCP servers:\\n- feishu-mcp")
         );
+    }
+
+    #[test]
+    fn merge_tool_presentation_prefers_meaningful_arguments_over_empty_array() {
+        let existing = Some(ToolCallPresentation {
+            server: Some("micode".to_string()),
+            tool: Some("execute".to_string()),
+            title: Some("execute".to_string()),
+            arguments: Some(json!([])),
+            result: None,
+            error: None,
+        });
+        let incoming = ToolCallPresentation {
+            server: Some("micode".to_string()),
+            tool: Some("execute".to_string()),
+            title: Some("execute".to_string()),
+            arguments: Some(json!({ "command": ["python", "run.py"] })),
+            result: None,
+            error: None,
+        };
+
+        let merged = merge_tool_presentation(existing, incoming);
+        let command = merged
+            .arguments
+            .as_ref()
+            .and_then(|value| value.get("command"))
+            .and_then(Value::as_array)
+            .and_then(|arr| arr.get(0))
+            .and_then(Value::as_str);
+        assert_eq!(command, Some("python"));
+    }
+
+    #[test]
+    fn extract_tool_presentation_reads_input_when_arguments_missing() {
+        let update = json!({
+            "sessionUpdate": "tool_call",
+            "toolCallId": "call_exec_input",
+            "toolName": "execute",
+            "input": {
+                "command": ["python", "scripts/run_pipeline.py"]
+            }
+        });
+        let presentation = extract_tool_presentation_from_update(&update);
+        let command = presentation
+            .arguments
+            .as_ref()
+            .and_then(|value| value.get("command"))
+            .and_then(Value::as_array)
+            .and_then(|arr| arr.get(1))
+            .and_then(Value::as_str);
+        assert_eq!(command, Some("scripts/run_pipeline.py"));
     }
 
     #[test]
@@ -3374,6 +3690,24 @@ mod tests {
         assert_eq!(
             loaded[0].get("text").and_then(Value::as_str),
             Some("hello world")
+        );
+
+        store.set_agent_item_token_usage(
+            thread_id,
+            "turn-1",
+            &json!({
+                "last": { "totalTokens": 12 },
+                "total": { "totalTokens": 24 }
+            }),
+        );
+        let loaded_with_usage = store.load_thread_items(thread_id);
+        assert_eq!(
+            loaded_with_usage[0]
+                .get("tokenUsage")
+                .and_then(|value| value.get("last"))
+                .and_then(|value| value.get("totalTokens"))
+                .and_then(Value::as_i64),
+            Some(12)
         );
 
         assert!(store.delete(thread_id));

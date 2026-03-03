@@ -22,6 +22,7 @@ import type { ReviewPromptState, ReviewPromptStep } from "../../threads/hooks/us
 import type { WorkspaceLaunchScriptsState } from "../../app/hooks/useWorkspaceLaunchScripts";
 import type {
   AccessMode,
+  ApprovalDecision,
   ApprovalRequest,
   BranchInfo,
   CollaborationModeOption,
@@ -133,7 +134,7 @@ type LayoutNodesOptions = {
   userInputRequests: RequestUserInputRequest[];
   handleApprovalDecision: (
     request: ApprovalRequest,
-    decision: "accept" | "decline",
+    decision: ApprovalDecision,
   ) => void;
   handleApprovalRemember: (
     request: ApprovalRequest,
@@ -638,6 +639,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
     <ApprovalToasts
       approvals={options.approvals}
       workspaces={options.workspaces}
+      language={options.language}
       onDecision={options.handleApprovalDecision}
       onRemember={options.handleApprovalRemember}
     />

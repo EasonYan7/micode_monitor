@@ -10,6 +10,7 @@ import {
   OPEN_APP_STORAGE_KEY,
 } from "../constants";
 import { GENERIC_APP_ICON, getKnownOpenAppIcon } from "../utils/openAppIcons";
+import { getFileManagerName, getRevealInFileManagerLabel } from "../utils/fileManager";
 
 type OpenTarget = {
   id: string;
@@ -66,9 +67,9 @@ export function OpenAppMenu({
     target:
       DEFAULT_OPEN_APP_TARGETS[0] ?? {
         id: DEFAULT_OPEN_APP_ID,
-        label: "VS Code",
-        kind: "app",
-        appName: "Visual Studio Code",
+        label: "Default App",
+        kind: "default",
+        appName: null,
         command: null,
         args: [],
       },
@@ -81,7 +82,7 @@ export function OpenAppMenu({
   const reportOpenError = (error: unknown, target: OpenTarget) => {
     const message = error instanceof Error ? error.message : String(error);
     pushErrorToast({
-      title: "Couldn’t open workspace",
+      title: "Couldn't open workspace",
       message,
     });
     console.warn("Failed to open workspace in target app", {
@@ -113,6 +114,9 @@ export function OpenAppMenu({
   const resolveCommand = (target: OpenTarget) =>
     (target.target.command ?? "").trim();
   const canOpenTarget = (target: OpenTarget) => {
+    if (target.target.kind === "default") {
+      return true;
+    }
     if (target.target.kind === "finder") {
       return true;
     }
@@ -124,6 +128,14 @@ export function OpenAppMenu({
 
   const openWithTarget = async (target: OpenTarget) => {
     try {
+      if (target.target.kind === "default") {
+        await openWorkspaceIn(path, {
+          appName: null,
+          args: target.target.args,
+          command: null,
+        });
+        return;
+      }
       if (target.target.kind === "finder") {
         await revealItemInDir(path);
         return;
@@ -170,8 +182,18 @@ export function OpenAppMenu({
   };
 
   const selectedCanOpen = canOpenTarget(selectedOpenTarget);
+  const selectedLabel =
+    selectedOpenTarget.target.kind === "finder"
+      ? getFileManagerName()
+      : selectedOpenTarget.target.kind === "default"
+        ? "Default App"
+      : selectedOpenTarget.label;
   const openLabel = selectedCanOpen
-    ? `Open in ${selectedOpenTarget.label}`
+    ? selectedOpenTarget.target.kind === "finder"
+      ? getRevealInFileManagerLabel()
+      : selectedOpenTarget.target.kind === "default"
+        ? "Open with default app"
+      : `Open in ${selectedLabel}`
     : selectedOpenTarget.target.kind === "command"
       ? "Set command in Settings"
       : "Set app name in Settings";
@@ -185,7 +207,7 @@ export function OpenAppMenu({
           onClick={handleOpen}
           disabled={!selectedCanOpen}
           data-tauri-drag-region="false"
-          aria-label={`Open in ${selectedOpenTarget.label}`}
+          aria-label={`Open in ${selectedLabel}`}
           title={openLabel}
         >
           <span className="open-app-label">
@@ -195,7 +217,7 @@ export function OpenAppMenu({
               alt=""
               aria-hidden
             />
-            {selectedOpenTarget.label}
+            {selectedLabel}
           </span>
         </button>
         <button
@@ -214,7 +236,6 @@ export function OpenAppMenu({
       {openMenuOpen && (
         <div className="open-app-dropdown" role="menu">
           {resolvedOpenTargets.map((target) => (
-            // Keep entries visible but disable ones missing required config.
             <button
               key={target.id}
               type="button"
@@ -227,7 +248,11 @@ export function OpenAppMenu({
               data-tauri-drag-region="false"
             >
               <img className="open-app-icon" src={target.icon} alt="" aria-hidden />
-              {target.label}
+              {target.target.kind === "finder"
+                ? getFileManagerName()
+                : target.target.kind === "default"
+                  ? "Default App"
+                  : target.label}
             </button>
           ))}
         </div>

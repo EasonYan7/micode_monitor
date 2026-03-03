@@ -185,7 +185,8 @@ export function Home({
   const noModelsLabel = isZh ? "暂无模型数据" : "No models yet";
 
   return (
-    <div className="home">
+    <div className="home-scroll">
+      <div className="home">
       <div className="home-hero">
         <div className="home-title">{isZh ? "智能体监控台" : "Agent Monitor"}</div>
         <div className="home-subtitle">
@@ -536,6 +537,7 @@ export function Home({
             </div>
           </>
         )}
+      </div>
       </div>
     </div>
   );

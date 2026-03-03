@@ -837,15 +837,61 @@ pub(crate) async fn open_workspace_in(
         cmd.status()
             .map_err(|error| format!("Failed to open app ({target_label}): {error}"))?
     } else if let Some(app) = app {
-        let mut cmd = std::process::Command::new("open");
-        cmd.arg("-a").arg(app).arg(path);
-        if !args.is_empty() {
-            cmd.arg("--args").args(args);
+        #[cfg(target_os = "macos")]
+        {
+            let mut cmd = std::process::Command::new("open");
+            cmd.arg("-a").arg(app).arg(path);
+            if !args.is_empty() {
+                cmd.arg("--args").args(args);
+            }
+            cmd.status()
+                .map_err(|error| format!("Failed to open app ({target_label}): {error}"))?
         }
-        cmd.status()
-            .map_err(|error| format!("Failed to open app ({target_label}): {error}"))?
+        #[cfg(target_os = "windows")]
+        {
+            // On Windows app display names like "Visual Studio Code" are not executable names.
+            // Prefer known CLI launchers when available.
+            let normalized_app = app.trim().to_ascii_lowercase();
+            let executable = match normalized_app.as_str() {
+                "visual studio code" | "vscode" | "vs code" => "code".to_string(),
+                "cursor" => "cursor".to_string(),
+                "zed" => "zed".to_string(),
+                _ => app,
+            };
+            let mut cmd = std::process::Command::new(executable);
+            cmd.args(args).arg(path);
+            cmd.status()
+                .map_err(|error| format!("Failed to open app ({target_label}): {error}"))?
+        }
+        #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+        {
+            let mut cmd = std::process::Command::new(app);
+            cmd.args(args).arg(path);
+            cmd.status()
+                .map_err(|error| format!("Failed to open app ({target_label}): {error}"))?
+        }
     } else {
-        return Err("Missing app or command".to_string());
+        #[cfg(target_os = "macos")]
+        {
+            let mut cmd = std::process::Command::new("open");
+            cmd.arg(path);
+            cmd.status()
+                .map_err(|error| format!("Failed to open file with default app: {error}"))?
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let mut cmd = std::process::Command::new("cmd");
+            cmd.args(["/C", "start", "", &path]);
+            cmd.status()
+                .map_err(|error| format!("Failed to open file with default app: {error}"))?
+        }
+        #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+        {
+            let mut cmd = std::process::Command::new("xdg-open");
+            cmd.arg(path);
+            cmd.status()
+                .map_err(|error| format!("Failed to open file with default app: {error}"))?
+        }
     };
 
     if status.success() {

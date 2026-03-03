@@ -677,4 +677,62 @@ describe("Messages", () => {
       expect(screen.getByText("5 tool calls")).toBeTruthy();
     });
   });
+
+  it("shows execute command preview in tool row summary", async () => {
+    const items: ConversationItem[] = [
+      {
+        id: "mcp-exec-1",
+        kind: "tool",
+        toolType: "mcpToolCall",
+        title: "Tool: micode / execute",
+        detail: JSON.stringify({ command: ["python", "scripts/run_pipeline.py", "--query", "手机"] }),
+        status: "completed",
+        output: "ok",
+      },
+    ];
+
+    render(
+      <Messages
+        items={items}
+        threadId="thread-1"
+        workspaceId="ws-1"
+        isThinking={false}
+        openTargets={[]}
+        selectedOpenAppId=""
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/python scripts\/run_pipeline\.py/i)).toBeTruthy();
+    });
+  });
+
+  it("shows read target inferred from output when args are empty", async () => {
+    const items: ConversationItem[] = [
+      {
+        id: "mcp-read-1",
+        kind: "tool",
+        toolType: "mcpToolCall",
+        title: "Tool: micode / read",
+        detail: "",
+        status: "completed",
+        output: "Read lines 1-20 of 200 from ../../.micode/skills/fin-sen-test-skill-01/scripts/fetch_data.py",
+      },
+    ];
+
+    render(
+      <Messages
+        items={items}
+        threadId="thread-1"
+        workspaceId="ws-1"
+        isThinking={false}
+        openTargets={[]}
+        selectedOpenAppId=""
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("fetch_data.py")).toBeTruthy();
+    });
+  });
 });

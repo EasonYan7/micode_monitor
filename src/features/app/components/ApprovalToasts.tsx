@@ -1,20 +1,24 @@
 import { useEffect, useMemo } from "react";
-import type { ApprovalRequest, WorkspaceInfo } from "../../../types";
+import type { ApprovalDecision, ApprovalRequest, UiLanguage, WorkspaceInfo } from "../../../types";
 import { getApprovalCommandInfo } from "../../../utils/approvalRules";
 
 type ApprovalToastsProps = {
   approvals: ApprovalRequest[];
   workspaces: WorkspaceInfo[];
-  onDecision: (request: ApprovalRequest, decision: "accept" | "decline") => void;
+  language?: UiLanguage;
+  onDecision: (request: ApprovalRequest, decision: ApprovalDecision) => void;
   onRemember?: (request: ApprovalRequest, command: string[]) => void;
 };
 
 export function ApprovalToasts({
   approvals,
   workspaces,
+  language = "en",
   onDecision,
   onRemember,
 }: ApprovalToastsProps) {
+  const isZh = language === "zh";
+  const t = (en: string, zh: string) => (isZh ? zh : en);
   const workspaceLabels = useMemo(
     () => new Map(workspaces.map((workspace) => [workspace.id, workspace.name])),
     [workspaces],
@@ -42,7 +46,7 @@ export function ApprovalToasts({
         return;
       }
       event.preventDefault();
-      onDecision(primaryRequest, "accept");
+      onDecision(primaryRequest, "accept_once");
     };
 
     window.addEventListener("keydown", handler);
@@ -66,7 +70,7 @@ export function ApprovalToasts({
 
   const renderParamValue = (value: unknown) => {
     if (value === null || value === undefined) {
-      return { text: "None", isCode: false };
+      return { text: t("None", "无"), isCode: false };
     }
     if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
       return { text: String(value), isCode: false };
@@ -94,7 +98,7 @@ export function ApprovalToasts({
             role="alert"
           >
             <div className="approval-toast-header">
-              <div className="approval-toast-title">Approval needed</div>
+              <div className="approval-toast-title">{t("Approval needed", "需要审批")}</div>
               {workspaceName ? (
                 <div className="approval-toast-workspace">{workspaceName}</div>
               ) : null}
@@ -123,31 +127,34 @@ export function ApprovalToasts({
                 })
               ) : (
                 <div className="approval-toast-detail approval-toast-detail-empty">
-                  No extra details.
+                  {t("No extra details.", "无额外信息。")}
                 </div>
               )}
             </div>
             <div className="approval-toast-actions">
               <button
                 className="secondary"
-                onClick={() => onDecision(request, "decline")}
+                onClick={() => onDecision(request, "decline_once")}
               >
-                Decline
+                {t("Decline", "拒绝")}
               </button>
               {commandInfo && onRemember ? (
                 <button
                   className="ghost approval-toast-remember"
                   onClick={() => onRemember(request, commandInfo.tokens)}
-                  title={`Allow commands that start with ${commandInfo.preview}`}
+                  title={t(
+                    `Always approve commands that start with ${commandInfo.preview}`,
+                    `始终批准以 ${commandInfo.preview} 开头的命令`,
+                  )}
                 >
-                  Always allow
+                  {t("Always approve", "始终批准")}
                 </button>
               ) : null}
               <button
                 className="primary"
-                onClick={() => onDecision(request, "accept")}
+                onClick={() => onDecision(request, "accept_once")}
               >
-                Approve (Enter)
+                {t("Approve once (Enter)", "本次批准（回车）")}
               </button>
             </div>
           </div>

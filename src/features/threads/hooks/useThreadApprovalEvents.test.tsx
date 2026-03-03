@@ -49,7 +49,7 @@ describe("useThreadApprovalEvents", () => {
       result.current(approval);
     });
 
-    expect(respondToServerRequest).toHaveBeenCalledWith("ws-1", 42, "accept");
+    expect(respondToServerRequest).toHaveBeenCalledWith("ws-1", 42, "accept_always");
     expect(dispatch).not.toHaveBeenCalled();
   });
 

@@ -6,6 +6,9 @@ import { describe, expect, it, vi } from "vitest";
 import { useComposerShortcuts } from "./useComposerShortcuts";
 
 function ShortcutHarness(props: {
+  accessShortcut?: string | null;
+  accessMode?: "read-only" | "current" | "full-access";
+  onSelectAccessMode?: (mode: "read-only" | "current" | "full-access") => void;
   collaborationShortcut: string | null;
   collaborationModes: { id: string; label: string }[];
   selectedCollaborationModeId: string | null;
@@ -15,7 +18,7 @@ function ShortcutHarness(props: {
   useComposerShortcuts({
     textareaRef,
     modelShortcut: null,
-    accessShortcut: null,
+    accessShortcut: props.accessShortcut ?? null,
     reasoningShortcut: null,
     collaborationShortcut: props.collaborationShortcut,
     models: [],
@@ -24,8 +27,8 @@ function ShortcutHarness(props: {
     onSelectModel: () => {},
     selectedCollaborationModeId: props.selectedCollaborationModeId,
     onSelectCollaborationMode: props.onSelectCollaborationMode,
-    accessMode: "read-only",
-    onSelectAccessMode: () => {},
+    accessMode: props.accessMode ?? "read-only",
+    onSelectAccessMode: props.onSelectAccessMode ?? (() => {}),
     reasoningOptions: [],
     selectedEffort: null,
     onSelectEffort: () => {},
@@ -88,5 +91,31 @@ describe("useComposerShortcuts", () => {
     window.dispatchEvent(event);
 
     expect(onSelectCollaborationMode).not.toHaveBeenCalled();
+  });
+
+  it("cycles access mode without textarea focus for ctrl+shift shortcuts", () => {
+    const onSelectAccessMode = vi.fn();
+    render(
+      <ShortcutHarness
+        accessShortcut="ctrl+shift+a"
+        accessMode="read-only"
+        onSelectAccessMode={onSelectAccessMode}
+        collaborationShortcut="shift+tab"
+        collaborationModes={[]}
+        selectedCollaborationModeId={null}
+        onSelectCollaborationMode={vi.fn()}
+      />,
+    );
+
+    const event = new KeyboardEvent("keydown", {
+      key: "A",
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(event);
+
+    expect(onSelectAccessMode).toHaveBeenCalledWith("current");
   });
 });

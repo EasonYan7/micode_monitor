@@ -53,7 +53,7 @@ const defaultSettings: AppSettings = {
   lastComposerReasoningEffort: null,
   uiScale: UI_SCALE_DEFAULT,
   theme: "system",
-  language: "en",
+  language: "zh",
   usageShowRemaining: false,
   uiFontFamily: DEFAULT_UI_FONT_FAMILY,
   codeFontFamily: DEFAULT_CODE_FONT_FAMILY,
@@ -126,7 +126,7 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
     theme: allowedThemes.has(settings.theme) ? settings.theme : "system",
     language: allowedLanguages.has(settings.language ?? "")
       ? settings.language
-      : "en",
+      : "zh",
     uiFontFamily: normalizeFontFamily(
       settings.uiFontFamily,
       DEFAULT_UI_FONT_FAMILY,

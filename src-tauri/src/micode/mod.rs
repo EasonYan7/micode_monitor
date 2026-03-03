@@ -224,6 +224,53 @@ pub(crate) async fn micode_doctor(
 }
 
 #[tauri::command]
+pub(crate) async fn micode_install_windows() -> Result<Value, String> {
+    #[cfg(not(target_os = "windows"))]
+    {
+        return Err("MiCode auto-install is only supported on Windows.".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let script = "iwr -useb https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.ps1 | iex";
+        let mut command = tokio_command("powershell");
+        command
+            .arg("-ExecutionPolicy")
+            .arg("Bypass")
+            .arg("-Command")
+            .arg(script)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+        let output = timeout(Duration::from_secs(600), command.output())
+            .await
+            .map_err(|_| "MiCode install timed out after 10 minutes.".to_string())?
+            .map_err(|err| format!("Failed to run installer: {err}"))?;
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let ok = output.status.success();
+        let code = output.status.code().unwrap_or(-1);
+        if !ok {
+            let detail = if stderr.trim().is_empty() {
+                stdout.trim()
+            } else {
+                stderr.trim()
+            };
+            return Err(if detail.is_empty() {
+                format!("MiCode installer failed with exit code {code}.")
+            } else {
+                format!("MiCode installer failed ({code}): {detail}")
+            });
+        }
+        Ok(json!({
+            "ok": true,
+            "code": code,
+            "stdout": stdout,
+            "stderr": stderr
+        }))
+    }
+}
+
+#[tauri::command]
 pub(crate) async fn start_thread(
     workspace_id: String,
     state: State<'_, AppState>,
@@ -916,8 +963,58 @@ pub(crate) async fn remember_approval_rule(
     workspace_id: String,
     command: Vec<String>,
     state: State<'_, AppState>,
+    app: AppHandle,
 ) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "remember_approval_rule",
+            json!({ "workspaceId": workspace_id, "command": command }),
+        )
+        .await;
+    }
+
     micode_core::remember_approval_rule_core(&state.workspaces, workspace_id, command).await
+}
+
+#[tauri::command]
+pub(crate) async fn list_approval_rules(
+    workspace_id: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "list_approval_rules",
+            json!({ "workspaceId": workspace_id }),
+        )
+        .await;
+    }
+
+    micode_core::list_approval_rules_core(&state.workspaces, workspace_id).await
+}
+
+#[tauri::command]
+pub(crate) async fn remove_approval_rule(
+    workspace_id: String,
+    command: Vec<String>,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "remove_approval_rule",
+            json!({ "workspaceId": workspace_id, "command": command }),
+        )
+        .await;
+    }
+
+    micode_core::remove_approval_rule_core(&state.workspaces, workspace_id, command).await
 }
 
 #[tauri::command]

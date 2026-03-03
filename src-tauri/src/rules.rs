@@ -44,6 +44,75 @@ pub(crate) fn append_prefix_rule(path: &Path, pattern: &[String]) -> Result<(), 
     fs::write(path, updated).map_err(|err| err.to_string())
 }
 
+pub(crate) fn list_prefix_rules(path: &Path) -> Result<Vec<Vec<String>>, String> {
+    let contents = fs::read_to_string(path).unwrap_or_default();
+    let lines = contents
+        .lines()
+        .map(|line| line.to_string())
+        .collect::<Vec<_>>();
+    let rules = parse_rule_blocks(&lines)
+        .into_iter()
+        .filter(|block| block.decision_allows)
+        .filter_map(|block| block.pattern)
+        .collect::<Vec<_>>();
+    Ok(rules)
+}
+
+pub(crate) fn remove_prefix_rule(path: &Path, pattern: &[String]) -> Result<bool, String> {
+    let normalized_target = normalize_pattern(pattern);
+    if normalized_target.is_empty() {
+        return Err("empty command pattern".to_string());
+    }
+    if !path.exists() {
+        return Ok(false);
+    }
+
+    let _lock = acquire_rules_lock(path)?;
+    let existing = fs::read_to_string(path).unwrap_or_default();
+    let lines = existing
+        .lines()
+        .map(|line| line.to_string())
+        .collect::<Vec<_>>();
+    if lines.is_empty() {
+        return Ok(false);
+    }
+
+    let blocks = parse_rule_blocks(&lines);
+    let mut keep = vec![true; lines.len()];
+    let mut removed = false;
+
+    for block in blocks {
+        if !block.decision_allows {
+            continue;
+        }
+        if block.pattern.as_deref() != Some(normalized_target.as_slice()) {
+            continue;
+        }
+        removed = true;
+        for index in block.start..=block.end {
+            if index < keep.len() {
+                keep[index] = false;
+            }
+        }
+    }
+
+    if !removed {
+        return Ok(false);
+    }
+
+    let mut updated = lines
+        .iter()
+        .enumerate()
+        .filter_map(|(index, line)| if keep[index] { Some(line.as_str()) } else { None })
+        .collect::<Vec<_>>()
+        .join("\n");
+    if !updated.is_empty() {
+        updated.push('\n');
+    }
+    fs::write(path, updated).map_err(|err| err.to_string())?;
+    Ok(true)
+}
+
 struct RulesFileLock {
     path: PathBuf,
 }
@@ -108,16 +177,45 @@ fn format_pattern_list(pattern: &[String]) -> String {
 }
 
 fn rule_already_present(contents: &str, pattern: &[String]) -> bool {
-    let target_pattern = normalize_rule_value(&format!("[{}]", format_pattern_list(pattern)));
+    let target = normalize_pattern(pattern);
+    let lines = contents
+        .lines()
+        .map(|line| line.to_string())
+        .collect::<Vec<_>>();
+    parse_rule_blocks(&lines).into_iter().any(|block| {
+        block.decision_allows && block.pattern.as_deref() == Some(target.as_slice())
+    })
+}
+
+fn normalize_pattern(pattern: &[String]) -> Vec<String> {
+    pattern
+        .iter()
+        .map(|item| item.trim().to_string())
+        .filter(|item| !item.is_empty())
+        .collect()
+}
+
+#[derive(Debug)]
+struct ParsedRuleBlock {
+    start: usize,
+    end: usize,
+    pattern: Option<Vec<String>>,
+    decision_allows: bool,
+}
+
+fn parse_rule_blocks(lines: &[String]) -> Vec<ParsedRuleBlock> {
+    let mut blocks = Vec::new();
     let mut in_rule = false;
-    let mut pattern_matches = false;
+    let mut start = 0usize;
+    let mut pattern: Option<Vec<String>> = None;
     let mut decision_allows = false;
 
-    for line in contents.lines() {
+    for (index, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
         if trimmed.starts_with("prefix_rule(") {
             in_rule = true;
-            pattern_matches = false;
+            start = index;
+            pattern = None;
             decision_allows = false;
             continue;
         }
@@ -126,10 +224,7 @@ fn rule_already_present(contents: &str, pattern: &[String]) -> bool {
         }
         if trimmed.starts_with("pattern") {
             if let Some((_, value)) = trimmed.split_once('=') {
-                let candidate = value.trim().trim_end_matches(',');
-                if normalize_rule_value(candidate) == target_pattern {
-                    pattern_matches = true;
-                }
+                pattern = parse_pattern_list(value);
             }
         } else if trimmed.starts_with("decision") {
             if let Some((_, value)) = trimmed.split_once('=') {
@@ -139,17 +234,34 @@ fn rule_already_present(contents: &str, pattern: &[String]) -> bool {
                 }
             }
         } else if trimmed.starts_with(')') {
-            if pattern_matches && decision_allows {
-                return true;
-            }
+            blocks.push(ParsedRuleBlock {
+                start,
+                end: index,
+                pattern: pattern.clone(),
+                decision_allows,
+            });
             in_rule = false;
         }
     }
-    false
+
+    blocks
 }
 
-fn normalize_rule_value(value: &str) -> String {
-    value.chars().filter(|ch| !ch.is_whitespace()).collect()
+fn parse_pattern_list(raw_value: &str) -> Option<Vec<String>> {
+    let candidate = raw_value.trim().trim_end_matches(',').trim();
+    if candidate.is_empty() {
+        return None;
+    }
+    if let Ok(pattern) = serde_json::from_str::<Vec<String>>(candidate) {
+        return Some(normalize_pattern(&pattern));
+    }
+    if candidate.contains('\'') {
+        let replaced = candidate.replace('\'', "\"");
+        if let Ok(pattern) = serde_json::from_str::<Vec<String>>(&replaced) {
+            return Some(normalize_pattern(&pattern));
+        }
+    }
+    None
 }
 
 fn escape_string(value: &str) -> String {

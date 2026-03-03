@@ -26,7 +26,7 @@ export function useThreadApprovalEvents({
         void respondToServerRequest(
           approval.workspace_id,
           approval.request_id,
-          "accept",
+          "accept_always",
         );
         return;
       }

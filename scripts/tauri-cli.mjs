@@ -2,9 +2,20 @@ import { spawnSync } from "node:child_process";
 
 const args = process.argv.slice(2);
 const [command, ...rest] = args;
+const isWindows = process.platform === "win32";
+
+const resolveBin = (bin) => {
+  if (!isWindows) return bin;
+  if (bin === "npm") return "npm.cmd";
+  if (bin === "tauri") return "tauri.cmd";
+  return bin;
+};
 
 const run = (bin, runArgs) => {
-  const result = spawnSync(bin, runArgs, { stdio: "inherit", shell: false });
+  const result = spawnSync(resolveBin(bin), runArgs, {
+    stdio: "inherit",
+    shell: isWindows,
+  });
   if (result.error) {
     console.error(result.error.message);
     process.exit(1);
@@ -15,8 +26,6 @@ const run = (bin, runArgs) => {
 const runNpmScript = (script, scriptArgs) => {
   run("npm", ["run", script, "--", ...scriptArgs]);
 };
-
-const isWindows = process.platform === "win32";
 
 if (command === "dev") {
   runNpmScript(isWindows ? "tauri:dev:win" : "tauri:dev", rest);

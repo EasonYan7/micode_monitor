@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { WorkspaceInfo } from "../../../types";
 import { useSidebarMenus } from "./useSidebarMenus";
+import { getShowInFileManagerLabel } from "../utils/fileManager";
 
 const menuNew = vi.hoisted(() =>
   vi.fn(async ({ items }) => ({ popup: vi.fn(), items })),
@@ -42,6 +43,43 @@ vi.mock("../../../services/toasts", () => ({
 }));
 
 describe("useSidebarMenus", () => {
+  it("localizes thread menu in zh and omits sync from server", async () => {
+    const { result } = renderHook(() =>
+      useSidebarMenus({
+        onDeleteThread: vi.fn(),
+        onSyncThread: vi.fn(),
+        onPinThread: vi.fn(),
+        onUnpinThread: vi.fn(),
+        isThreadPinned: vi.fn(() => false),
+        onRenameThread: vi.fn(),
+        onReloadWorkspaceThreads: vi.fn(),
+        onDeleteWorkspace: vi.fn(),
+        onClearWorkspaceHistory: vi.fn(),
+        onDeleteWorktree: vi.fn(),
+        language: "zh",
+      }),
+    );
+
+    const event = {
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      clientX: 10,
+      clientY: 20,
+    } as unknown as ReactMouseEvent;
+
+    await result.current.showThreadMenu(event, "ws-1", "thread-1", true);
+
+    const menuArgs = menuNew.mock.calls[menuNew.mock.calls.length - 1]?.[0];
+    const labels = menuArgs.items.map((item: { text: string }) => item.text);
+
+    expect(labels).toContain("重命名");
+    expect(labels).toContain("置顶");
+    expect(labels).toContain("复制 ID");
+    expect(labels).toContain("归档");
+    expect(labels).toContain("删除会话");
+    expect(labels).not.toContain("Sync from server");
+  });
+
   it("adds a show in finder option for worktrees", async () => {
     const onDeleteThread = vi.fn();
     const onSyncThread = vi.fn();
@@ -91,9 +129,9 @@ describe("useSidebarMenus", () => {
 
     await result.current.showWorktreeMenu(event, worktree);
 
-    const menuArgs = menuNew.mock.calls[0]?.[0];
+    const menuArgs = menuNew.mock.calls[menuNew.mock.calls.length - 1]?.[0];
     const revealItem = menuArgs.items.find(
-      (item: { text: string }) => item.text === "Show in Finder",
+      (item: { text: string }) => item.text === getShowInFileManagerLabel(),
     );
 
     expect(revealItem).toBeDefined();

@@ -46,9 +46,7 @@ export function UpdateToast({ state, onUpdate, onDismiss }: UpdateToastProps) {
         )}
         {state.stage === "available" && (
           <>
-            <div className="update-toast-body">
-              A new version is available.
-            </div>
+            <div className="update-toast-body">A new version is available.</div>
             <div className="update-toast-actions">
               <button className="secondary" onClick={onDismiss}>
                 Later
@@ -62,7 +60,7 @@ export function UpdateToast({ state, onUpdate, onDismiss }: UpdateToastProps) {
         {state.stage === "latest" && (
           <div className="update-toast-inline">
             <div className="update-toast-body update-toast-body-inline">
-              You’re up to date.
+              You're up to date.
             </div>
             <button className="secondary" onClick={onDismiss}>
               Dismiss
@@ -71,9 +69,7 @@ export function UpdateToast({ state, onUpdate, onDismiss }: UpdateToastProps) {
         )}
         {state.stage === "downloading" && (
           <>
-            <div className="update-toast-body">
-              Downloading update…
-            </div>
+            <div className="update-toast-body">Downloading update...</div>
             <div className="update-toast-progress">
               <div className="update-toast-progress-bar">
                 <span
@@ -90,10 +86,10 @@ export function UpdateToast({ state, onUpdate, onDismiss }: UpdateToastProps) {
           </>
         )}
         {state.stage === "installing" && (
-          <div className="update-toast-body">Installing update…</div>
+          <div className="update-toast-body">Installing update...</div>
         )}
         {state.stage === "restarting" && (
-          <div className="update-toast-body">Restarting…</div>
+          <div className="update-toast-body">Restarting...</div>
         )}
         {state.stage === "error" && (
           <>

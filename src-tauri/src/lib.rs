@@ -4,6 +4,7 @@ use tauri::{RunEvent, WindowEvent};
 
 mod backend;
 mod dictation;
+mod debug_logs;
 mod event_sink;
 mod files;
 mod git;
@@ -40,19 +41,27 @@ pub fn run() {
         .manage(menu::MenuItemRegistry::<tauri::Wry>::default())
         .menu(menu::build_menu)
         .on_menu_event(menu::handle_menu_event)
-        .on_window_event(|window, event| {
+        .on_window_event(|window, _event| {
             if window.label() != "main" {
                 return;
             }
             #[cfg(target_os = "macos")]
-            if let WindowEvent::CloseRequested { api, .. } = event {
+            if let WindowEvent::CloseRequested { api, .. } = _event {
                 api.prevent_close();
                 let _ = window.hide();
             }
         })
         .setup(|app| {
             let state = state::AppState::load(&app.handle());
+            let menu_is_zh = state
+                .app_settings
+                .blocking_lock()
+                .language
+                .trim()
+                .eq_ignore_ascii_case("zh");
+            menu::set_menu_language_zh(menu_is_zh);
             app.manage(state);
+            let _ = menu::rebuild_menu(&app.handle());
             Ok(())
         });
 
@@ -65,6 +74,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             settings::get_app_settings,
             settings::update_app_settings,
@@ -74,6 +84,7 @@ pub fn run() {
             micode::get_config_model,
             menu::menu_set_accelerators,
             micode::micode_doctor,
+            micode::micode_install_windows,
             workspaces::list_workspaces,
             workspaces::is_workspace_path_dir,
             workspaces::add_workspace,
@@ -95,6 +106,8 @@ pub fn run() {
             micode::start_review,
             micode::respond_to_server_request,
             micode::remember_approval_rule,
+            micode::list_approval_rules,
+            micode::remove_approval_rule,
             micode::get_commit_message_prompt,
             micode::generate_commit_message,
             micode::generate_run_metadata,
@@ -161,16 +174,17 @@ pub fn run() {
             dictation::dictation_stop,
             dictation::dictation_cancel,
             local_usage::local_usage_snapshot,
+            debug_logs::append_debug_logs,
             notifications::is_macos_debug_build,
             notifications::send_notification_fallback
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
 
-    app.run(|app_handle, event| {
+    app.run(|_app_handle, _event| {
         #[cfg(target_os = "macos")]
-        if let RunEvent::Reopen { .. } = event {
-            if let Some(window) = app_handle.get_webview_window("main") {
+        if let RunEvent::Reopen { .. } = _event {
+            if let Some(window) = _app_handle.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.set_focus();
             }

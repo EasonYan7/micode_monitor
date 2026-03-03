@@ -148,7 +148,11 @@ function parseToolArgs(detail: string) {
     return null;
   }
   try {
-    return JSON.parse(detail) as Record<string, unknown>;
+    const parsed = JSON.parse(detail) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed as Record<string, unknown>;
   } catch {
     return null;
   }
@@ -168,6 +172,60 @@ function firstStringField(
     }
   }
   return "";
+}
+
+function firstListField(
+  source: Record<string, unknown> | null,
+  keys: string[],
+) {
+  if (!source) {
+    return "";
+  }
+  for (const key of keys) {
+    const value = source[key];
+    if (!Array.isArray(value)) {
+      continue;
+    }
+    const parts = value
+      .filter((entry) => ["string", "number", "boolean"].includes(typeof entry))
+      .map((entry) => String(entry).trim())
+      .filter(Boolean);
+    if (parts.length > 0) {
+      return parts.join(" ");
+    }
+  }
+  return "";
+}
+
+function inlinePreview(value: string, maxLength = 96) {
+  const trimmed = value.trim().replace(/\s+/g, " ");
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, maxLength - 1)}…`;
+}
+
+function commandPreviewFromArgs(args: Record<string, unknown> | null) {
+  const fromString = firstStringField(args, ["command", "cmd", "argv", "args", "script"]);
+  if (fromString) {
+    return inlinePreview(fromString);
+  }
+  const fromList = firstListField(args, ["command", "cmd", "argv", "args"]);
+  if (fromList) {
+    return inlinePreview(fromList);
+  }
+  return "";
+}
+
+function readTargetFromOutput(output: string) {
+  if (!output) {
+    return "";
+  }
+  const match = output.match(/\bfrom\s+([^\r\n]+)/i);
+  if (!match) {
+    return "";
+  }
+  return (match[1] ?? "").trim();
 }
 
 function toolNameFromTitle(title: string) {
@@ -525,6 +583,7 @@ function buildToolSummary(
   if (item.toolType === "mcpToolCall") {
     const toolName = toolNameFromTitle(item.title);
     const args = parseToolArgs(item.detail);
+    const commandPreview = commandPreviewFromArgs(args);
     if (toolName.toLowerCase().includes("search")) {
       return {
         label: "searched",
@@ -534,11 +593,23 @@ function buildToolSummary(
     }
     if (toolName.toLowerCase().includes("read")) {
       const targetPath =
-        firstStringField(args, ["path", "file", "filename"]) || item.detail;
+        firstStringField(args, ["path", "file", "filename"]) ||
+        commandPreview ||
+        readTargetFromOutput(item.output ?? "");
+      const displayValue =
+        targetPath && /[\\/]/.test(targetPath) ? basename(targetPath) : targetPath;
       return {
         label: "read",
-        value: basename(targetPath),
-        detail: targetPath && targetPath !== basename(targetPath) ? targetPath : "",
+        value: displayValue || "read",
+        detail:
+          targetPath && displayValue && targetPath !== displayValue ? targetPath : item.detail || "",
+      };
+    }
+    if (toolName.toLowerCase().includes("execute")) {
+      return {
+        label: "run",
+        value: commandPreview || "execute",
+        detail: item.detail || "",
       };
     }
     if (toolName) {
@@ -581,6 +652,9 @@ function toolIconForSummary(
   const label = summary.label.toLowerCase();
   if (label === "read") {
     return FileText;
+  }
+  if (label === "run") {
+    return Terminal;
   }
   if (label === "searched") {
     return Search;

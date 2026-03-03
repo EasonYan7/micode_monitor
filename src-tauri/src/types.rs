@@ -578,7 +578,7 @@ fn default_theme() -> String {
 }
 
 fn default_language() -> String {
-    "en".to_string()
+    "zh".to_string()
 }
 
 fn default_usage_show_remaining() -> bool {
@@ -761,42 +761,18 @@ fn default_workspace_groups() -> Vec<WorkspaceGroup> {
 fn default_open_app_targets() -> Vec<OpenAppTarget> {
     vec![
         OpenAppTarget {
+            id: "system".to_string(),
+            label: "Default App".to_string(),
+            kind: "default".to_string(),
+            app_name: None,
+            command: None,
+            args: Vec::new(),
+        },
+        OpenAppTarget {
             id: "vscode".to_string(),
             label: "VS Code".to_string(),
             kind: "app".to_string(),
             app_name: Some("Visual Studio Code".to_string()),
-            command: None,
-            args: Vec::new(),
-        },
-        OpenAppTarget {
-            id: "cursor".to_string(),
-            label: "Cursor".to_string(),
-            kind: "app".to_string(),
-            app_name: Some("Cursor".to_string()),
-            command: None,
-            args: Vec::new(),
-        },
-        OpenAppTarget {
-            id: "zed".to_string(),
-            label: "Zed".to_string(),
-            kind: "app".to_string(),
-            app_name: Some("Zed".to_string()),
-            command: None,
-            args: Vec::new(),
-        },
-        OpenAppTarget {
-            id: "ghostty".to_string(),
-            label: "Ghostty".to_string(),
-            kind: "app".to_string(),
-            app_name: Some("Ghostty".to_string()),
-            command: None,
-            args: Vec::new(),
-        },
-        OpenAppTarget {
-            id: "antigravity".to_string(),
-            label: "Antigravity".to_string(),
-            kind: "app".to_string(),
-            app_name: Some("Antigravity".to_string()),
             command: None,
             args: Vec::new(),
         },
@@ -812,7 +788,7 @@ fn default_open_app_targets() -> Vec<OpenAppTarget> {
 }
 
 fn default_selected_open_app_id() -> String {
-    "vscode".to_string()
+    "system".to_string()
 }
 
 impl Default for AppSettings {
@@ -955,7 +931,7 @@ mod tests {
         assert!(settings.last_composer_reasoning_effort.is_none());
         assert!((settings.ui_scale - 1.0).abs() < f64::EPSILON);
         assert_eq!(settings.theme, "system");
-        assert_eq!(settings.language, "en");
+        assert_eq!(settings.language, "zh");
         assert!(!settings.usage_show_remaining);
         assert!(settings.ui_font_family.contains("SF Pro Text"));
         assert!(settings.code_font_family.contains("SF Mono"));
@@ -983,9 +959,9 @@ mod tests {
         assert!(!settings.composer_list_continuation);
         assert!(!settings.composer_code_block_copy_use_modifier);
         assert!(settings.workspace_groups.is_empty());
-        assert_eq!(settings.selected_open_app_id, "vscode");
-        assert_eq!(settings.open_app_targets.len(), 6);
-        assert_eq!(settings.open_app_targets[0].id, "vscode");
+        assert_eq!(settings.selected_open_app_id, "system");
+        assert_eq!(settings.open_app_targets.len(), 3);
+        assert_eq!(settings.open_app_targets[0].id, "system");
     }
 
     #[test]

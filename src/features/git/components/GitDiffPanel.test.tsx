@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { GitLogEntry } from "../../../types";
 import { GitDiffPanel } from "./GitDiffPanel";
+import { getShowInFileManagerLabel } from "../../app/utils/fileManager";
 
 const menuNew = vi.hoisted(() =>
   vi.fn(async ({ items }) => ({ popup: vi.fn(), items })),
@@ -100,7 +101,7 @@ describe("GitDiffPanel", () => {
     await waitFor(() => expect(menuNew).toHaveBeenCalled());
     const menuArgs = menuNew.mock.calls[0]?.[0];
     const revealItem = menuArgs.items.find(
-      (item: { text: string }) => item.text === "Show in Finder",
+      (item: { text: string }) => item.text === getShowInFileManagerLabel(),
     );
 
     expect(revealItem).toBeDefined();
@@ -129,7 +130,7 @@ describe("GitDiffPanel", () => {
     await waitFor(() => expect(menuNew).toHaveBeenCalled());
     const menuArgs = menuNew.mock.calls[menuNew.mock.calls.length - 1]?.[0];
     const revealItem = menuArgs.items.find(
-      (item: { text: string }) => item.text === "Show in Finder",
+      (item: { text: string }) => item.text === getShowInFileManagerLabel(),
     );
 
     expect(revealItem).toBeDefined();

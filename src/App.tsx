@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./styles/base.css";
 import "./styles/buttons.css";
 import "./styles/sidebar.css";
@@ -101,7 +101,7 @@ import { useGitCommitController } from "./features/app/hooks/useGitCommitControl
 import { WorkspaceHome } from "./features/workspaces/components/WorkspaceHome";
 import { useWorkspaceHome } from "./features/workspaces/hooks/useWorkspaceHome";
 import { useWorkspaceAgentMd } from "./features/workspaces/hooks/useWorkspaceAgentMd";
-import { pickWorkspacePath } from "./services/tauri";
+import { pickWorkspacePath, runMiCodeInstallWindows } from "./services/tauri";
 import type {
   AccessMode,
   AppSettings,
@@ -315,6 +315,7 @@ function MainApp() {
     queueSaveSettings,
   } = useAppSettingsController();
   const missingMiCodeHintShownRef = useRef(false);
+  const installAttemptedRef = useRef(false);
   useCodeCssVars(appSettings);
   const {
     dictationModel,
@@ -337,23 +338,62 @@ function MainApp() {
     let canceled = false;
     const micodeBin = appSettings.agentBin ?? appSettings.micodeBin ?? null;
     const micodeArgs = appSettings.agentArgs ?? appSettings.micodeArgs ?? null;
-    void doctor(micodeBin, micodeArgs).catch((error) => {
-      if (canceled || !isMiCodeMissingError(error)) {
-        return;
-      }
+    const isWindows = navigator.userAgent.toLowerCase().includes("windows");
+
+    const showMissingToast = () => {
       missingMiCodeHintShownRef.current = true;
       pushErrorToast({
-        title:
-          appSettings.language === "zh"
-            ? "未检测到 MiCode CLI"
-            : "MiCode CLI not found",
+        title: appSettings.language === "zh" ? "未检测到 MiCode CLI" : "MiCode CLI not found",
         message:
           appSettings.language === "zh"
             ? "请先安装 MiCode CLI，并在终端确认 `micode --version` 可用。可在 设置 > MiCode 里运行诊断。"
             : "Install MiCode CLI first and verify `micode --version` in Terminal. You can run Doctor in Settings > MiCode.",
         durationMs: 12000,
       });
+    };
+
+    void doctor(micodeBin, micodeArgs).catch(async (error) => {
+      if (canceled || !isMiCodeMissingError(error)) {
+        return;
+      }
+
+      if (isWindows && !installAttemptedRef.current) {
+        installAttemptedRef.current = true;
+        pushErrorToast({
+          title: appSettings.language === "zh" ? "正在自动安装 MiCode" : "Installing MiCode",
+          message:
+            appSettings.language === "zh"
+              ? "检测到未安装，正在执行安装，请稍候。"
+              : "MiCode CLI is missing. Running automatic installation.",
+          durationMs: 6000,
+        });
+
+        try {
+          await runMiCodeInstallWindows();
+          await doctor(micodeBin, micodeArgs);
+          if (canceled) {
+            return;
+          }
+          pushErrorToast({
+            title: appSettings.language === "zh" ? "MiCode 已安装" : "MiCode installed",
+            message:
+              appSettings.language === "zh"
+                ? "自动安装已完成，可以直接使用。"
+                : "Automatic installation completed.",
+            durationMs: 5000,
+          });
+          return;
+        } catch (installError) {
+          if (canceled) {
+            return;
+          }
+          console.error("micode/install error", installError);
+        }
+      }
+
+      showMissingToast();
     });
+
     return () => {
       canceled = true;
     };
@@ -2629,3 +2669,4 @@ function App() {
 }
 
 export default App;
+

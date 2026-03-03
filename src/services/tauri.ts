@@ -2,7 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { Options as NotificationOptions } from "@tauri-apps/plugin-notification";
 import type {
+  ApprovalDecision,
+  ApprovalRule,
   AppSettings,
+  DebugEntry,
   MiCodeDoctorResult,
   DictationModelStatus,
   DictationSessionState,
@@ -309,7 +312,7 @@ export async function startReview(
 export async function respondToServerRequest(
   workspaceId: string,
   requestId: number | string,
-  decision: "accept" | "decline",
+  decision: ApprovalDecision,
 ) {
   return invoke("respond_to_server_request", {
     workspaceId,
@@ -335,6 +338,33 @@ export async function rememberApprovalRule(
   command: string[],
 ) {
   return invoke("remember_approval_rule", { workspaceId, command });
+}
+
+export async function listApprovalRules(
+  workspaceId: string,
+): Promise<{ rules: ApprovalRule[]; rulesPath?: string | null }> {
+  const response = await invoke<{ rules?: string[][]; rulesPath?: string | null }>(
+    "list_approval_rules",
+    { workspaceId },
+  );
+  return {
+    rules: (response.rules ?? []).map((command) => ({ command })),
+    rulesPath: response.rulesPath ?? null,
+  };
+}
+
+export async function removeApprovalRule(
+  workspaceId: string,
+  command: string[],
+): Promise<{ ok: boolean; removed: boolean }> {
+  const response = await invoke<{ ok?: boolean; removed?: boolean }>(
+    "remove_approval_rule",
+    { workspaceId, command },
+  );
+  return {
+    ok: Boolean(response.ok),
+    removed: Boolean(response.removed),
+  };
 }
 
 export async function getGitStatus(workspace_id: string): Promise<{
@@ -588,6 +618,20 @@ export async function updateAppSettings(settings: AppSettings): Promise<AppSetti
   return invoke<AppSettings>("update_app_settings", { settings });
 }
 
+export type PersistedDebugEntry = Pick<
+  DebugEntry,
+  "id" | "timestamp" | "source" | "label" | "payload"
+> & {
+  workspaceId?: string | null;
+};
+
+export async function appendDebugLogs(entries: PersistedDebugEntry[]): Promise<void> {
+  if (!entries.length) {
+    return;
+  }
+  return invoke("append_debug_logs", { entries });
+}
+
 type MenuAcceleratorUpdate = {
   id: string;
   accelerator: string | null;
@@ -604,6 +648,15 @@ export async function runMiCodeDoctor(
   micodeArgs: string | null,
 ): Promise<MiCodeDoctorResult> {
   return invoke<MiCodeDoctorResult>("micode_doctor", { micodeBin, micodeArgs });
+}
+
+export async function runMiCodeInstallWindows(): Promise<{
+  ok: boolean;
+  code: number;
+  stdout: string;
+  stderr: string;
+}> {
+  return invoke("micode_install_windows");
 }
 
 export async function getWorkspaceFiles(workspaceId: string) {

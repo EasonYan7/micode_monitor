@@ -5,7 +5,9 @@ import { useWindowFocusState } from "../../layout/hooks/useWindowFocusState";
 import { playNotificationSound } from "../../../utils/notificationSounds";
 import { sendNotification } from "../../../services/tauri";
 import type { DebugEntry } from "../../../types";
-import type { UpdateState } from "../../update/hooks/useUpdater";
+import { useUpdater } from "../../update/hooks/useUpdater";
+import { useTauriEvent } from "./useTauriEvent";
+import { subscribeUpdaterCheck } from "../../../services/events";
 
 type Params = {
   notificationSoundsEnabled: boolean;
@@ -26,7 +28,8 @@ export function useUpdaterController({
   successSoundUrl,
   errorSoundUrl,
 }: Params) {
-  const updaterState: UpdateState = { stage: "idle" };
+  const { state: updaterState, startUpdate, dismiss: dismissUpdate, checkForUpdates } =
+    useUpdater({ onDebug });
   const isWindowFocused = useWindowFocusState();
   const nextTestSoundIsError = useRef(false);
 
@@ -70,13 +73,9 @@ export function useUpdaterController({
     });
   }, [onDebug, systemNotificationsEnabled]);
 
-  const startUpdate = useCallback(() => {
-    // Updates are intentionally disabled in this build.
-  }, []);
-
-  const dismissUpdate = useCallback(() => {
-    // Updates are intentionally disabled in this build.
-  }, []);
+  useTauriEvent(subscribeUpdaterCheck, () => {
+    void checkForUpdates({ announceNoUpdate: true });
+  });
 
   return {
     updaterState,

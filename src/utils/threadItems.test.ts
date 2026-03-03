@@ -646,6 +646,22 @@ describe("threadItems", () => {
     }
   });
 
+  it("keeps mcp tool detail empty when arguments are an empty array", () => {
+    const item = buildConversationItem({
+      type: "mcpToolCall",
+      id: "mcp-1",
+      server: "micode",
+      tool: "read",
+      arguments: [],
+      status: "completed",
+      result: "ok",
+    });
+    expect(item).not.toBeNull();
+    if (item && item.kind === "tool") {
+      expect(item.detail).toBe("");
+    }
+  });
+
   it("parses ISO timestamps for thread updates", () => {
     const timestamp = getThreadTimestamp({ updated_at: "2025-01-01T00:00:00Z" });
     expect(timestamp).toBe(Date.parse("2025-01-01T00:00:00Z"));

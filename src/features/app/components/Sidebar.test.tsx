@@ -137,4 +137,63 @@ describe("Sidebar", () => {
     fireEvent.click(draftRow);
     expect(onSelectWorkspace).toHaveBeenCalledWith("ws-1");
   });
+
+  it("keeps parent workspace visible when search matches a worktree name", () => {
+    vi.useFakeTimers();
+    const props = {
+      ...baseProps,
+      workspaces: [
+        {
+          id: "ws-main",
+          name: "Main Repo",
+          path: "/tmp/main-repo",
+          kind: "main" as const,
+          connected: true,
+          settings: { sidebarCollapsed: false },
+        },
+        {
+          id: "ws-worktree",
+          name: "feature/payment-fix",
+          path: "/tmp/main-repo/.worktrees/feature-payment-fix",
+          kind: "worktree" as const,
+          parentId: "ws-main",
+          connected: true,
+          settings: { sidebarCollapsed: false },
+        },
+      ],
+      groupedWorkspaces: [
+        {
+          id: null,
+          name: "Workspaces",
+          workspaces: [
+            {
+              id: "ws-main",
+              name: "Main Repo",
+              path: "/tmp/main-repo",
+              kind: "main" as const,
+              connected: true,
+              settings: { sidebarCollapsed: false },
+            },
+          ],
+        },
+      ],
+    };
+
+    render(<Sidebar {...props} />);
+    const toggleButtons = screen.getAllByRole("button", { name: "Toggle search" });
+    const toggleButton = toggleButtons[toggleButtons.length - 1] as HTMLButtonElement;
+
+    act(() => {
+      fireEvent.click(toggleButton);
+    });
+
+    const inputs = screen.getAllByLabelText("Search projects");
+    const input = inputs[inputs.length - 1] as HTMLInputElement;
+    act(() => {
+      fireEvent.change(input, { target: { value: "payment-fix" } });
+      vi.runOnlyPendingTimers();
+    });
+
+    expect(screen.getByText("Main Repo")).toBeTruthy();
+  });
 });

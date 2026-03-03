@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import type { AccessMode } from "../../../types";
-import { matchesShortcut } from "../../../utils/shortcuts";
+import { pushErrorToast } from "../../../services/toasts";
+import { matchesShortcut, parseShortcut } from "../../../utils/shortcuts";
 
 type ModelOption = { id: string; displayName: string; model: string };
 
@@ -26,6 +27,14 @@ type UseComposerShortcutsOptions = {
 
 const ACCESS_ORDER: AccessMode[] = ["read-only", "current", "full-access"];
 
+function requiresComposerFocus(shortcut: string | null) {
+  const parsed = parseShortcut(shortcut);
+  if (!parsed) {
+    return false;
+  }
+  return parsed.key === "tab" && !parsed.meta && !parsed.ctrl && !parsed.alt;
+}
+
 export function useComposerShortcuts({
   textareaRef,
   modelShortcut,
@@ -50,12 +59,17 @@ export function useComposerShortcuts({
       if (event.repeat) {
         return;
       }
-      if (document.activeElement !== textareaRef.current) {
-        return;
-      }
+      const composerFocused = document.activeElement === textareaRef.current;
       if (matchesShortcut(event, modelShortcut)) {
+        if (!composerFocused && requiresComposerFocus(modelShortcut)) {
+          return;
+        }
         event.preventDefault();
         if (models.length === 0) {
+          pushErrorToast({
+            title: "Composer action unavailable",
+            message: "No models are available for the current workspace.",
+          });
           return;
         }
         const currentIndex = models.findIndex((model) => model.id === selectedModelId);
@@ -67,6 +81,9 @@ export function useComposerShortcuts({
         return;
       }
       if (matchesShortcut(event, accessShortcut)) {
+        if (!composerFocused && requiresComposerFocus(accessShortcut)) {
+          return;
+        }
         event.preventDefault();
         const currentIndex = ACCESS_ORDER.indexOf(accessMode);
         const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % ACCESS_ORDER.length : 0;
@@ -77,8 +94,15 @@ export function useComposerShortcuts({
         return;
       }
       if (matchesShortcut(event, reasoningShortcut)) {
+        if (!composerFocused && requiresComposerFocus(reasoningShortcut)) {
+          return;
+        }
         event.preventDefault();
         if (!reasoningSupported || reasoningOptions.length === 0) {
+          pushErrorToast({
+            title: "Composer action unavailable",
+            message: "Reasoning mode is not available for the current model.",
+          });
           return;
         }
         const currentIndex = reasoningOptions.indexOf(selectedEffort ?? "");
@@ -94,6 +118,9 @@ export function useComposerShortcuts({
         collaborationModes.length > 0 &&
         matchesShortcut(event, collaborationShortcut)
       ) {
+        if (!composerFocused && requiresComposerFocus(collaborationShortcut)) {
+          return;
+        }
         event.preventDefault();
         const currentIndex = collaborationModes.findIndex(
           (mode) => mode.id === selectedCollaborationModeId,
@@ -106,6 +133,15 @@ export function useComposerShortcuts({
         if (nextMode) {
           onSelectCollaborationMode(nextMode.id);
         }
+      } else if (matchesShortcut(event, collaborationShortcut)) {
+        if (!composerFocused && requiresComposerFocus(collaborationShortcut)) {
+          return;
+        }
+        event.preventDefault();
+        pushErrorToast({
+          title: "Composer action unavailable",
+          message: "No collaboration modes are available.",
+        });
       }
     };
 

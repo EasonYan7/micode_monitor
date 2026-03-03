@@ -11,11 +11,13 @@ import {
   getGitStatus,
   getOpenAppIcon,
   listMcpServerStatus,
+  listApprovalRules,
   readGlobalAgentsMd,
   readGlobalMiCodeConfigToml,
   listWorkspaces,
   openWorkspaceIn,
   readAgentMd,
+  removeApprovalRule,
   stageGitAll,
   respondToServerRequest,
   respondToUserInputRequest,
@@ -346,6 +348,50 @@ describe("tauri invoke wrappers", () => {
       requestId: 101,
       result: { decision: "accept" },
     });
+  });
+
+  it("passes through explicit approval modes", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({});
+
+    await respondToServerRequest("ws-6", 102, "accept_always");
+
+    expect(invokeMock).toHaveBeenCalledWith("respond_to_server_request", {
+      workspaceId: "ws-6",
+      requestId: 102,
+      result: { decision: "accept_always" },
+    });
+  });
+
+  it("lists approval rules and normalizes the shape", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({
+      rules: [["fetch", "https://example.com"]],
+      rulesPath: "/tmp/.micode/rules/default.rules",
+    });
+
+    const result = await listApprovalRules("ws-9");
+
+    expect(invokeMock).toHaveBeenCalledWith("list_approval_rules", {
+      workspaceId: "ws-9",
+    });
+    expect(result).toEqual({
+      rules: [{ command: ["fetch", "https://example.com"] }],
+      rulesPath: "/tmp/.micode/rules/default.rules",
+    });
+  });
+
+  it("removes approval rules by command pattern", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({ ok: true, removed: true });
+
+    const result = await removeApprovalRule("ws-10", ["fetch", "https://example.com"]);
+
+    expect(invokeMock).toHaveBeenCalledWith("remove_approval_rule", {
+      workspaceId: "ws-10",
+      command: ["fetch", "https://example.com"],
+    });
+    expect(result).toEqual({ ok: true, removed: true });
   });
 
   it("nests answers for user input responses", async () => {

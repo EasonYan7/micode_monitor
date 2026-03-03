@@ -12,6 +12,7 @@ import { OpenAppMenu } from "./OpenAppMenu";
 import { LaunchScriptButton } from "./LaunchScriptButton";
 import { LaunchScriptEntryButton } from "./LaunchScriptEntryButton";
 import type { WorkspaceLaunchScriptsState } from "../hooks/useWorkspaceLaunchScripts";
+import { getRevealInFileManagerLabel } from "../utils/fileManager";
 
 type MainHeaderProps = {
   workspace: WorkspaceInfo;
@@ -339,7 +340,7 @@ export function MainHeader({
                       }}
                       data-tauri-drag-region="false"
                     >
-                      Reveal in Finder
+                      {getRevealInFileManagerLabel()}
                     </button>
                   </div>
                 </div>

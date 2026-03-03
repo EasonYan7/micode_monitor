@@ -137,7 +137,7 @@ export type ComposerEditorSettings = {
 export type OpenAppTarget = {
   id: string;
   label: string;
-  kind: "app" | "command" | "finder";
+  kind: "app" | "command" | "finder" | "default";
   appName?: string | null;
   command?: string | null;
   args: string[];
@@ -225,6 +225,18 @@ export type ApprovalRequest = {
   request_id: number | string;
   method: string;
   params: Record<string, unknown>;
+};
+
+export type ApprovalDecision =
+  | "accept"
+  | "decline"
+  | "accept_once"
+  | "accept_always"
+  | "decline_once"
+  | "decline_always";
+
+export type ApprovalRule = {
+  command: string[];
 };
 
 export type RequestUserInputOption = {

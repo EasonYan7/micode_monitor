@@ -5,6 +5,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import type { WorkspaceInfo } from "../../../types";
 import { pushErrorToast } from "../../../services/toasts";
+import { getFileManagerName, getShowInFileManagerLabel } from "../utils/fileManager";
 
 type SidebarMenuHandlers = {
   onDeleteThread: (workspaceId: string, threadId: string) => void;
@@ -22,7 +23,6 @@ type SidebarMenuHandlers = {
 
 export function useSidebarMenus({
   onDeleteThread,
-  onSyncThread,
   onPinThread,
   onUnpinThread,
   isThreadPinned,
@@ -33,6 +33,11 @@ export function useSidebarMenus({
   onDeleteWorktree,
   language = "en",
 }: SidebarMenuHandlers) {
+  const t = useCallback(
+    (en: string, zh: string) => (language === "zh" ? zh : en),
+    [language],
+  );
+
   const showThreadMenu = useCallback(
     async (
       event: MouseEvent,
@@ -43,23 +48,19 @@ export function useSidebarMenus({
       event.preventDefault();
       event.stopPropagation();
       const renameItem = await MenuItem.new({
-        text: "Rename",
+        text: t("Rename", "重命名"),
         action: () => onRenameThread(workspaceId, threadId),
       });
-      const syncItem = await MenuItem.new({
-        text: "Sync from server",
-        action: () => onSyncThread(workspaceId, threadId),
-      });
       const archiveItem = await MenuItem.new({
-        text: "Archive",
+        text: t("Archive", "归档"),
         action: () => onDeleteThread(workspaceId, threadId),
       });
       const deleteConversationItem = await MenuItem.new({
-        text: "Delete Conversation",
+        text: t("Delete Conversation", "删除会话"),
         action: () => onDeleteThread(workspaceId, threadId),
       });
       const copyItem = await MenuItem.new({
-        text: "Copy ID",
+        text: t("Copy ID", "复制 ID"),
         action: async () => {
           try {
             await navigator.clipboard.writeText(threadId);
@@ -68,12 +69,12 @@ export function useSidebarMenus({
           }
         },
       });
-      const items = [renameItem, syncItem];
+      const items = [renameItem];
       if (canPin) {
         const isPinned = isThreadPinned(workspaceId, threadId);
         items.push(
           await MenuItem.new({
-            text: isPinned ? "Unpin" : "Pin",
+            text: isPinned ? t("Unpin", "取消置顶") : t("Pin", "置顶"),
             action: () => {
               if (isPinned) {
                 onUnpinThread(workspaceId, threadId);
@@ -95,8 +96,8 @@ export function useSidebarMenus({
       onDeleteThread,
       onPinThread,
       onRenameThread,
-      onSyncThread,
       onUnpinThread,
+      t,
     ],
   );
 
@@ -133,7 +134,7 @@ export function useSidebarMenus({
         action: () => onReloadWorkspaceThreads(worktree.id),
       });
       const revealItem = await MenuItem.new({
-        text: "Show in Finder",
+        text: getShowInFileManagerLabel(),
         action: async () => {
           if (!worktree.path) {
             return;
@@ -146,7 +147,7 @@ export function useSidebarMenus({
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             pushErrorToast({
-              title: "Couldn't show worktree in Finder",
+              title: `Couldn't show worktree in ${getFileManagerName()}`,
               message,
             });
             console.warn("Failed to reveal worktree", {

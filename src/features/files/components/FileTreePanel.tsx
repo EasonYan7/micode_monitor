@@ -20,6 +20,7 @@ import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
 import { languageFromPath } from "../../../utils/syntax";
 import { getFileTypeIconUrl } from "../../../utils/fileTypeIcons";
 import { FilePreviewPopover } from "./FilePreviewPopover";
+import { getRevealInFileManagerLabel } from "../../app/utils/fileManager";
 
 type FileTreeNode = {
   name: string;
@@ -149,9 +150,33 @@ const imageExtensions = new Set([
   "tiff",
 ]);
 
+const binaryPreviewExtensions = new Set([
+  "xlsx",
+  "xls",
+  "xlsm",
+  "xlsb",
+  "doc",
+  "docx",
+  "ppt",
+  "pptx",
+  "pdf",
+  "zip",
+  "7z",
+  "rar",
+  "exe",
+  "dll",
+  "so",
+  "dylib",
+]);
+
 function isImagePath(path: string) {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
   return imageExtensions.has(ext);
+}
+
+function isBinaryPreviewPath(path: string) {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  return binaryPreviewExtensions.has(ext);
 }
 
 export function FileTreePanel({
@@ -385,6 +410,15 @@ export function FileTreePanel({
         cancelled = true;
       };
     }
+    if (isBinaryPreviewPath(previewPath)) {
+      setPreviewContent("");
+      setPreviewTruncated(false);
+      setPreviewError("Binary file preview is not supported. Use Open to view this file.");
+      setPreviewLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
     setPreviewLoading(true);
     setPreviewError(null);
     readWorkspaceFile(workspaceId, previewPath)
@@ -399,7 +433,12 @@ export function FileTreePanel({
         if (cancelled) {
           return;
         }
-        setPreviewError(error instanceof Error ? error.message : String(error));
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes("File is not valid UTF-8")) {
+          setPreviewError("Binary file preview is not supported. Use Open to view this file.");
+        } else {
+          setPreviewError(message);
+        }
       })
       .finally(() => {
         if (!cancelled) {
@@ -563,7 +602,7 @@ export function FileTreePanel({
             },
           }),
           await MenuItem.new({
-            text: "Reveal in Finder",
+            text: getRevealInFileManagerLabel(),
             action: async () => {
               await revealItemInDir(resolvePath(relativePath));
             },

@@ -29,6 +29,9 @@ const DEFAULT_OPEN_TARGET: OpenTarget = {
 const resolveAppName = (target: OpenTarget) => (target.appName ?? "").trim();
 const resolveCommand = (target: OpenTarget) => (target.command ?? "").trim();
 const canOpenTarget = (target: OpenTarget) => {
+  if (target.kind === "default") {
+    return true;
+  }
   if (target.kind === "finder") {
     return true;
   }
@@ -99,6 +102,14 @@ export function useFileLinkOpener(
         if (!canOpenTarget(target)) {
           return;
         }
+        if (target.kind === "default") {
+          await openWorkspaceIn(resolvedPath, {
+            appName: null,
+            command: null,
+            args: target.args,
+          });
+          return;
+        }
         if (target.kind === "finder") {
           await revealItemInDir(resolvedPath);
           return;
@@ -155,6 +166,8 @@ export function useFileLinkOpener(
       const openLabel =
         target.kind === "finder"
           ? revealLabel()
+          : target.kind === "default"
+            ? "Open with Default App"
           : target.kind === "command"
             ? command
               ? `Open in ${target.label}`

@@ -43,23 +43,15 @@ export function AboutView() {
           />
           <div className="about-title">MiCode Monitor</div>
         </div>
-        <div className="about-version">
-          {version ? `Version ${version}` : "Version —"}
-        </div>
-        <div className="about-tagline">
-          Monitor the situation of your MiCode agents
-        </div>
+        <div className="about-version">{version ? `Version ${version}` : "Version -"}</div>
+        <div className="about-tagline">Monitor the situation of your MiCode agents</div>
         <div className="about-divider" />
         <div className="about-links">
-          <button
-            type="button"
-            className="about-link"
-            onClick={handleOpenGitHub}
-          >
+          <button type="button" className="about-link" onClick={handleOpenGitHub}>
             GitHub
           </button>
         </div>
-        <div className="about-footer">Made with 💗 by Eason Yan & Contributors</div>
+        <div className="about-footer">Made by Eason Yan and contributors</div>
       </div>
     </div>
   );

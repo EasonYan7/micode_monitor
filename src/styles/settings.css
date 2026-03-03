@@ -676,6 +676,57 @@
   word-break: break-all;
   overflow-wrap: anywhere;
 }
+
+.settings-approval-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-approval-workspace {
+  padding: 10px 12px;
+  border: 1px solid var(--border-muted);
+  border-radius: 10px;
+  background: var(--surface-card);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-approval-workspace-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.settings-approval-path {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+.settings-approval-error {
+  color: var(--text-danger);
+}
+
+.settings-approval-rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-approval-rule-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-approval-rule-command {
+  font-size: 11px;
+  color: var(--text-subtle);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .settings-empty {
   color: var(--text-faint);
   font-size: 12px;

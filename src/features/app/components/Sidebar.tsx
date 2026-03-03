@@ -184,15 +184,62 @@ export function Sidebar({
   const debouncedQuery = useDebouncedValue(searchQuery, 150);
   const normalizedQuery = debouncedQuery.trim().toLowerCase();
 
+  const worktreesByParent = useMemo(() => {
+    const worktrees = new Map<string, WorkspaceInfo[]>();
+    workspaces
+      .filter((entry) => (entry.kind ?? "main") === "worktree" && entry.parentId)
+      .forEach((entry) => {
+        const parentId = entry.parentId as string;
+        const list = worktrees.get(parentId) ?? [];
+        list.push(entry);
+        worktrees.set(parentId, list);
+      });
+    worktrees.forEach((entries) => {
+      entries.sort((a, b) => a.name.localeCompare(b.name));
+    });
+    return worktrees;
+  }, [workspaces]);
+
   const isWorkspaceMatch = useCallback(
     (workspace: WorkspaceInfo) => {
       if (!normalizedQuery) {
         return true;
       }
-      return workspace.name.toLowerCase().includes(normalizedQuery);
+      const workspaceThreads = threadsByWorkspace[workspace.id] ?? [];
+      const inWorkspace =
+        workspace.name.toLowerCase().includes(normalizedQuery) ||
+        workspace.path.toLowerCase().includes(normalizedQuery) ||
+        workspaceThreads.some((thread) =>
+          thread.name.toLowerCase().includes(normalizedQuery),
+        );
+      if (inWorkspace) {
+        return true;
+      }
+      const worktrees = worktreesByParent.get(workspace.id) ?? [];
+      return worktrees.some(
+        (worktree) =>
+          worktree.name.toLowerCase().includes(normalizedQuery) ||
+          worktree.path.toLowerCase().includes(normalizedQuery) ||
+          (threadsByWorkspace[worktree.id] ?? []).some((thread) =>
+            thread.name.toLowerCase().includes(normalizedQuery),
+          ),
+      );
     },
-    [normalizedQuery],
+    [normalizedQuery, threadsByWorkspace, worktreesByParent],
   );
+
+  const filteredThreadsByWorkspace = useMemo(() => {
+    if (!normalizedQuery) {
+      return threadsByWorkspace;
+    }
+    const next: Record<string, ThreadSummary[]> = {};
+    Object.entries(threadsByWorkspace).forEach(([workspaceId, threads]) => {
+      next[workspaceId] = threads.filter((thread) =>
+        thread.name.toLowerCase().includes(normalizedQuery),
+      );
+    });
+    return next;
+  }, [normalizedQuery, threadsByWorkspace]);
 
   const renderHighlightedName = useCallback(
     (name: string) => {
@@ -238,7 +285,7 @@ export function Sidebar({
       if (!isWorkspaceMatch(workspace)) {
         return;
       }
-      const threads = threadsByWorkspace[workspace.id] ?? [];
+      const threads = filteredThreadsByWorkspace[workspace.id] ?? [];
       if (!threads.length) {
         return;
       }
@@ -289,15 +336,15 @@ export function Sidebar({
       );
   }, [
     workspaces,
-    threadsByWorkspace,
+    filteredThreadsByWorkspace,
     getThreadRows,
     getPinTimestamp,
     isWorkspaceMatch,
   ]);
 
   const scrollFadeDeps = useMemo(
-    () => [groupedWorkspaces, threadsByWorkspace, expandedWorkspaces, normalizedQuery],
-    [groupedWorkspaces, threadsByWorkspace, expandedWorkspaces, normalizedQuery],
+    () => [groupedWorkspaces, filteredThreadsByWorkspace, expandedWorkspaces, normalizedQuery],
+    [groupedWorkspaces, filteredThreadsByWorkspace, expandedWorkspaces, normalizedQuery],
   );
   const { sidebarBodyRef, scrollFade, updateScrollFade } =
     useSidebarScrollFade(scrollFadeDeps);
@@ -314,22 +361,6 @@ export function Sidebar({
   );
 
   const isSearchActive = Boolean(normalizedQuery);
-
-  const worktreesByParent = useMemo(() => {
-    const worktrees = new Map<string, WorkspaceInfo[]>();
-    workspaces
-      .filter((entry) => (entry.kind ?? "main") === "worktree" && entry.parentId)
-      .forEach((entry) => {
-        const parentId = entry.parentId as string;
-        const list = worktrees.get(parentId) ?? [];
-        list.push(entry);
-        worktrees.set(parentId, list);
-      });
-    worktrees.forEach((entries) => {
-      entries.sort((a, b) => a.name.localeCompare(b.name));
-    });
-    return worktrees;
-  }, [workspaces]);
 
   const handleToggleExpanded = useCallback((workspaceId: string) => {
     setExpandedWorkspaces((prev) => {
@@ -478,7 +509,7 @@ export function Sidebar({
                 onToggleCollapse={toggleGroupCollapse}
               >
                 {group.workspaces.map((entry) => {
-                  const threads = threadsByWorkspace[entry.id] ?? [];
+                  const threads = filteredThreadsByWorkspace[entry.id] ?? [];
                   const isCollapsed = entry.settings.sidebarCollapsed;
                   const isExpanded = expandedWorkspaces.has(entry.id);
                   const {
@@ -587,7 +618,7 @@ export function Sidebar({
                         <WorktreeSection
                           worktrees={worktrees}
                           deletingWorktreeIds={deletingWorktreeIds}
-                          threadsByWorkspace={threadsByWorkspace}
+                          threadsByWorkspace={filteredThreadsByWorkspace}
                           threadStatusById={threadStatusById}
                           threadListLoadingByWorkspace={threadListLoadingByWorkspace}
                           threadListPagingByWorkspace={threadListPagingByWorkspace}

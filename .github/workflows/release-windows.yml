@@ -33,6 +33,31 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
+      - name: Sync app version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          if ([string]::IsNullOrWhiteSpace($tag) -or -not $tag.StartsWith("v")) {
+            throw "Invalid tag format. Expected v<semver>, got: $tag"
+          }
+          $version = $tag.Substring(1)
+          if (-not ($version -match '^\d+\.\d+\.\d+([.-][0-9A-Za-z.-]+)?$')) {
+            throw "Invalid version parsed from tag: $version"
+          }
+
+          $tauriPath = "src-tauri/tauri.conf.json"
+          $tauriJson = Get-Content $tauriPath -Raw | ConvertFrom-Json
+          $tauriJson.version = $version
+          $tauriJson | ConvertTo-Json -Depth 20 | Set-Content -Path $tauriPath -Encoding utf8
+
+          $pkgPath = "package.json"
+          $pkgJson = Get-Content $pkgPath -Raw | ConvertFrom-Json
+          $pkgJson.version = $version
+          $pkgJson | ConvertTo-Json -Depth 20 | Set-Content -Path $pkgPath -Encoding utf8
+
+          Write-Host "Synced version to $version in $tauriPath and $pkgPath"
+
       - name: Install dependencies
         run: npm ci
 
