@@ -142,6 +142,8 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($signature)) {
             throw "Updater signature file is empty: $($updater.Sig.FullName)"
           }
+          $updaterAssetName = ($updater.Artifact.Name -replace '\s+', '.')
+          $updaterSigAssetName = ($updater.Sig.Name -replace '\s+', '.')
 
           $notes = "Windows release $version."
           $latest = @{
@@ -151,7 +153,7 @@ jobs:
             platforms = @{
               "windows-x86_64" = @{
                 signature = $signature
-                url = "https://github.com/EasonYan7/micode_monitor/releases/download/$tag/$($updater.Artifact.Name)"
+                url = "https://github.com/EasonYan7/micode_monitor/releases/download/$tag/$updaterAssetName"
               }
             }
           }
@@ -168,8 +170,25 @@ jobs:
             throw "No MSI/NSIS installers found under $bundleRoot"
           }
 
-          $uploadList = @($updater.Artifact.FullName, $updater.Sig.FullName, $latestPath) + ($installerFiles | Select-Object -ExpandProperty FullName)
-          $uploadList | Set-Content -Path (Join-Path $releaseDir "upload-list.txt")
+          $uploads = New-Object System.Collections.Generic.List[object]
+          $uploads.Add([PSCustomObject]@{ path = $updater.Artifact.FullName; label = $updaterAssetName })
+          $uploads.Add([PSCustomObject]@{ path = $updater.Sig.FullName; label = $updaterSigAssetName })
+          $uploads.Add([PSCustomObject]@{ path = $latestPath; label = "latest.json" })
+          foreach ($file in $installerFiles) {
+            $uploads.Add([PSCustomObject]@{
+              path = $file.FullName
+              label = ($file.Name -replace '\s+', '.')
+            })
+          }
+
+          $seenLabels = @{}
+          $uploadsDedup = foreach ($item in $uploads) {
+            $key = $item.label.ToLowerInvariant()
+            if ($seenLabels.ContainsKey($key)) { continue }
+            $seenLabels[$key] = $true
+            $item
+          }
+          $uploadsDedup | ConvertTo-Json -Depth 4 | Set-Content -Path (Join-Path $releaseDir "upload-manifest.json") -Encoding utf8
 
           "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
@@ -188,7 +207,8 @@ jobs:
             gh release create $tag --title $tag --notes "Windows release $tag" --target $env:GITHUB_SHA
           }
 
-          $uploadFiles = Get-Content "release-artifacts/upload-list.txt"
-          foreach ($file in $uploadFiles) {
-            gh release upload $tag $file --clobber
+          $uploadItems = Get-Content "release-artifacts/upload-manifest.json" -Raw | ConvertFrom-Json
+          foreach ($item in $uploadItems) {
+            $sourceWithLabel = "$($item.path)#$($item.label)"
+            gh release upload $tag $sourceWithLabel --clobber
           }
