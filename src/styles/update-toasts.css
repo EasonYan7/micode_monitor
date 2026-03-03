@@ -42,7 +42,7 @@
 
 .update-toast-body {
   font-size: 13px;
-  color: var(--text);
+  color: var(--text-strong);
   margin-bottom: 10px;
 }
 

@@ -46,6 +46,7 @@
 .approval-toast-method {
   font-size: 12px;
   font-weight: 600;
+  color: var(--text-strong);
   margin-bottom: 8px;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -71,7 +72,7 @@
 
 .approval-toast-detail-value {
   font-size: 12px;
-  color: var(--text);
+  color: var(--text-strong);
   overflow-wrap: anywhere;
   word-break: break-word;
 }

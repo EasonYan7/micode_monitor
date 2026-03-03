@@ -28,7 +28,18 @@ pub(crate) fn read_settings(path: &PathBuf) -> Result<AppSettings, String> {
         return Ok(AppSettings::default());
     }
     let data = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&data).map_err(|e| e.to_string())
+    let mut settings: AppSettings = serde_json::from_str(&data).map_err(|e| e.to_string())?;
+    // Legacy builds wrote "--profile personal" as a default arg.
+    // Treat it as unset so first-run/doctor behavior is stable across machines.
+    if settings
+        .agent_args
+        .as_deref()
+        .map(|value| value.trim() == "--profile personal")
+        .unwrap_or(false)
+    {
+        settings.agent_args = None;
+    }
+    Ok(settings)
 }
 
 pub(crate) fn write_settings(path: &PathBuf, settings: &AppSettings) -> Result<(), String> {
@@ -41,8 +52,8 @@ pub(crate) fn write_settings(path: &PathBuf, settings: &AppSettings) -> Result<(
 
 #[cfg(test)]
 mod tests {
-    use super::{read_workspaces, write_workspaces};
-    use crate::types::{WorkspaceEntry, WorkspaceKind, WorkspaceSettings};
+    use super::{read_settings, read_workspaces, write_workspaces};
+    use crate::types::{AppSettings, WorkspaceEntry, WorkspaceKind, WorkspaceSettings};
     use uuid::Uuid;
 
     #[test]
@@ -80,5 +91,21 @@ mod tests {
             stored.settings.agent_args.as_deref(),
             Some("--profile personal")
         );
+    }
+
+    #[test]
+    fn read_settings_clears_legacy_default_profile_personal() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("micode-monitor-settings-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&temp_dir).expect("create temp dir");
+        let path = temp_dir.join("settings.json");
+
+        let mut settings = AppSettings::default();
+        settings.agent_args = Some("--profile personal".to_string());
+        let raw = serde_json::to_string_pretty(&settings).expect("serialize settings");
+        std::fs::write(&path, raw).expect("write settings");
+
+        let loaded = read_settings(&path).expect("read settings");
+        assert!(loaded.agent_args.is_none());
     }
 }

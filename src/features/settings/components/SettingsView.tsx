@@ -3036,7 +3036,7 @@ export function SettingsView({
                       id="micode-args"
                       className="settings-input"
                       value={micodeArgsDraft}
-                      placeholder="--profile personal"
+                      placeholder="--flag value"
                       onChange={(event) => setMiCodeArgsDraft(event.target.value)}
                     />
                     <button

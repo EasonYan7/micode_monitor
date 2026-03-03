@@ -760,7 +760,10 @@ function MainApp() {
     onTrigger: openBranchSwitcher,
   });
   const alertError = useCallback((error: unknown) => {
-    alert(error instanceof Error ? error.message : String(error));
+    pushErrorToast({
+      title: "Error",
+      message: error instanceof Error ? error.message : String(error),
+    });
   }, []);
   const {
     applyWorktreeChanges: handleApplyWorktreeChanges,

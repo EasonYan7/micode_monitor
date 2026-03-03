@@ -130,24 +130,22 @@ fn mcp_status_has_entries(value: &Value) -> bool {
 #[tauri::command]
 pub(crate) async fn micode_doctor(
     micode_bin: Option<String>,
-    micode_args: Option<String>,
+    _micode_args: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
-    let (default_bin, default_args) = {
+    let default_bin = {
         let settings = state.app_settings.lock().await;
-        (settings.agent_bin.clone(), settings.agent_args.clone())
+        settings.agent_bin.clone()
     };
     let resolved = micode_bin
         .clone()
         .filter(|value| !value.trim().is_empty())
         .or(default_bin);
-    let resolved_args = micode_args
-        .clone()
-        .filter(|value| !value.trim().is_empty())
-        .or(default_args);
     let path_env = build_micode_path_env(resolved.as_deref());
     let version = check_micode_installation(resolved.clone()).await?;
-    let app_server_ok = check_acp_handshake(resolved.clone(), resolved_args.clone()).await?;
+    // Doctor should validate baseline ACP availability first.
+    // Additional runtime args can be valid for real sessions but still break handshake probes.
+    let app_server_ok = check_acp_handshake(resolved.clone(), None).await?;
     let (node_ok, node_version, node_details) = {
         let mut node_command = tokio_command("node");
         if let Some(ref path_env) = path_env {
@@ -207,7 +205,11 @@ pub(crate) async fn micode_doctor(
     let details = if app_server_ok {
         None
     } else {
-        Some("Failed ACP initialize handshake (`micode --experimental-acp`).".to_string())
+        Some(if cfg!(windows) {
+            "Failed ACP initialize handshake (`micode.cmd --experimental-acp`). If PowerShell blocks `micode`, use `micode.cmd` or run `Set-ExecutionPolicy RemoteSigned`.".to_string()
+        } else {
+            "Failed ACP initialize handshake (`micode --experimental-acp`).".to_string()
+        })
     };
     Ok(json!({
         "ok": version.is_some() && app_server_ok,

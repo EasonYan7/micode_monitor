@@ -2,6 +2,7 @@ import type { RefObject } from "react";
 import { useCallback } from "react";
 import { useNewAgentShortcut } from "./useNewAgentShortcut";
 import type { DebugEntry, WorkspaceInfo } from "../../../types";
+import { pushErrorToast } from "../../../services/toasts";
 
 type Params = {
   activeWorkspace: WorkspaceInfo | null;
@@ -57,7 +58,10 @@ export function useWorkspaceActions({
         label: "workspace/add error",
         payload: message,
       });
-      alert(`Failed to add workspace.\n\n${message}`);
+      pushErrorToast({
+        title: "Failed to add workspace",
+        message,
+      });
     }
   }, [addWorkspace, handleWorkspaceAdded, onDebug]);
 
@@ -77,7 +81,10 @@ export function useWorkspaceActions({
           label: "workspace/add error",
           payload: message,
         });
-        alert(`Failed to add workspace.\n\n${message}`);
+        pushErrorToast({
+          title: "Failed to add workspace",
+          message,
+        });
       }
     },
     [addWorkspaceFromPath, handleWorkspaceAdded, onDebug],

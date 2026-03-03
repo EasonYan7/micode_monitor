@@ -9,7 +9,16 @@ pub(crate) fn parse_micode_args(value: Option<&str>) -> Result<Vec<String>, Stri
     };
     shell_words::split(raw)
         .map_err(|err| format!("Invalid MiCode args: {err}"))
-        .map(|args| args.into_iter().filter(|arg| !arg.is_empty()).collect())
+        .map(|args| {
+            args.into_iter()
+                .filter(|arg| {
+                    let normalized = arg.trim();
+                    !normalized.is_empty()
+                        && normalized != "--experimental-acp"
+                        && normalized != "-experimental-acp"
+                })
+                .collect()
+        })
 }
 
 pub(crate) fn apply_micode_args(command: &mut Command, value: Option<&str>) -> Result<(), String> {
@@ -49,7 +58,7 @@ pub(crate) fn resolve_workspace_micode_args(
 
 fn normalize_micode_args(value: &str) -> Option<String> {
     let trimmed = value.trim();
-    if trimmed.is_empty() {
+    if trimmed.is_empty() || trimmed == "--profile personal" {
         None
     } else {
         Some(trimmed.to_string())
@@ -73,6 +82,13 @@ mod tests {
     fn parses_simple_args() {
         let args = parse_micode_args(Some("--profile personal --flag")).expect("parse args");
         assert_eq!(args, vec!["--profile", "personal", "--flag"]);
+    }
+
+    #[test]
+    fn filters_reserved_acp_flag() {
+        let args = parse_micode_args(Some("--experimental-acp --flag x"))
+            .expect("parse args");
+        assert_eq!(args, vec!["--flag", "x"]);
     }
 
     #[test]
@@ -132,5 +148,23 @@ mod tests {
         };
         let resolved_main = resolve_workspace_micode_args(&main, None, Some(&app_settings));
         assert_eq!(resolved_main.as_deref(), Some("--profile app"));
+    }
+
+    #[test]
+    fn ignores_legacy_profile_personal_default() {
+        let mut app_settings = AppSettings::default();
+        app_settings.agent_args = Some("--profile personal".to_string());
+        let entry = WorkspaceEntry {
+            id: "main".to_string(),
+            name: "Main".to_string(),
+            path: "/tmp/main".to_string(),
+            agent_bin: None,
+            kind: WorkspaceKind::Main,
+            parent_id: None,
+            worktree: None,
+            settings: WorkspaceSettings::default(),
+        };
+        let resolved = resolve_workspace_micode_args(&entry, None, Some(&app_settings));
+        assert!(resolved.is_none());
     }
 }

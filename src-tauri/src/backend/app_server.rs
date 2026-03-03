@@ -376,6 +376,27 @@ fn is_request_aborted_message(message: &str) -> bool {
         .contains("request was aborted")
 }
 
+fn normalize_turn_start_error_message(error: &str, requested_model: Option<&str>) -> String {
+    let lowered = error.to_ascii_lowercase();
+    let is_http_400_empty = lowered.contains("400 status code (no body)")
+        || (lowered.contains("status code 400") && lowered.contains("no body"))
+        || (lowered.contains("openai api streaming error") && lowered.contains("400"));
+    if !is_http_400_empty {
+        return format!("turn/start failed: {error}");
+    }
+
+    let model_hint = requested_model
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| format!(" Selected model: `{value}`."))
+        .unwrap_or_default();
+    format!(
+        "turn/start failed: Upstream model request returned HTTP 400 (empty body).{} This is usually caused by model availability/permission, expired login/token, or corporate proxy interception. Please open Terminal and run `micode` (or `micode.cmd` on Windows), complete browser login/auth, then retry in Monitor. You can also run `micode.cmd account read` to verify login state. Raw error: {}",
+        model_hint,
+        error
+    )
+}
+
 fn is_not_generating_message(message: &str) -> bool {
     message
         .to_ascii_lowercase()
@@ -1992,6 +2013,7 @@ impl WorkspaceSession {
                     .map(str::trim)
                     .filter(|value| !value.is_empty())
                     .map(ToString::to_string);
+                let requested_model_for_error = requested_model.clone();
                 if let Some(requested_model) = requested_model {
                     if let Ok(changed) = set_preferred_model(&requested_model) {
                         if changed {
@@ -2301,7 +2323,10 @@ impl WorkspaceSession {
                             }
                         }));
                     }
-                    return Err(format!("turn/start failed: {error}"));
+                    return Err(normalize_turn_start_error_message(
+                        &error,
+                        requested_model_for_error.as_deref(),
+                    ));
                 }
                 if !is_background_thread {
                     self.persist_prompt_agent_item(&thread_id, &turn_id, &tracked_session_id)
@@ -2632,6 +2657,9 @@ pub(crate) fn build_micode_command_with_bin(agent_bin: Option<String>) -> Comman
     if cfg!(windows) && bin.eq_ignore_ascii_case("micode") {
         bin = "micode.cmd".into();
     }
+    if cfg!(windows) {
+        bin = normalize_windows_micode_bin(bin);
+    }
     let mut command = tokio_command(bin);
     if let Some(path_env) = build_micode_path_env(agent_bin.as_deref()) {
         command.env("PATH", path_env);
@@ -2650,17 +2678,23 @@ pub(crate) async fn check_micode_installation(
     let output = match timeout(Duration::from_secs(5), command.output()).await {
         Ok(result) => result.map_err(|e| {
             if e.kind() == ErrorKind::NotFound {
-                "MiCode CLI not found. Install micode and ensure `micode` is on your PATH."
-                    .to_string()
+                if cfg!(windows) {
+                    "MiCode CLI not found. Install with: powershell -ExecutionPolicy Bypass -Command \"iwr -useb https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.ps1 | iex\". After install, run `micode.cmd --version` (or set PowerShell policy with `Set-ExecutionPolicy RemoteSigned`).".to_string()
+                } else {
+                    "MiCode CLI not found. Install micode and ensure `micode` is on your PATH."
+                        .to_string()
+                }
             } else {
                 e.to_string()
             }
         })?,
         Err(_) => {
-            return Err(
+            return Err(if cfg!(windows) {
+                "Timed out while checking MiCode CLI. Run `micode.cmd --version` in Terminal.".to_string()
+            } else {
                 "Timed out while checking MiCode CLI. Make sure `micode --version` runs in Terminal."
-                    .to_string(),
-            );
+                    .to_string()
+            });
         }
     };
 
@@ -2673,7 +2707,11 @@ pub(crate) async fn check_micode_installation(
             stderr.trim()
         };
         return Err(if detail.is_empty() {
-            "MiCode CLI failed to start. Try running `micode --version` in Terminal.".to_string()
+            if cfg!(windows) {
+                "MiCode CLI failed to start. Try `micode.cmd --version`. If PowerShell blocks scripts, run `Set-ExecutionPolicy RemoteSigned`.".to_string()
+            } else {
+                "MiCode CLI failed to start. Try running `micode --version` in Terminal.".to_string()
+            }
         } else {
             format!("MiCode CLI failed to start: {detail}")
         });
@@ -2718,14 +2756,82 @@ pub(crate) async fn check_acp_handshake(
         .await
         .map_err(|e| e.to_string())?;
     let mut lines = BufReader::new(stdout).lines();
-    let result = timeout(Duration::from_secs(5), lines.next_line()).await;
-    let _ = child.kill().await;
-    match result {
-        Ok(Ok(Some(line))) => Ok(line.contains("\"result\"") && line.contains("protocolVersion")),
-        Ok(Ok(None)) => Ok(false),
-        Ok(Err(err)) => Err(err.to_string()),
-        Err(_) => Ok(false),
+    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    let mut ok = false;
+    loop {
+        let now = std::time::Instant::now();
+        if now >= deadline {
+            break;
+        }
+        let remaining = deadline.duration_since(now);
+        let result = timeout(remaining, lines.next_line()).await;
+        match result {
+            Ok(Ok(Some(line))) => {
+                let trimmed = line.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+                if let Ok(value) = serde_json::from_str::<Value>(trimmed) {
+                    let id_is_initialize = value
+                        .get("id")
+                        .and_then(Value::as_i64)
+                        .map(|id| id == 1)
+                        .unwrap_or(false);
+                    if !id_is_initialize {
+                        continue;
+                    }
+                    if value.get("result").is_some() {
+                        ok = true;
+                        break;
+                    }
+                    if value.get("error").is_some() {
+                        break;
+                    }
+                }
+            }
+            Ok(Ok(None)) => break,
+            Ok(Err(err)) => return Err(err.to_string()),
+            Err(_) => break,
+        }
     }
+    let _ = child.kill().await;
+    Ok(ok)
+}
+
+fn normalize_windows_micode_bin(bin: String) -> String {
+    if !cfg!(windows) {
+        return bin;
+    }
+    let trimmed = bin.trim();
+    if trimmed.is_empty() {
+        return "micode.cmd".to_string();
+    }
+    if trimmed.eq_ignore_ascii_case("micode") || trimmed.eq_ignore_ascii_case("micode.ps1") {
+        return "micode.cmd".to_string();
+    }
+
+    let path = PathBuf::from(trimmed);
+    let ext = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase());
+    if matches!(ext.as_deref(), Some("cmd") | Some("exe") | Some("bat")) {
+        return trimmed.to_string();
+    }
+
+    // Normalize extensionless/ps1 wrappers to sibling micode.cmd when present.
+    if path.file_stem().and_then(|value| value.to_str()) == Some("micode") {
+        let cmd_path = if path.extension().is_some() {
+            path.with_extension("cmd")
+        } else {
+            path.with_file_name("micode.cmd")
+        };
+        if cmd_path.is_file() {
+            return cmd_path.to_string_lossy().to_string();
+        }
+    }
+
+    trimmed.to_string()
 }
 
 fn session_id_from_notification(value: &Value) -> Option<String> {
@@ -3230,7 +3336,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
 
     let init_params = build_initialize_params(&client_version);
     let init_result = timeout(
-        Duration::from_secs(15),
+        Duration::from_secs(60),
         session.send_acp_request("initialize", init_params),
     )
     .await;
@@ -3239,10 +3345,12 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
         Err(_) => {
             let mut child = session.child.lock().await;
             let _ = child.kill().await;
-            return Err(
+            return Err(if cfg!(windows) {
+                "MiCode ACP did not respond to initialize. Check `micode.cmd --experimental-acp` in Terminal. If PowerShell blocks `micode`, use `micode.cmd` or run `Set-ExecutionPolicy RemoteSigned`.".to_string()
+            } else {
                 "MiCode ACP did not respond to initialize. Check that `micode --experimental-acp` works in Terminal."
-                    .to_string(),
-            );
+                    .to_string()
+            });
         }
     };
     let init_response = init_response?;
@@ -3265,7 +3373,8 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
 mod tests {
     use super::{
         build_initialize_params, extract_approval_command, extract_tool_presentation_from_update,
-        load_thread_token_usage_for_session_in_home, normalize_wrapper_cli_token,
+        load_thread_token_usage_for_session_in_home, normalize_turn_start_error_message,
+        normalize_wrapper_cli_token,
         resolve_cli_bundle_near_bin, translate_acp_update, merge_tool_presentation, ActivePromptContext,
         ToolCallPresentation, WorkspaceSession,
     };
@@ -3449,6 +3558,23 @@ mod tests {
             item.get("result").and_then(Value::as_str),
             Some("Configured MCP servers:\\n- feishu-mcp")
         );
+    }
+
+    #[test]
+    fn normalizes_http_400_empty_body_turn_start_error() {
+        let message = normalize_turn_start_error_message(
+            "Internal error: 400 status code (no body)",
+            Some("mimo-v2-flash-micode"),
+        );
+        assert!(message.contains("HTTP 400 (empty body)"));
+        assert!(message.contains("mimo-v2-flash-micode"));
+        assert!(message.contains("micode.cmd account read"));
+    }
+
+    #[test]
+    fn keeps_non_http_400_turn_start_error_intact() {
+        let message = normalize_turn_start_error_message("workspace not connected", None);
+        assert_eq!(message, "turn/start failed: workspace not connected");
     }
 
     #[test]
