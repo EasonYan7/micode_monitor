@@ -52,6 +52,17 @@ describe("useUpdater", () => {
     );
   });
 
+  it("stays idle when background check fails", async () => {
+    checkMock.mockRejectedValue(new Error("remote unavailable"));
+    const { result } = renderHook(() => useUpdater({}));
+
+    await act(async () => {
+      await result.current.checkForUpdates();
+    });
+
+    expect(result.current.state.stage).toBe("idle");
+  });
+
   it("returns to idle when no update is available", async () => {
     checkMock.mockResolvedValue(null);
     const { result } = renderHook(() => useUpdater({}));
