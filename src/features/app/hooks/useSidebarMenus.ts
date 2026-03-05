@@ -23,6 +23,7 @@ type SidebarMenuHandlers = {
 
 export function useSidebarMenus({
   onDeleteThread,
+  onSyncThread: _onSyncThread,
   onPinThread,
   onUnpinThread,
   isThreadPinned,
@@ -50,10 +51,6 @@ export function useSidebarMenus({
       const renameItem = await MenuItem.new({
         text: t("Rename", "重命名"),
         action: () => onRenameThread(workspaceId, threadId),
-      });
-      const archiveItem = await MenuItem.new({
-        text: t("Archive", "归档"),
-        action: () => onDeleteThread(workspaceId, threadId),
       });
       const deleteConversationItem = await MenuItem.new({
         text: t("Delete Conversation", "删除会话"),
@@ -85,7 +82,7 @@ export function useSidebarMenus({
           }),
         );
       }
-      items.push(copyItem, archiveItem, deleteConversationItem);
+      items.push(copyItem, deleteConversationItem);
       const menu = await Menu.new({ items });
       const window = getCurrentWindow();
       const position = new LogicalPosition(event.clientX, event.clientY);

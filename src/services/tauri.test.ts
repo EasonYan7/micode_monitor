@@ -25,10 +25,13 @@ import {
   sendNotification,
   startReview,
   setThreadName,
+  updateAppSettings,
+  updateWorkspaceSettings,
   writeGlobalAgentsMd,
   writeGlobalMiCodeConfigToml,
   writeAgentMd,
 } from "./tauri";
+import type { AppSettings, WorkspaceSettings } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -91,6 +94,59 @@ describe("tauri invoke wrappers", () => {
     expect(invokeMock).toHaveBeenCalledWith("get_github_issues", {
       workspaceId: "ws-2",
     });
+  });
+
+  it("sends canonical app settings payload without micode aliases", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({} as AppSettings);
+
+    await updateAppSettings({
+      agentProvider: "micode-acp",
+      agentBin: "C:/agent.cmd",
+      agentArgs: "--profile team",
+      micodeBin: "C:/legacy.cmd",
+      micodeArgs: "--profile legacy",
+    } as AppSettings);
+
+    expect(invokeMock).toHaveBeenCalledWith("update_app_settings", {
+      settings: expect.objectContaining({
+        agentProvider: "micode-acp",
+        agentBin: "C:/agent.cmd",
+        agentArgs: "--profile team",
+      }),
+    });
+    const payload = invokeMock.mock.calls[0]?.[1] as {
+      settings?: Record<string, unknown>;
+    };
+    expect(payload.settings).not.toHaveProperty("micodeBin");
+    expect(payload.settings).not.toHaveProperty("micodeArgs");
+  });
+
+  it("sends canonical workspace settings payload without micode aliases", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({ id: "ws-1" });
+
+    await updateWorkspaceSettings("ws-1", {
+      sidebarCollapsed: false,
+      agentHome: "C:/Users/test/.micode",
+      micodeHome: "C:/Users/test/.legacy",
+      agentArgs: "--profile team",
+      micodeArgs: "--profile legacy",
+    } as WorkspaceSettings);
+
+    expect(invokeMock).toHaveBeenCalledWith("update_workspace_settings", {
+      id: "ws-1",
+      settings: expect.objectContaining({
+        sidebarCollapsed: false,
+        agentHome: "C:/Users/test/.micode",
+        agentArgs: "--profile team",
+      }),
+    });
+    const payload = invokeMock.mock.calls[0]?.[1] as {
+      settings?: Record<string, unknown>;
+    };
+    expect(payload.settings).not.toHaveProperty("micodeHome");
+    expect(payload.settings).not.toHaveProperty("micodeArgs");
   });
 
   it("returns an empty list when the Tauri invoke bridge is missing", async () => {
@@ -377,6 +433,28 @@ describe("tauri invoke wrappers", () => {
     });
     expect(result).toEqual({
       rules: [{ command: ["fetch", "https://example.com"] }],
+      rulesPath: "/tmp/.micode/rules/default.rules",
+    });
+  });
+
+  it("normalizes non-string approval tokens into string arrays", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({
+      rules: [
+        ["execute", "npm", 123, true],
+        { kind: "fetch", target: "https://example.com" },
+        null,
+      ],
+      rulesPath: "/tmp/.micode/rules/default.rules",
+    });
+
+    const result = await listApprovalRules("ws-11");
+
+    expect(result).toEqual({
+      rules: [
+        { command: ["execute", "npm", "123", "true"] },
+        { command: ['{"kind":"fetch","target":"https://example.com"}'] },
+      ],
       rulesPath: "/tmp/.micode/rules/default.rules",
     });
   });

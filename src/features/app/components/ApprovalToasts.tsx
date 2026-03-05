@@ -1,5 +1,10 @@
-import { useEffect, useMemo } from "react";
-import type { ApprovalDecision, ApprovalRequest, UiLanguage, WorkspaceInfo } from "../../../types";
+import { useEffect, useMemo, useState } from "react";
+import type {
+  ApprovalDecision,
+  ApprovalRequest,
+  UiLanguage,
+  WorkspaceInfo,
+} from "../../../types";
 import { getApprovalCommandInfo } from "../../../utils/approvalRules";
 
 type ApprovalToastsProps = {
@@ -10,6 +15,30 @@ type ApprovalToastsProps = {
   onRemember?: (request: ApprovalRequest, command: string[]) => void;
 };
 
+type SummaryRow = {
+  key: string;
+  label: string;
+  value: string;
+  isCode: boolean;
+};
+
+function summarizeText(value: string, maxLength = 120) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength - 1)}…`;
+}
+
+function firstStringField(params: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = params[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
 export function ApprovalToasts({
   approvals,
   workspaces,
@@ -19,6 +48,10 @@ export function ApprovalToasts({
 }: ApprovalToastsProps) {
   const isZh = language === "zh";
   const t = (en: string, zh: string) => (isZh ? zh : en);
+  const [expandedByRequest, setExpandedByRequest] = useState<
+    Record<string, boolean>
+  >({});
+
   const workspaceLabels = useMemo(
     () => new Map(workspaces.map((workspace) => [workspace.id, workspace.name])),
     [workspaces],
@@ -53,6 +86,27 @@ export function ApprovalToasts({
     return () => window.removeEventListener("keydown", handler);
   }, [onDecision, primaryRequest]);
 
+  useEffect(() => {
+    const activeKeys = new Set(
+      approvals.map((request) => `${request.workspace_id}:${request.request_id}`),
+    );
+    setExpandedByRequest((prev) => {
+      const next: Record<string, boolean> = {};
+      let changed = false;
+      for (const [key, value] of Object.entries(prev)) {
+        if (activeKeys.has(key)) {
+          next[key] = value;
+        } else {
+          changed = true;
+        }
+      }
+      if (!changed && Object.keys(next).length === Object.keys(prev).length) {
+        return prev;
+      }
+      return next;
+    });
+  }, [approvals]);
+
   if (!approvals.length) {
     return null;
   }
@@ -72,7 +126,11 @@ export function ApprovalToasts({
     if (value === null || value === undefined) {
       return { text: t("None", "无"), isCode: false };
     }
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
       return { text: String(value), isCode: false };
     }
     if (Array.isArray(value)) {
@@ -88,9 +146,39 @@ export function ApprovalToasts({
     <div className="approval-toasts" role="region" aria-live="assertive">
       {approvals.map((request) => {
         const workspaceName = workspaceLabels.get(request.workspace_id);
+        const requestKey = `${request.workspace_id}:${request.request_id}`;
+        const isExpanded = expandedByRequest[requestKey] ?? false;
         const params = request.params ?? {};
         const commandInfo = getApprovalCommandInfo(params);
         const entries = Object.entries(params);
+
+        const targetPreview = firstStringField(params, [
+          "path",
+          "cwd",
+          "url",
+          "target",
+          "filePath",
+          "workspacePath",
+        ]);
+
+        const summaryRows: SummaryRow[] = [];
+        if (commandInfo?.preview) {
+          summaryRows.push({
+            key: "command",
+            label: t("Command", "命令"),
+            value: summarizeText(commandInfo.preview),
+            isCode: true,
+          });
+        }
+        if (targetPreview) {
+          summaryRows.push({
+            key: "target",
+            label: t("Target", "目标"),
+            value: summarizeText(targetPreview),
+            isCode: false,
+          });
+        }
+
         return (
           <div
             key={`${request.workspace_id}-${request.request_id}`}
@@ -105,33 +193,62 @@ export function ApprovalToasts({
             </div>
             <div className="approval-toast-method">{methodLabel(request.method)}</div>
             <div className="approval-toast-details">
-              {entries.length ? (
-                entries.map(([key, value]) => {
-                  const rendered = renderParamValue(value);
-                  return (
-                    <div key={key} className="approval-toast-detail">
-                      <div className="approval-toast-detail-label">
-                        {formatLabel(key)}
+              {summaryRows.map((summary) => (
+                <div key={summary.key} className="approval-toast-detail">
+                  <div className="approval-toast-detail-label">{summary.label}</div>
+                  {summary.isCode ? (
+                    <pre className="approval-toast-detail-code">{summary.value}</pre>
+                  ) : (
+                    <div className="approval-toast-detail-value">{summary.value}</div>
+                  )}
+                </div>
+              ))}
+
+              {entries.length > 0 && !isExpanded ? (
+                <div className="approval-toast-detail approval-toast-detail-empty">
+                  {t(
+                    `Detailed params hidden (${entries.length}).`,
+                    `详细参数已折叠（${entries.length} 项）。`,
+                  )}
+                </div>
+              ) : null}
+
+              {entries.length > 0 && isExpanded
+                ? entries.map(([key, value]) => {
+                    const rendered = renderParamValue(value);
+                    return (
+                      <div key={key} className="approval-toast-detail">
+                        <div className="approval-toast-detail-label">{formatLabel(key)}</div>
+                        {rendered.isCode ? (
+                          <pre className="approval-toast-detail-code">{rendered.text}</pre>
+                        ) : (
+                          <div className="approval-toast-detail-value">{rendered.text}</div>
+                        )}
                       </div>
-                      {rendered.isCode ? (
-                        <pre className="approval-toast-detail-code">
-                          {rendered.text}
-                        </pre>
-                      ) : (
-                        <div className="approval-toast-detail-value">
-                          {rendered.text}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              ) : (
+                    );
+                  })
+                : null}
+
+              {!entries.length && !summaryRows.length ? (
                 <div className="approval-toast-detail approval-toast-detail-empty">
                   {t("No extra details.", "无额外信息。")}
                 </div>
-              )}
+              ) : null}
             </div>
             <div className="approval-toast-actions">
+              {entries.length > 0 ? (
+                <button
+                  className="ghost approval-toast-remember"
+                  onClick={() =>
+                    setExpandedByRequest((prev) => ({
+                      ...prev,
+                      [requestKey]: !isExpanded,
+                    }))
+                  }
+                >
+                  {isExpanded ? t("Hide details", "收起详情") : t("Show details", "查看详情")}
+                </button>
+              ) : null}
               <button
                 className="secondary"
                 onClick={() => onDecision(request, "decline_once")}

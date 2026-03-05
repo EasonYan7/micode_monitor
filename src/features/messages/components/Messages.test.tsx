@@ -707,6 +707,39 @@ describe("Messages", () => {
     });
   });
 
+  it("shows skill name and action in tool row summary", async () => {
+    const items: ConversationItem[] = [
+      {
+        id: "mcp-skill-1",
+        kind: "tool",
+        toolType: "mcpToolCall",
+        title: "Tool: skills / run",
+        detail: JSON.stringify({
+          skillName: "contract-extraction",
+          command: ["python", ".micode/skills/contract-extraction/scripts/run.py"],
+        }),
+        status: "completed",
+        output: "ok",
+      },
+    ];
+
+    render(
+      <Messages
+        items={items}
+        threadId="thread-1"
+        workspaceId="ws-1"
+        isThinking={false}
+        openTargets={[]}
+        selectedOpenAppId=""
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/skill:/i)).toBeTruthy();
+      expect(screen.getByText(/contract-extraction \(run\)/i)).toBeTruthy();
+    });
+  });
+
   it("shows read target inferred from output when args are empty", async () => {
     const items: ConversationItem[] = [
       {
@@ -733,6 +766,49 @@ describe("Messages", () => {
 
     await waitFor(() => {
       expect(screen.getByText("fetch_data.py")).toBeTruthy();
+    });
+  });
+
+  it("renders numeric/object content without crashing", async () => {
+    const items = [
+      {
+        id: "msg-weird",
+        kind: "message",
+        role: "assistant",
+        text: 123,
+      },
+      {
+        id: "reasoning-weird",
+        kind: "reasoning",
+        summary: 456,
+        content: { detail: "object-content" },
+      },
+      {
+        id: "tool-weird",
+        kind: "tool",
+        toolType: "mcpToolCall",
+        title: "Tool: micode / execute",
+        detail: { argv: ["echo", "ok"] },
+        status: "completed",
+        output: { ok: true },
+      },
+    ] as unknown as ConversationItem[];
+
+    const { container } = render(
+      <Messages
+        items={items}
+        threadId="thread-weird"
+        workspaceId="ws-1"
+        isThinking={false}
+        openTargets={[]}
+        selectedOpenAppId=""
+      />,
+    );
+
+    await waitFor(() => {
+      expect(container.textContent ?? "").toContain("123");
+      expect(container.textContent ?? "").toContain("456");
+      expect(container.textContent ?? "").toContain("echo ok");
     });
   });
 });

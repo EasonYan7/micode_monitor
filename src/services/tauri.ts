@@ -184,7 +184,11 @@ export async function updateWorkspaceSettings(
   id: string,
   settings: WorkspaceSettings,
 ): Promise<WorkspaceInfo> {
-  return invoke<WorkspaceInfo>("update_workspace_settings", { id, settings });
+  const canonicalSettings = toCanonicalWorkspaceSettings(settings);
+  return invoke<WorkspaceInfo>("update_workspace_settings", {
+    id,
+    settings: canonicalSettings,
+  });
 }
 
 export async function updateWorkspaceMiCodeBin(
@@ -343,12 +347,42 @@ export async function rememberApprovalRule(
 export async function listApprovalRules(
   workspaceId: string,
 ): Promise<{ rules: ApprovalRule[]; rulesPath?: string | null }> {
-  const response = await invoke<{ rules?: string[][]; rulesPath?: string | null }>(
+  const response = await invoke<{ rules?: unknown[]; rulesPath?: string | null }>(
     "list_approval_rules",
     { workspaceId },
   );
+  const normalizeToken = (token: unknown) => {
+    if (typeof token === "string") {
+      return token.trim();
+    }
+    if (token === null || token === undefined) {
+      return "";
+    }
+    if (
+      typeof token === "number" ||
+      typeof token === "boolean" ||
+      typeof token === "bigint"
+    ) {
+      return String(token);
+    }
+    try {
+      const encoded = JSON.stringify(token);
+      return typeof encoded === "string" ? encoded : "";
+    } catch {
+      return "";
+    }
+  };
+  const normalizeCommand = (raw: unknown): string[] => {
+    if (Array.isArray(raw)) {
+      return raw.map((token) => normalizeToken(token)).filter(Boolean);
+    }
+    const single = normalizeToken(raw);
+    return single ? [single] : [];
+  };
   return {
-    rules: (response.rules ?? []).map((command) => ({ command })),
+    rules: (response.rules ?? [])
+      .map((command) => ({ command: normalizeCommand(command) }))
+      .filter((rule) => rule.command.length > 0),
     rulesPath: response.rulesPath ?? null,
   };
 }
@@ -615,7 +649,41 @@ export async function getAppSettings(): Promise<AppSettings> {
 }
 
 export async function updateAppSettings(settings: AppSettings): Promise<AppSettings> {
-  return invoke<AppSettings>("update_app_settings", { settings });
+  const canonicalSettings = toCanonicalAppSettings(settings);
+  return invoke<AppSettings>("update_app_settings", { settings: canonicalSettings });
+}
+
+type CanonicalWorkspaceSettingsPayload = Omit<
+  WorkspaceSettings,
+  "micodeHome" | "micodeArgs"
+> & {
+  agentHome: string | null;
+  agentArgs: string | null;
+};
+
+type CanonicalAppSettingsPayload = Omit<AppSettings, "micodeBin" | "micodeArgs"> & {
+  agentBin: string | null;
+  agentArgs: string | null;
+};
+
+function toCanonicalWorkspaceSettings(
+  settings: WorkspaceSettings,
+): CanonicalWorkspaceSettingsPayload {
+  const { micodeHome: _micodeHome, micodeArgs: _micodeArgs, ...rest } = settings;
+  return {
+    ...rest,
+    agentHome: settings.agentHome ?? settings.micodeHome ?? null,
+    agentArgs: settings.agentArgs ?? settings.micodeArgs ?? null,
+  };
+}
+
+function toCanonicalAppSettings(settings: AppSettings): CanonicalAppSettingsPayload {
+  const { micodeBin: _micodeBin, micodeArgs: _micodeArgs, ...rest } = settings;
+  return {
+    ...rest,
+    agentBin: settings.agentBin ?? settings.micodeBin ?? null,
+    agentArgs: settings.agentArgs ?? settings.micodeArgs ?? null,
+  };
 }
 
 export type PersistedDebugEntry = Pick<

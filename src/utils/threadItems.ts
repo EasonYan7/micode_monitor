@@ -28,7 +28,32 @@ const RG_FLAGS_WITH_VALUES = new Set([
 ]);
 
 function asString(value: unknown) {
-  return typeof value === "string" ? value : value ? String(value) : "";
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  try {
+    const encoded = JSON.stringify(value);
+    if (typeof encoded === "string" && encoded !== "null") {
+      return encoded;
+    }
+  } catch {
+    // Fall back to String(...) below.
+  }
+  try {
+    return String(value);
+  } catch {
+    return "";
+  }
 }
 
 function asNumber(value: unknown) {
@@ -46,14 +71,21 @@ function stringifyToolArguments(value: unknown) {
   if (value === null || value === undefined) {
     return "";
   }
+  const safeJson = (input: unknown) => {
+    try {
+      return JSON.stringify(input, null, 2);
+    } catch {
+      return "";
+    }
+  };
   if (Array.isArray(value)) {
-    return value.length > 0 ? JSON.stringify(value, null, 2) : "";
+    return value.length > 0 ? safeJson(value) : "";
   }
   if (typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>);
-    return entries.length > 0 ? JSON.stringify(value, null, 2) : "";
+    return entries.length > 0 ? safeJson(value) : "";
   }
-  return JSON.stringify(value, null, 2);
+  return safeJson(value) || asString(value);
 }
 
 function truncateText(text: string, maxLength = MAX_ITEM_TEXT) {

@@ -163,6 +163,7 @@ type LayoutNodesOptions = {
   unpinThread: (workspaceId: string, threadId: string) => void;
   isThreadPinned: (workspaceId: string, threadId: string) => boolean;
   getPinTimestamp: (workspaceId: string, threadId: string) => number | null;
+  pinnedThreadsVersion: number;
   onRenameThread: (workspaceId: string, threadId: string) => void;
   onDeleteWorkspace: (workspaceId: string) => void;
   onClearWorkspaceHistory: (workspaceId: string) => void;
@@ -512,6 +513,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       unpinThread={options.unpinThread}
       isThreadPinned={options.isThreadPinned}
       getPinTimestamp={options.getPinTimestamp}
+      pinnedThreadsVersion={options.pinnedThreadsVersion}
       onRenameThread={options.onRenameThread}
       onDeleteWorkspace={options.onDeleteWorkspace}
       onClearWorkspaceHistory={options.onClearWorkspaceHistory}

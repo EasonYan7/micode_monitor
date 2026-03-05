@@ -20,7 +20,7 @@ use crate::shared::process_core::tokio_command;
 use crate::types::WorkspaceEntry;
 
 const ACP_PROTOCOL_VERSION: u32 = 1;
-const TURN_START_TIMEOUT: Duration = Duration::from_secs(180);
+const TURN_START_TIMEOUT: Duration = Duration::from_secs(6 * 60 * 60);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct LocalThreadRecord {

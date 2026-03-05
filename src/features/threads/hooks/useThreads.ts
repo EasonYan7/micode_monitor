@@ -82,7 +82,6 @@ export function useThreads({
     isThreadPinned,
     getPinTimestamp,
   } = useThreadStorage();
-  void pinnedThreadsVersion;
 
   const activeWorkspaceId = activeWorkspace?.id ?? null;
 
@@ -539,6 +538,7 @@ export function useThreads({
     unpinThread,
     isThreadPinned,
     getPinTimestamp,
+    pinnedThreadsVersion,
     renameThread,
     startThread,
     startThreadForWorkspace,

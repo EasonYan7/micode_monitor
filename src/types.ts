@@ -161,7 +161,6 @@ export type AppSettings = {
   interruptShortcut: string | null;
   newAgentShortcut: string | null;
   newWorktreeAgentShortcut: string | null;
-  archiveThreadShortcut: string | null;
   toggleProjectsSidebarShortcut: string | null;
   toggleGitSidebarShortcut: string | null;
   branchSwitcherShortcut: string | null;

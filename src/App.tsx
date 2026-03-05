@@ -90,7 +90,6 @@ import { useWorkspaceActions } from "./features/app/hooks/useWorkspaceActions";
 import { useWorkspaceCycling } from "./features/app/hooks/useWorkspaceCycling";
 import { useThreadRows } from "./features/app/hooks/useThreadRows";
 import { useInterruptShortcut } from "./features/app/hooks/useInterruptShortcut";
-import { useArchiveShortcut } from "./features/app/hooks/useArchiveShortcut";
 import { useLiquidGlassEffect } from "./features/app/hooks/useLiquidGlassEffect";
 import { useCopyThread } from "./features/threads/hooks/useCopyThread";
 import { useTerminalController } from "./features/terminal/hooks/useTerminalController";
@@ -912,6 +911,7 @@ function MainApp() {
     unpinThread,
     isThreadPinned,
     getPinTimestamp,
+    pinnedThreadsVersion,
     renameThread,
     startThreadForWorkspace,
     listThreadsForWorkspace,
@@ -1212,25 +1212,41 @@ function MainApp() {
 
   const handleUpdateAppSettings = useCallback(
     async (next: AppSettings) => {
-      setAppSettings(next);
+      let previousSettings: AppSettings | null = null;
+      setAppSettings((current) => {
+        previousSettings = current;
+        return next;
+      });
       try {
         await queueSaveSettings(next);
       } catch (error) {
+        if (previousSettings) {
+          setAppSettings(previousSettings);
+        }
+        const message =
+          error instanceof Error
+            ? error.message
+            : typeof error === "string"
+              ? error
+              : "Unknown settings save error";
         addDebugEntry({
           id: `${Date.now()}-settings-save-error`,
           timestamp: Date.now(),
           source: "error",
           label: "settings/save error",
-          payload:
-            error instanceof Error
-              ? error.message
-              : typeof error === "string"
-                ? error
-                : "Unknown settings save error",
+          payload: message,
+        });
+        const language = appSettings.language;
+        pushErrorToast({
+          title: language === "zh" ? "设置保存失败" : "Failed to save settings",
+          message:
+            language === "zh"
+              ? `已恢复到最近一次保存的设置。${message}`
+              : `Restored the last saved settings. ${message}`,
         });
       }
     },
-    [addDebugEntry, queueSaveSettings, setAppSettings],
+    [addDebugEntry, appSettings.language, queueSaveSettings, setAppSettings],
   );
 
   const latestAgentRuns = useMemo(() => {
@@ -1773,26 +1789,6 @@ function MainApp() {
     onDropPaths: handleDropWorkspacePaths,
   });
 
-  const handleArchiveActiveThread = useCallback(() => {
-    if (!activeWorkspaceId || !activeThreadId) {
-      return;
-    }
-    void (async () => {
-      const removed = await removeThread(activeWorkspaceId, activeThreadId);
-      if (!removed) {
-        return;
-      }
-      clearDraftForThread(activeThreadId);
-      removeImagesForThread(activeThreadId);
-    })();
-  }, [
-    activeThreadId,
-    activeWorkspaceId,
-    clearDraftForThread,
-    removeImagesForThread,
-    removeThread,
-  ]);
-
   useInterruptShortcut({
     isEnabled: canInterrupt,
     shortcut: appSettings.interruptShortcut,
@@ -1936,14 +1932,6 @@ function MainApp() {
   };
 
   const showGitDetail = Boolean(selectedDiffPath) && isPhone;
-  const isThreadOpen = Boolean(activeThreadId && showComposer);
-
-  useArchiveShortcut({
-    isEnabled: isThreadOpen,
-    shortcut: appSettings.archiveThreadShortcut,
-    onTrigger: handleArchiveActiveThread,
-  });
-
   const { handleCycleAgent, handleCycleWorkspace } = useWorkspaceCycling({
     workspaces,
     groupedWorkspaces,
@@ -2108,6 +2096,7 @@ function MainApp() {
     unpinThread,
     isThreadPinned,
     getPinTimestamp,
+    pinnedThreadsVersion,
     onRenameThread: (workspaceId, threadId) => {
       handleRenameThread(workspaceId, threadId);
     },
