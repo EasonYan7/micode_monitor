@@ -3,13 +3,13 @@
 ## Live Repo State
 
 - Current branch: `main`
-- Local `main`: `0bbe01e` (`fix(release): immutable-safe windows publish and updater fallback; bump v0.7.52`)
-- Remote `origin/main`: `0bbe01e` (`fix(release): immutable-safe windows publish and updater fallback; bump v0.7.52`)
+- Local `main`: `87473b7` (`docs: sync live repo branch state`)
+- Remote `origin/main`: `87473b7` (`docs: sync live repo branch state`)
 - Remote `origin/windows-main`: `0bbe01e` (`fix(release): immutable-safe windows publish and updater fallback; bump v0.7.52`)
 - Remote `origin/windows-sen`: `0bbe01e` (`fix(release): immutable-safe windows publish and updater fallback; bump v0.7.52`)
-- Local `main` is aligned with `origin/main` before the next local commit
-- Remote `main` and `windows-main` are currently identical; no commit difference remains between them
-- Remote `windows-sen` was created and currently also points at the same tip as `main` / `windows-main`
+- Local `main` is aligned with `origin/main`
+- Remote `main` is now 1 commit ahead of `windows-main`
+- Remote `windows-sen` currently matches `windows-main`
 - The shared remote-only chain from `3a73aa3` to `0bbe01e` is still Windows release/publish oriented, but it now exists on all three remote branches above
 - Pending decision: redefine branch responsibilities before further pushes, otherwise `main` and Windows branches will continue to drift together semantically
 - Last audit date: 2026-03-06
