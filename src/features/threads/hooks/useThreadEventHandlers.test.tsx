@@ -24,6 +24,7 @@ function makeOptions(overrides?: Partial<Parameters<typeof useThreadEventHandler
     onReviewExited: vi.fn(),
     approvalAllowlistRef: { current: {} as Record<string, string[][]> },
     pendingInterruptsRef: { current: new Set<string>() },
+    activeTurnIdByThread: {} as Record<string, string | null>,
     ...overrides,
   };
 }

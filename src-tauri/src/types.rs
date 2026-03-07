@@ -33,6 +33,7 @@ pub(crate) struct StartupEnvironmentStatus {
     pub(crate) micode_args: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct GitFileStatus {
     pub(crate) path: String,
@@ -41,6 +42,7 @@ pub(crate) struct GitFileStatus {
     pub(crate) deletions: i64,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct GitFileDiff {
     pub(crate) path: String,
@@ -63,6 +65,7 @@ pub(crate) struct GitFileDiff {
     pub(crate) new_image_mime: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct GitCommitDiff {
     pub(crate) path: String,
@@ -86,6 +89,7 @@ pub(crate) struct GitCommitDiff {
     pub(crate) new_image_mime: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct GitLogEntry {
     pub(crate) sha: String,
@@ -94,6 +98,7 @@ pub(crate) struct GitLogEntry {
     pub(crate) timestamp: i64,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct GitLogResponse {
     pub(crate) total: usize,
@@ -110,6 +115,7 @@ pub(crate) struct GitLogResponse {
     pub(crate) upstream: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct GitHubIssue {
     pub(crate) number: u64,
@@ -119,17 +125,20 @@ pub(crate) struct GitHubIssue {
     pub(crate) updated_at: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct GitHubIssuesResponse {
     pub(crate) total: usize,
     pub(crate) issues: Vec<GitHubIssue>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct GitHubPullRequestAuthor {
     pub(crate) login: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct GitHubPullRequest {
     pub(crate) number: u64,
@@ -150,6 +159,7 @@ pub(crate) struct GitHubPullRequest {
     pub(crate) author: Option<GitHubPullRequestAuthor>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct GitHubPullRequestsResponse {
     pub(crate) total: usize,
@@ -157,6 +167,7 @@ pub(crate) struct GitHubPullRequestsResponse {
     pub(crate) pull_requests: Vec<GitHubPullRequest>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct GitHubPullRequestDiff {
     pub(crate) path: String,
@@ -164,6 +175,7 @@ pub(crate) struct GitHubPullRequestDiff {
     pub(crate) diff: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct GitHubPullRequestComment {
     pub(crate) id: u64,

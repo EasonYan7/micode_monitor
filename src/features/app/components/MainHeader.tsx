@@ -1,14 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Check from "lucide-react/dist/esm/icons/check";
-import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import Copy from "lucide-react/dist/esm/icons/copy";
 import Terminal from "lucide-react/dist/esm/icons/terminal";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import type { BranchInfo, OpenAppTarget, UiLanguage, WorkspaceInfo } from "../../../types";
 import type { ReactNode } from "react";
-import { BranchList } from "../../git/components/BranchList";
-import { filterBranches, findExactBranch } from "../../git/utils/branchSearch";
-import { validateBranchName } from "../../git/utils/branchValidation";
+import type { OpenAppTarget, UiLanguage, WorkspaceInfo } from "../../../types";
 import { OpenAppMenu } from "./OpenAppMenu";
 import { LaunchScriptButton } from "./LaunchScriptButton";
 import { LaunchScriptEntryButton } from "./LaunchScriptEntryButton";
@@ -26,10 +22,7 @@ type MainHeaderProps = {
   openAppIconById: Record<string, string>;
   selectedOpenAppId: string;
   onSelectOpenAppId: (id: string) => void;
-  branchName: string;
-  branches: BranchInfo[];
-  onCheckoutBranch: (name: string) => Promise<void> | void;
-  onCreateBranch: (name: string) => Promise<void> | void;
+  branchName?: string;
   canCopyThread?: boolean;
   onCopyThread?: () => void | Promise<void>;
   onToggleTerminal: () => void;
@@ -79,10 +72,7 @@ export function MainHeader({
   openAppIconById,
   selectedOpenAppId,
   onSelectOpenAppId,
-  branchName,
-  branches,
-  onCheckoutBranch,
-  onCreateBranch,
+  branchName = "",
   canCopyThread = false,
   onCopyThread,
   onToggleTerminal,
@@ -105,32 +95,14 @@ export function MainHeader({
 }: MainHeaderProps) {
   const isZh = language === "zh";
   const t = (en: string, zh: string) => (isZh ? zh : en);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
-  const [branchQuery, setBranchQuery] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const copyTimeoutRef = useRef<number | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
   const infoRef = useRef<HTMLDivElement | null>(null);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const renameConfirmRef = useRef<HTMLButtonElement | null>(null);
   const renameOnCancel = worktreeRename?.onCancel;
 
-  const trimmedQuery = branchQuery.trim();
-  const filteredBranches = useMemo(
-    () => filterBranches(branches, branchQuery, { mode: "includes", whenEmptyLimit: 12 }),
-    [branches, branchQuery],
-  );
-  const exactMatch = useMemo(
-    () => findExactBranch(branches, trimmedQuery),
-    [branches, trimmedQuery],
-  );
-  const canCreate = trimmedQuery.length > 0 && !exactMatch;
-  const branchValidationMessage = useMemo(
-    () => validateBranchName(trimmedQuery),
-    [trimmedQuery],
-  );
   const resolvedWorktreePath = worktreePath ?? workspace.path;
   const relativeWorktreePath = useMemo(() => {
     if (!parentPath) {
@@ -140,33 +112,26 @@ export function MainHeader({
       ? resolvedWorktreePath.slice(parentPath.length + 1)
       : resolvedWorktreePath;
   }, [parentPath, resolvedWorktreePath]);
-  const cdCommand = useMemo(
-    () => `cd "${relativeWorktreePath}"`,
-    [relativeWorktreePath],
-  );
+  const cdCommand = useMemo(() => `cd "${relativeWorktreePath}"`, [relativeWorktreePath]);
   const branchLabel =
-    branchName && branchName !== "unknown" ? branchName : t("unknown", "未知分支");
+    branchName && branchName !== "unknown" ? branchName : t("Workspace", "工作区");
 
   useEffect(() => {
-    if (!menuOpen && !infoOpen) {
+    if (!infoOpen) {
       return;
     }
     const handleClick = (event: MouseEvent) => {
       const target = event.target as Node;
-      const menuContains = menuRef.current?.contains(target) ?? false;
       const infoContains = infoRef.current?.contains(target) ?? false;
-      if (!menuContains && !infoContains) {
-        setMenuOpen(false);
+      if (!infoContains) {
         setInfoOpen(false);
-        setBranchQuery("");
-        setError(null);
       }
     };
     window.addEventListener("mousedown", handleClick);
     return () => {
       window.removeEventListener("mousedown", handleClick);
     };
-  }, [infoOpen, menuOpen]);
+  }, [infoOpen]);
 
   useEffect(() => {
     if (!infoOpen && renameOnCancel) {
@@ -207,9 +172,7 @@ export function MainHeader({
           <span className="workspace-context-badge">
             {workspace.connected ? t("Connected", "已连接") : t("Preparing", "准备中")}
           </span>
-          <span className="workspace-title">
-            {parentName ? parentName : workspace.name}
-          </span>
+          <span className="workspace-title">{parentName ? parentName : workspace.name}</span>
           {disableBranchMenu ? (
             <div className="workspace-branch-static-row" ref={infoRef}>
               <button
@@ -271,9 +234,7 @@ export function MainHeader({
                           className="icon-button worktree-info-confirm"
                           ref={renameConfirmRef}
                           onClick={() => worktreeRename.onCommit()}
-                          disabled={
-                            worktreeRename.isSubmitting || !worktreeRename.isDirty
-                          }
+                          disabled={worktreeRename.isSubmitting || !worktreeRename.isDirty}
                           aria-label="Confirm rename"
                           title="Confirm rename"
                         >
@@ -284,9 +245,7 @@ export function MainHeader({
                         <div className="worktree-info-error">{worktreeRename.error}</div>
                       )}
                       {worktreeRename.notice && (
-                        <span className="worktree-info-subtle">
-                          {worktreeRename.notice}
-                        </span>
+                        <span className="worktree-info-subtle">{worktreeRename.notice}</span>
                       )}
                       {worktreeRename.upstream && (
                         <div className="worktree-info-upstream">
@@ -318,9 +277,7 @@ export function MainHeader({
                       {parentPath ? t(" (repo root)", "（仓库根目录）") : ""}
                     </span>
                     <div className="worktree-info-command">
-                      <code className="worktree-info-code">
-                        {cdCommand}
-                      </code>
+                      <code className="worktree-info-code">{cdCommand}</code>
                       <button
                         type="button"
                         className="worktree-info-copy"
@@ -355,146 +312,20 @@ export function MainHeader({
               )}
             </div>
           ) : (
-            <div className="workspace-branch-menu" ref={menuRef}>
-              <button
-                type="button"
-                className="workspace-branch-button"
-                onClick={() => setMenuOpen((prev) => !prev)}
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
+            <div className="workspace-branch-static-row">
+              <span
+                className="workspace-branch-static-button"
                 data-tauri-drag-region="false"
+                title={branchLabel}
               >
-                <span className="workspace-branch">{branchLabel}</span>
-                <span className="workspace-branch-caret" aria-hidden>
-                  <ChevronDown size={12} />
-                </span>
-              </button>
-              {menuOpen && (
-                <div
-                  className="workspace-branch-dropdown popover-surface"
-                  role="menu"
-                  data-tauri-drag-region="false"
-                >
-                  <div className="branch-actions">
-                    <div className="branch-search">
-                      <input
-                        value={branchQuery}
-                        onChange={(event) => {
-                          setBranchQuery(event.target.value);
-                          setError(null);
-                        }}
-                        onKeyDown={async (event) => {
-                          if (event.key !== "Enter") {
-                            return;
-                          }
-                          event.preventDefault();
-                          if (branchValidationMessage) {
-                            setError(branchValidationMessage);
-                            return;
-                          }
-                          if (canCreate) {
-                            try {
-                              await onCreateBranch(trimmedQuery);
-                              setMenuOpen(false);
-                              setBranchQuery("");
-                              setError(null);
-                            } catch (err) {
-                              setError(
-                                err instanceof Error ? err.message : String(err),
-                              );
-                            }
-                            return;
-                          }
-                          if (exactMatch && exactMatch.name !== branchName) {
-                            try {
-                              await onCheckoutBranch(exactMatch.name);
-                              setMenuOpen(false);
-                              setBranchQuery("");
-                              setError(null);
-                            } catch (err) {
-                              setError(
-                                err instanceof Error ? err.message : String(err),
-                              );
-                            }
-                          }
-                        }}
-                        placeholder={t("Search or create branch", "搜索或创建分支")}
-                        className="branch-input"
-                        autoFocus
-                        data-tauri-drag-region="false"
-                        aria-label={t("Search branches", "搜索分支")}
-                      />
-                      <button
-                        type="button"
-                        className="branch-create-button"
-                        disabled={!canCreate || Boolean(branchValidationMessage)}
-                        onClick={async () => {
-                          if (branchValidationMessage) {
-                            setError(branchValidationMessage);
-                            return;
-                          }
-                          if (!canCreate) {
-                            return;
-                          }
-                          try {
-                            await onCreateBranch(trimmedQuery);
-                            setMenuOpen(false);
-                            setBranchQuery("");
-                            setError(null);
-                          } catch (err) {
-                            setError(
-                              err instanceof Error ? err.message : String(err),
-                            );
-                          }
-                        }}
-                        data-tauri-drag-region="false"
-                      >
-                        {t("Create", "创建")}
-                      </button>
-                    </div>
-                    {branchValidationMessage && (
-                      <div className="branch-error">{branchValidationMessage}</div>
-                    )}
-                    {canCreate && !branchValidationMessage && (
-                      <div className="branch-create-hint">
-                        {isZh ? `创建分支“${trimmedQuery}”` : `Create branch "${trimmedQuery}"`}
-                      </div>
-                    )}
-                  </div>
-                  <BranchList
-                    branches={filteredBranches}
-                    currentBranch={branchName}
-                    listClassName="branch-list"
-                    listRole="none"
-                    itemClassName="branch-item"
-                    currentItemClassName="is-active"
-                    itemRole="menuitem"
-                    itemDataTauriDragRegion="false"
-                    emptyClassName="branch-empty"
-                    emptyText={t("No branches found", "没有找到分支")}
-                    onSelect={async (branch) => {
-                      if (branch.name === branchName) {
-                        return;
-                      }
-                      try {
-                        await onCheckoutBranch(branch.name);
-                        setMenuOpen(false);
-                        setBranchQuery("");
-                        setError(null);
-                      } catch (err) {
-                        setError(err instanceof Error ? err.message : String(err));
-                      }
-                    }}
-                  />
-                  {error && <div className="branch-error">{error}</div>}
-                </div>
-              )}
+                {branchLabel}
+              </span>
             </div>
           )}
         </div>
       </div>
       <div className="main-header-actions">
-        <div className="main-header-brand-chip">财多多 / Rich</div>
+        <div className="main-header-brand-chip">Rich</div>
         {onRunLaunchScript &&
           onOpenLaunchScriptEditor &&
           onCloseLaunchScriptEditor &&
@@ -586,5 +417,3 @@ export function MainHeader({
     </header>
   );
 }
-
-

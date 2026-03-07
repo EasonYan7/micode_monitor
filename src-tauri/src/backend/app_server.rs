@@ -293,6 +293,23 @@ fn now_ts() -> i64 {
         .as_secs() as i64
 }
 
+fn should_suppress_micode_stderr_line(line: &str, suppress_ide_debug_block: &mut bool) -> bool {
+    let trimmed = line.trim();
+    if *suppress_ide_debug_block {
+        if trimmed == "}" || trimmed.starts_with("at async ") || trimmed.starts_with("at ") {
+            return true;
+        }
+        *suppress_ide_debug_block = false;
+    }
+
+    if line.contains("[DEBUG] [IDEClient] Failed to read IDE connection directory:") {
+        *suppress_ide_debug_block = true;
+        return true;
+    }
+
+    false
+}
+
 fn derive_thread_title(prompt: &str) -> Option<String> {
     let first_line = prompt.lines().next().unwrap_or_default().trim();
     if first_line.is_empty() {
@@ -3369,8 +3386,12 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
     let event_sink_clone = event_sink.clone();
     tokio::spawn(async move {
         let mut lines = BufReader::new(stderr).lines();
+        let mut suppress_ide_debug_block = false;
         while let Ok(Some(line)) = lines.next_line().await {
             if line.trim().is_empty() {
+                continue;
+            }
+            if should_suppress_micode_stderr_line(&line, &mut suppress_ide_debug_block) {
                 continue;
             }
             event_sink_clone.emit_app_server_event(AppServerEvent {
@@ -3424,7 +3445,7 @@ mod tests {
     use super::{
         build_initialize_params, extract_approval_command, extract_tool_presentation_from_update,
         load_thread_token_usage_for_session_in_home, normalize_turn_start_error_message,
-        normalize_wrapper_cli_token,
+        normalize_wrapper_cli_token, should_suppress_micode_stderr_line,
         resolve_cli_bundle_near_bin, translate_acp_update, merge_tool_presentation, ActivePromptContext,
         ToolCallPresentation, WorkspaceSession,
     };
@@ -3441,6 +3462,25 @@ mod tests {
                 .and_then(|value| value.as_u64()),
             Some(1)
         );
+    }
+
+    #[test]
+    fn suppresses_ide_connection_directory_debug_block() {
+        let mut suppress = false;
+        assert!(should_suppress_micode_stderr_line(
+            "[DEBUG] [IDEClient] Failed to read IDE connection directory: Error: ENOENT: no such file or directory",
+            &mut suppress
+        ));
+        assert!(suppress);
+        assert!(should_suppress_micode_stderr_line(
+            "    at async ideCommand (file:///tmp/cli.js:1:1)",
+            &mut suppress
+        ));
+        assert!(should_suppress_micode_stderr_line("}", &mut suppress));
+        assert!(!should_suppress_micode_stderr_line(
+            "[ERROR] real problem",
+            &mut suppress
+        ));
     }
 
     #[test]

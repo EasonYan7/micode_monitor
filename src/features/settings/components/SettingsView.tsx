@@ -8,7 +8,6 @@ import SlidersHorizontal from "lucide-react/dist/esm/icons/sliders-horizontal";
 import Mic from "lucide-react/dist/esm/icons/mic";
 import Keyboard from "lucide-react/dist/esm/icons/keyboard";
 import Stethoscope from "lucide-react/dist/esm/icons/stethoscope";
-import GitBranch from "lucide-react/dist/esm/icons/git-branch";
 import TerminalSquare from "lucide-react/dist/esm/icons/terminal-square";
 import FileText from "lucide-react/dist/esm/icons/file-text";
 import Trash2 from "lucide-react/dist/esm/icons/trash-2";
@@ -26,7 +25,6 @@ import type {
   WorkspaceGroup,
   WorkspaceInfo,
 } from "../../../types";
-import { formatDownloadSize } from "../../../utils/formatting";
 import {
   buildShortcutValue,
   formatShortcut,
@@ -54,6 +52,7 @@ import { getFileManagerName } from "../../app/utils/fileManager";
 import { useGlobalAgentsMd } from "../hooks/useGlobalAgentsMd";
 import { useGlobalMiCodeConfigToml } from "../hooks/useGlobalMiCodeConfigToml";
 import { FileEditorCard } from "../../shared/components/FileEditorCard";
+import { DICTATION_UNAVAILABLE_TOOLTIP } from "../../dictation/constants";
 
 const DICTATION_MODELS = [
   { id: "tiny", label: "Tiny", size: "75 MB", note: "Fastest, least accurate." },
@@ -62,6 +61,9 @@ const DICTATION_MODELS = [
   { id: "medium", label: "Medium", size: "1.5 GB", note: "High accuracy." },
   { id: "large-v3", label: "Large V3", size: "3.0 GB", note: "Best accuracy, heavy download." },
 ];
+
+const DICTATION_UNAVAILABLE_TOOLTIP_EN =
+  "Voice input is not available yet. It will be added in a future update.";
 
 type ComposerPreset = AppSettings["composerEditorPreset"];
 
@@ -214,8 +216,7 @@ type SettingsSection =
   | "composer"
   | "dictation"
   | "shortcuts"
-  | "open-apps"
-  | "git";
+  | "open-apps";
 type MiCodeSection = SettingsSection | "micode" | "features";
 type ShortcutSettingKey =
   | "composerModelShortcut"
@@ -331,10 +332,10 @@ export function SettingsView({
   scaleShortcutText,
   onTestNotificationSound,
   onTestSystemNotification,
-  dictationModelStatus,
-  onDownloadDictationModel,
-  onCancelDictationDownload,
-  onRemoveDictationModel,
+  dictationModelStatus: _dictationModelStatus,
+  onDownloadDictationModel: _onDownloadDictationModel,
+  onCancelDictationDownload: _onCancelDictationDownload,
+  onRemoveDictationModel: _onRemoveDictationModel,
   initialSection,
 }: SettingsViewProps) {
   const isZh = (appSettings.language ?? "en") === "zh";
@@ -454,8 +455,10 @@ export function SettingsView({
     cycleWorkspaceNext: appSettings.cycleWorkspaceNextShortcut ?? "",
     cycleWorkspacePrev: appSettings.cycleWorkspacePrevShortcut ?? "",
   });
-  const dictationReady = dictationModelStatus?.state === "ready";
-  const dictationProgress = dictationModelStatus?.progress ?? null;
+  const dictationUnavailableTooltip = t(
+    DICTATION_UNAVAILABLE_TOOLTIP_EN,
+    DICTATION_UNAVAILABLE_TOOLTIP,
+  );
   const globalAgentsStatus = globalAgentsLoading
     ? t("Loading…", "加载中…")
     : globalAgentsSaving
@@ -1233,14 +1236,6 @@ export function SettingsView({
             >
               <ExternalLink aria-hidden />
               {t("Open in", "打开方式")}
-            </button>
-            <button
-              type="button"
-              className={`settings-nav ${activeSection === "git" ? "active" : ""}`}
-              onClick={() => setActiveSection("git")}
-            >
-              <GitBranch aria-hidden />
-              {t("Git", "Git")}
             </button>
             <button
               type="button"
@@ -2162,110 +2157,107 @@ export function SettingsView({
               <section className="settings-section">
                 <div className="settings-section-title">{t("Dictation", "语音输入")}</div>
                 <div className="settings-section-subtitle">
-                  {t("Enable microphone dictation with on-device transcription.", "启用麦克风语音输入与本地转写。")}
+                  {t(
+                    "Voice input is not available yet. It will be added in a future update.",
+                    "暂未加入语音功能，将在后续版本迭代。",
+                  )}
                 </div>
                 <div className="settings-toggle-row">
                   <div>
                     <div className="settings-toggle-title">{t("Enable dictation", "启用语音输入")}</div>
                     <div className="settings-toggle-subtitle">
-                      {t("Downloads the selected Whisper model on first use.", "首次使用会下载所选 Whisper 模型。")}
+                      {t(
+                        "This feature is reserved for a future version.",
+                        "该功能预留给后续版本。",
+                      )}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className={`settings-toggle ${appSettings.dictationEnabled ? "on" : ""}`}
-                    onClick={() => {
-                      const nextEnabled = !appSettings.dictationEnabled;
-                      void onUpdateAppSettings({
-                        ...appSettings,
-                        dictationEnabled: nextEnabled,
-                      });
-                      if (
-                        !nextEnabled &&
-                        dictationModelStatus?.state === "downloading" &&
-                        onCancelDictationDownload
-                      ) {
-                        onCancelDictationDownload();
-                      }
-                      if (
-                        nextEnabled &&
-                        dictationModelStatus?.state === "missing" &&
-                        onDownloadDictationModel
-                      ) {
-                        onDownloadDictationModel();
-                      }
-                    }}
-                    aria-pressed={appSettings.dictationEnabled}
+                  <span
+                    className="settings-disabled-control"
+                    data-tooltip={dictationUnavailableTooltip}
                   >
-                    <span className="settings-toggle-knob" />
-                  </button>
+                    <button
+                      type="button"
+                      className="settings-toggle"
+                      disabled
+                      aria-pressed={false}
+                      aria-label={dictationUnavailableTooltip}
+                    >
+                      <span className="settings-toggle-knob" />
+                    </button>
+                  </span>
                 </div>
                 <div className="settings-field">
                   <label className="settings-field-label" htmlFor="dictation-model">
                     {t("Dictation model", "语音模型")}
                   </label>
-                  <select
-                    id="dictation-model"
-                    className="settings-select"
-                    value={appSettings.dictationModelId}
-                    onChange={(event) =>
-                      void onUpdateAppSettings({
-                        ...appSettings,
-                        dictationModelId: event.target.value,
-                      })
-                    }
+                  <span
+                    className="settings-disabled-control"
+                    data-tooltip={dictationUnavailableTooltip}
                   >
-                    {DICTATION_MODELS.map((model) => (
-                      <option key={model.id} value={model.id}>
-                        {model.label} ({model.size})
-                      </option>
-                    ))}
-                  </select>
+                    <select
+                      id="dictation-model"
+                      className="settings-select"
+                      value={appSettings.dictationModelId}
+                      disabled
+                      aria-label={dictationUnavailableTooltip}
+                      onChange={() => undefined}
+                    >
+                      {DICTATION_MODELS.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.label} ({model.size})
+                        </option>
+                      ))}
+                    </select>
+                  </span>
                   <div className="settings-help">
-                    {isZh
-                      ? `下载大小：${selectedDictationModel.size}。`
-                      : `${selectedDictationModel.note} Download size: ${selectedDictationModel.size}.`}
+                    {t(
+                      `${selectedDictationModel.note} This control will unlock after the feature ships.`,
+                      `预计模型大小：${selectedDictationModel.size}。功能上线后可在这里选择模型。`,
+                    )}
                   </div>
                 </div>
                 <div className="settings-field">
                   <label className="settings-field-label" htmlFor="dictation-language">
                     {t("Preferred dictation language", "优先识别语言")}
                   </label>
-                  <select
-                    id="dictation-language"
-                    className="settings-select"
-                    value={appSettings.dictationPreferredLanguage ?? ""}
-                    onChange={(event) =>
-                      void onUpdateAppSettings({
-                        ...appSettings,
-                        dictationPreferredLanguage: event.target.value || null,
-                      })
-                    }
+                  <span
+                    className="settings-disabled-control"
+                    data-tooltip={dictationUnavailableTooltip}
                   >
-                    <option value="">{t("Auto-detect only", "仅自动识别")}</option>
-                    <option value="en">{t("English", "英语")}</option>
-                    <option value="es">{t("Spanish", "西班牙语")}</option>
-                    <option value="fr">{t("French", "法语")}</option>
-                    <option value="de">{t("German", "德语")}</option>
-                    <option value="it">{t("Italian", "意大利语")}</option>
-                    <option value="pt">{t("Portuguese", "葡萄牙语")}</option>
-                    <option value="nl">{t("Dutch", "荷兰语")}</option>
-                    <option value="sv">{t("Swedish", "瑞典语")}</option>
-                    <option value="no">{t("Norwegian", "挪威语")}</option>
-                    <option value="da">{t("Danish", "丹麦语")}</option>
-                    <option value="fi">{t("Finnish", "芬兰语")}</option>
-                    <option value="pl">{t("Polish", "波兰语")}</option>
-                    <option value="tr">{t("Turkish", "土耳其语")}</option>
-                    <option value="ru">{t("Russian", "俄语")}</option>
-                    <option value="uk">{t("Ukrainian", "乌克兰语")}</option>
-                    <option value="ja">{t("Japanese", "日语")}</option>
-                    <option value="ko">{t("Korean", "韩语")}</option>
-                    <option value="zh">{t("Chinese", "中文")}</option>
-                  </select>
+                    <select
+                      id="dictation-language"
+                      className="settings-select"
+                      value={appSettings.dictationPreferredLanguage ?? ""}
+                      disabled
+                      aria-label={dictationUnavailableTooltip}
+                      onChange={() => undefined}
+                    >
+                      <option value="">{t("Auto-detect only", "仅自动识别")}</option>
+                      <option value="en">{t("English", "英语")}</option>
+                      <option value="es">{t("Spanish", "西班牙语")}</option>
+                      <option value="fr">{t("French", "法语")}</option>
+                      <option value="de">{t("German", "德语")}</option>
+                      <option value="it">{t("Italian", "意大利语")}</option>
+                      <option value="pt">{t("Portuguese", "葡萄牙语")}</option>
+                      <option value="nl">{t("Dutch", "荷兰语")}</option>
+                      <option value="sv">{t("Swedish", "瑞典语")}</option>
+                      <option value="no">{t("Norwegian", "挪威语")}</option>
+                      <option value="da">{t("Danish", "丹麦语")}</option>
+                      <option value="fi">{t("Finnish", "芬兰语")}</option>
+                      <option value="pl">{t("Polish", "波兰语")}</option>
+                      <option value="tr">{t("Turkish", "土耳其语")}</option>
+                      <option value="ru">{t("Russian", "俄语")}</option>
+                      <option value="uk">{t("Ukrainian", "乌克兰语")}</option>
+                      <option value="ja">{t("Japanese", "日语")}</option>
+                      <option value="ko">{t("Korean", "韩语")}</option>
+                      <option value="zh">{t("Chinese", "中文")}</option>
+                    </select>
+                  </span>
                   <div className="settings-help">
                     {t(
-                      "Auto-detect stays on; this nudges the decoder toward your preference.",
-                      "自动识别会保持开启；该项仅用于提升偏好语言的识别概率。",
+                      "Preferred language selection will become available together with voice input.",
+                      "优先语言会随语音功能一起开放。",
                     )}
                   </div>
                 </div>
@@ -2273,98 +2265,65 @@ export function SettingsView({
                   <label className="settings-field-label" htmlFor="dictation-hold-key">
                     {t("Hold-to-dictate key", "按住说话按键")}
                   </label>
-                  <select
-                    id="dictation-hold-key"
-                    className="settings-select"
-                    value={appSettings.dictationHoldKey ?? ""}
-                    onChange={(event) =>
-                      void onUpdateAppSettings({
-                        ...appSettings,
-                        dictationHoldKey: event.target.value,
-                      })
-                    }
+                  <span
+                    className="settings-disabled-control"
+                    data-tooltip={dictationUnavailableTooltip}
                   >
-                    <option value="">{t("Off", "关闭")}</option>
-                    <option value="alt">{t("Option / Alt", "Option / Alt")}</option>
-                    <option value="shift">Shift</option>
-                    <option value="control">Control</option>
-                    <option value="meta">Command / Meta</option>
-                  </select>
+                    <select
+                      id="dictation-hold-key"
+                      className="settings-select"
+                      value={appSettings.dictationHoldKey ?? ""}
+                      disabled
+                      aria-label={dictationUnavailableTooltip}
+                      onChange={() => undefined}
+                    >
+                      <option value="">{t("Off", "关闭")}</option>
+                      <option value="alt">{t("Option / Alt", "Option / Alt")}</option>
+                      <option value="shift">Shift</option>
+                      <option value="control">Control</option>
+                      <option value="meta">Command / Meta</option>
+                    </select>
+                  </span>
                   <div className="settings-help">
-                    {t("Hold the key to start dictation, release to stop and process.", "按住按键开始说话，松开后停止并处理。")}
+                    {t(
+                      "Hold-to-dictate shortcuts will be configurable after voice input is added.",
+                      "语音功能上线后，这里可以配置按住说话快捷键。",
+                    )}
                   </div>
                 </div>
-                {dictationModelStatus && (
-                  <div className="settings-field">
-                    <div className="settings-field-label">
-                      {t("Model status", "模型状态")} ({selectedDictationModel.label})
-                    </div>
-                    <div className="settings-help">
-                      {dictationModelStatus.state === "ready" &&
-                        t("Ready for dictation.", "可开始语音输入。")}
-                      {dictationModelStatus.state === "missing" &&
-                        t("Model not downloaded yet.", "模型尚未下载。")}
-                      {dictationModelStatus.state === "downloading" &&
-                        t("Downloading model...", "模型下载中...")}
-                      {dictationModelStatus.state === "error" &&
-                        (dictationModelStatus.error ?? t("Download error.", "下载失败。"))}
-                    </div>
-                    {dictationProgress && (
-                      <div className="settings-download-progress">
-                        <div className="settings-download-bar">
-                          <div
-                            className="settings-download-fill"
-                            style={{
-                              width: dictationProgress.totalBytes
-                                ? `${Math.min(
-                                    100,
-                                    (dictationProgress.downloadedBytes /
-                                      dictationProgress.totalBytes) *
-                                      100,
-                                  )}%`
-                                : "0%",
-                            }}
-                          />
-                        </div>
-                        <div className="settings-download-meta">
-                          {formatDownloadSize(dictationProgress.downloadedBytes)}
-                        </div>
-                      </div>
-                    )}
-                    <div className="settings-field-actions">
-                      {dictationModelStatus.state === "missing" && (
-                        <button
-                          type="button"
-                          className="primary"
-                          onClick={onDownloadDictationModel}
-                          disabled={!onDownloadDictationModel}
-                        >
-                          {t("Download model", "下载模型")}
-                        </button>
-                      )}
-                      {dictationModelStatus.state === "downloading" && (
-                        <button
-                          type="button"
-                          className="ghost settings-button-compact"
-                          onClick={onCancelDictationDownload}
-                          disabled={!onCancelDictationDownload}
-                        >
-                          {t("Cancel download", "取消下载")}
-                        </button>
-                      )}
-                      {dictationReady && (
-                        <button
-                          type="button"
-                          className="ghost settings-button-compact"
-                          onClick={onRemoveDictationModel}
-                          disabled={!onRemoveDictationModel}
-                        >
-                          {t("Remove model", "删除模型")}
-                        </button>
-                      )}
-                    </div>
+                <div className="settings-field">
+                  <div className="settings-field-label">
+                    {t("Model status", "模型状态")} ({selectedDictationModel.label})
                   </div>
-                )}
+                  <div className="settings-help">
+                    {t(
+                      "Model download and local transcription controls will appear here in a future update.",
+                      "模型下载和本地转写状态会在后续版本显示在这里。",
+                    )}
+                  </div>
+                  <div className="settings-field-actions">
+                    <span
+                      className="settings-disabled-control"
+                      data-tooltip={dictationUnavailableTooltip}
+                    >
+                      <button type="button" className="primary" disabled>
+                        {t("Download model", "下载模型")}
+                      </button>
+                    </span>
+                    <span
+                      className="settings-disabled-control"
+                      data-tooltip={dictationUnavailableTooltip}
+                    >
+                      <button
+                        type="button"
+                        className="ghost settings-button-compact"
+                        disabled
+                      >
+                        {t("Remove model", "删除模型")}
+                      </button>
+                    </span>
+                  </div>
+                </div>
               </section>
             )}
             {activeSection === "shortcuts" && (
@@ -2586,54 +2545,6 @@ export function SettingsView({
                   </div>
                   <div className="settings-help">
                     {t("Default:", "默认：")} {formatShortcut("cmd+shift+p")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">{t("Toggle git sidebar", "切换 Git 侧栏")}</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.gitSidebar)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "toggleGitSidebarShortcut")
-                      }
-                      placeholder={t("Type shortcut", "按下快捷键")}
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("toggleGitSidebarShortcut", null)}
-                    >
-                      {t("Clear", "清空")}
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    {t("Default:", "默认：")} {formatShortcut("cmd+shift+g")}
-                  </div>
-                </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">{t("Branch switcher", "分支切换器")}</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.branchSwitcher)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "branchSwitcherShortcut")
-                      }
-                      placeholder={t("Type shortcut", "按下快捷键")}
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("branchSwitcherShortcut", null)}
-                    >
-                      {t("Clear", "清空")}
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    {t("Default:", "默认：")} {formatShortcut("cmd+b")}
                   </div>
                 </div>
                 <div className="settings-field">
@@ -2884,56 +2795,6 @@ export function SettingsView({
                       "文件管理器在 Windows 显示为 Explorer，在 macOS 显示为 Finder。",
                     )}
                   </div>
-                </div>
-              </section>
-            )}
-            {activeSection === "git" && (
-              <section className="settings-section">
-                <div className="settings-section-title">{t("Git", "Git")}</div>
-                <div className="settings-section-subtitle">
-                  {t("Manage how diffs are loaded in the Git sidebar.", "管理 Git 侧栏中 Diff 的加载方式。")}
-                </div>
-                <div className="settings-toggle-row">
-                  <div>
-                    <div className="settings-toggle-title">{t("Preload git diffs", "预加载 Git Diff")}</div>
-                    <div className="settings-toggle-subtitle">
-                      {t("Make viewing git diff faster.", "提升查看 Git Diff 的速度。")}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className={`settings-toggle ${appSettings.preloadGitDiffs ? "on" : ""}`}
-                    onClick={() =>
-                      void onUpdateAppSettings({
-                        ...appSettings,
-                        preloadGitDiffs: !appSettings.preloadGitDiffs,
-                      })
-                    }
-                    aria-pressed={appSettings.preloadGitDiffs}
-                  >
-                    <span className="settings-toggle-knob" />
-                  </button>
-                </div>
-                <div className="settings-toggle-row">
-                  <div>
-                    <div className="settings-toggle-title">{t("Ignore whitespace changes", "忽略空白字符变更")}</div>
-                    <div className="settings-toggle-subtitle">
-                      {t("Hides whitespace-only changes in local and commit diffs.", "在本地与提交 Diff 中隐藏仅空白字符的变更。")}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className={`settings-toggle ${appSettings.gitDiffIgnoreWhitespaceChanges ? "on" : ""}`}
-                    onClick={() =>
-                      void onUpdateAppSettings({
-                        ...appSettings,
-                        gitDiffIgnoreWhitespaceChanges: !appSettings.gitDiffIgnoreWhitespaceChanges,
-                      })
-                    }
-                    aria-pressed={appSettings.gitDiffIgnoreWhitespaceChanges}
-                  >
-                    <span className="settings-toggle-knob" />
-                  </button>
                 </div>
               </section>
             )}

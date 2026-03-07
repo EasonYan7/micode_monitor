@@ -155,6 +155,51 @@
   margin-right: 4px;
 }
 
+.settings-disabled-control {
+  position: relative;
+  display: inline-flex;
+  width: 100%;
+}
+
+.settings-disabled-control::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  max-width: min(320px, 70vw);
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--surface-command);
+  color: var(--text-emphasis);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  z-index: 2;
+}
+
+.settings-disabled-control:hover::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.settings-disabled-control > .settings-select,
+.settings-disabled-control > .settings-toggle,
+.settings-disabled-control > button {
+  width: 100%;
+}
+
+.settings-disabled-control > .settings-toggle,
+.settings-disabled-control > button,
+.settings-disabled-control > .settings-select {
+  pointer-events: none;
+}
+
 .settings-agents-header {
   display: flex;
   align-items: center;

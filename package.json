@@ -29,9 +29,9 @@
     "pretauri:build": "npm run sync:material-icons",
     "tauri:build": "npm run doctor:strict && sh scripts/tauri-build.sh",
     "pretauri:dev:win": "npm run sync:material-icons",
-    "tauri:dev:win": "npm run doctor:win && powershell -ExecutionPolicy Bypass -File scripts/with-vs-dev-env.ps1 tauri.cmd dev --config src-tauri/tauri.windows.conf.json",
+    "tauri:dev:win": "npm run doctor:win && powershell -ExecutionPolicy Bypass -File scripts/with-vs-dev-env.ps1 .\\node_modules\\.bin\\tauri.cmd dev --config src-tauri/tauri.windows.conf.json",
     "pretauri:build:win": "npm run sync:material-icons",
-    "tauri:build:win": "npm run doctor:win && powershell -ExecutionPolicy Bypass -File scripts/with-vs-dev-env.ps1 tauri.cmd build --config src-tauri/tauri.windows.conf.json"
+    "tauri:build:win": "npm run doctor:win && powershell -ExecutionPolicy Bypass -File scripts/with-vs-dev-env.ps1 .\\node_modules\\.bin\\tauri.cmd build --config src-tauri/tauri.windows.conf.json"
   },
   "dependencies": {
     "@pierre/diffs": "^1.0.6",

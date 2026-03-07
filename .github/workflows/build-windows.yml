@@ -1,9 +1,6 @@
 name: Build Windows
 
 on:
-  push:
-    branches:
-      - windows-main
   workflow_dispatch:
 
 jobs:
