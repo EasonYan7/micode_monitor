@@ -63,6 +63,8 @@
 - [x] Resolve MiCode home with global default (`~/.micode|~/.codex`) for all workspaces; only use workspace `.micodemonitor` as legacy fallback
 - [x] Add startup doctor hint for missing MiCode CLI (show localized toast instead of silent failure)
 - [x] Add blocking startup environment gate with structured checks/install-retry flow for Node/MiCode ACP/Python (exclude VS Code from startup gating)
+- [x] Increase ACP initialize timeout for slow Windows environments and surface timeout duration in the error message
+- [x] Make Windows Python startup re-check resilient after in-app install by probing common Python install directories and improving failure detail selection
 - [x] Enforce slash command-only send path: slash-prefixed input is never forwarded to AI text prompt; `/mcp *` always runs local MCP handler
 - [x] Keep Token terminology untranslated in Chinese UI (replace 鈥滀唬甯佲€?labels with 鈥淭oken鈥?
 - [x] Hide composer "Default" controls: remove collaboration selector when only default mode exists and hide thinking selector when no reasoning options
@@ -81,6 +83,9 @@
 - [x] Rebrand frontend experience to 璐㈠澶?/ Rich and redesign the post-login home, sidebar, header, startup gate, and about panel
 - [x] Split Home into a dedicated shell with stable chart and panel heights so async file/usage loads no longer push the page upward after render
 - [x] Mount the app behind the startup gate so workspace restore/connect begins during checks instead of only after the gate unlocks
+- [x] Show per-workspace restore status in the sidebar during startup recovery so slow machines see opening/syncing-history progress
+- [x] Show a small opening-workspace toast after the user clicks open workspace so slow directory loads do not look stuck
+- [x] Hide sidebar token-usage card on Home and show it only inside a project/session context
 - [x] Disable in-app updater entry/flow (remove menu check-updates item and force updater controller idle/no-op)
 - [x] Disable updater at build/runtime config level (remove updater plugin/permission and turn off updater artifacts in `tauri.conf.json`)
 - [x] Add GitHub Actions Windows build workflow (`build-windows.yml`) for `windows-main` branch + manual dispatch + artifact upload
@@ -111,6 +116,8 @@
 - [x] Fix Windows build/runtime portability: move `sha2` to cross-platform dependency and make MiCode PATH discovery Windows-aware (`;` PATH, win shim dirs, `.exe/.cmd`)
 - [x] Fix Windows model discovery fallback: resolve `micode` command-name via PATH and parse npm/winget shim wrappers (`%~dp0 ... @mi/mi-code-cli/dist/cli.js`)
 - [x] Disable composer image uploads in chat/workspace dialogs (remove button and block drag/drop/paste attach paths)
+- [x] Fix Chinese UI leakage and mojibake in header/file panel/composer, and enlarge About page card by 50%
+- [x] Enlarge About window itself and make it resizable so enlarged content is fully visible
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
@@ -204,3 +211,5 @@
   - `npm test -- src/features/settings/components/SettingsView.test.tsx src/features/home/components/Home.test.tsx src/features/settings/hooks/useAppSettings.test.ts`
   - `cargo test --manifest-path src-tauri/Cargo.toml translate_tool_call_event_includes_server_and_tool`
   - `cargo test --manifest-path src-tauri/Cargo.toml translate_tool_call_update_uses_cached_tool_identity`
+- [x] Localize the main workspace page for Chinese mode and raise help/about contrast so visible English remnants and low-contrast text no longer confuse users.
+

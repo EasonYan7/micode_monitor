@@ -65,6 +65,30 @@
   background: linear-gradient(90deg, #4fb8ff, #3be082);
 }
 
+.workspace-opening-toasts {
+  bottom: 132px;
+}
+
+.workspace-opening-toast-body {
+  margin-bottom: 8px;
+}
+
+.workspace-opening-toast-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-card-muted);
+  overflow: hidden;
+}
+
+.workspace-opening-toast-progress-fill {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #d3aa43, #62b783);
+  animation: workspace-opening-progress 1.2s ease-in-out infinite;
+}
+
 .update-toast-progress-meta {
   font-size: 11px;
   color: var(--text-muted);
@@ -113,11 +137,24 @@
   }
 }
 
+@keyframes workspace-opening-progress {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(340%);
+  }
+}
+
 @media (max-width: 960px) {
   .update-toasts {
     top: auto;
     bottom: 96px;
     left: 50%;
     transform: translateX(-50%);
+  }
+
+  .workspace-opening-toasts {
+    bottom: 156px;
   }
 }

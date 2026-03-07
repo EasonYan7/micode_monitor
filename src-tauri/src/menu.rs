@@ -385,21 +385,28 @@ pub(crate) fn handle_menu_event<R: Runtime>(app: &tauri::AppHandle<R>, event: ta
             if let Some(window) = app.get_webview_window("about") {
                 let _ = window.close();
             }
+            let about_width = 900.0;
+            let about_height = 720.0;
             let window =
                 WebviewWindowBuilder::new(app, "about", WebviewUrl::App("index.html".into()))
-                    .title("About 财多多")
-                    .resizable(false)
-                    .maximizable(false)
-                    .minimizable(false)
-                    .inner_size(360.0, 240.0)
+                    .title("关于财多多")
+                    .resizable(true)
+                    .maximizable(true)
+                    .minimizable(true)
+                    .inner_size(about_width, about_height)
+                    .min_inner_size(760.0, 620.0)
                     .center()
                     .build();
             if let Ok(window) = window {
                 let _ = window.set_fullscreen(false);
                 let _ = window.unmaximize();
-                let _ = window.set_resizable(false);
-                let _ = window
-                    .set_size(tauri::Size::Logical(tauri::LogicalSize::new(360.0, 240.0)));
+                let _ = window.set_resizable(true);
+                let _ = window.set_maximizable(true);
+                let _ = window.set_minimizable(true);
+                let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(
+                    about_width,
+                    about_height,
+                )));
                 let _ = window.center();
                 let _ = window.show();
                 let _ = window.set_focus();
@@ -564,5 +571,6 @@ fn emit_menu_event<R: Runtime>(app: &tauri::AppHandle<R>, event: &str) {
         let _ = app.emit(event, ());
     }
 }
+
 
 

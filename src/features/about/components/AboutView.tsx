@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
@@ -36,17 +36,13 @@ export function AboutView() {
     <div className="about">
       <div className="about-card">
         <div className="about-header">
-          <img
-            className="about-icon"
-            src="/app-icon.png"
-            alt="财多多 icon"
-          />
+          <img className="about-icon" src="/app-icon.png" alt="财多多图标" />
           <div>
             <div className="about-title">财多多</div>
             <div className="about-name-en">Rich</div>
           </div>
         </div>
-        <div className="about-version">{version ? `Version ${version}` : "Version -"}</div>
+        <div className="about-version">{version ? `版本 ${version}` : "版本 -"}</div>
         <div className="about-tagline">面向本地项目的智能协作与任务工作台。</div>
         <div className="about-divider" />
         <div className="about-links">
@@ -54,7 +50,7 @@ export function AboutView() {
             项目主页
           </button>
         </div>
-        <div className="about-footer">Built by Eason Yan and contributors</div>
+        <div className="about-footer">由 Eason Yan 与贡献者共同构建</div>
       </div>
     </div>
   );

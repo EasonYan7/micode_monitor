@@ -758,6 +758,14 @@
   min-width: 0;
 }
 
+.workspace-restore-hint {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-subtle);
+  padding-left: 6px;
+}
+
 .workspace-toggle {
   border: none;
   background: transparent;

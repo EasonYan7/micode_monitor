@@ -9,6 +9,8 @@ type Params = {
   isCompact: boolean;
   addWorkspace: () => Promise<WorkspaceInfo | null>;
   addWorkspaceFromPath: (path: string) => Promise<WorkspaceInfo | null>;
+  onWorkspaceOpenStart?: () => void;
+  onWorkspaceOpenEnd?: () => void;
   setActiveThreadId: (threadId: string | null, workspaceId: string) => void;
   setActiveTab: (tab: "projects" | "micode" | "git" | "log") => void;
   exitDiffView: () => void;
@@ -24,6 +26,8 @@ export function useWorkspaceActions({
   isCompact,
   addWorkspace,
   addWorkspaceFromPath,
+  onWorkspaceOpenStart,
+  onWorkspaceOpenEnd,
   setActiveThreadId,
   setActiveTab,
   exitDiffView,
@@ -44,6 +48,7 @@ export function useWorkspaceActions({
   );
 
   const handleAddWorkspace = useCallback(async () => {
+    onWorkspaceOpenStart?.();
     try {
       const workspace = await addWorkspace();
       if (workspace) {
@@ -62,11 +67,14 @@ export function useWorkspaceActions({
         title: "Failed to add workspace",
         message,
       });
+    } finally {
+      onWorkspaceOpenEnd?.();
     }
-  }, [addWorkspace, handleWorkspaceAdded, onDebug]);
+  }, [addWorkspace, handleWorkspaceAdded, onDebug, onWorkspaceOpenEnd, onWorkspaceOpenStart]);
 
   const handleAddWorkspaceFromPath = useCallback(
     async (path: string) => {
+      onWorkspaceOpenStart?.();
       try {
         const workspace = await addWorkspaceFromPath(path);
         if (workspace) {
@@ -85,9 +93,17 @@ export function useWorkspaceActions({
           title: "Failed to add workspace",
           message,
         });
+      } finally {
+        onWorkspaceOpenEnd?.();
       }
     },
-    [addWorkspaceFromPath, handleWorkspaceAdded, onDebug],
+    [
+      addWorkspaceFromPath,
+      handleWorkspaceAdded,
+      onDebug,
+      onWorkspaceOpenEnd,
+      onWorkspaceOpenStart,
+    ],
   );
 
   const handleAddAgent = useCallback(

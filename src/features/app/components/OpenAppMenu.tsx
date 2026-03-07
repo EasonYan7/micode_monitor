@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { openWorkspaceIn } from "../../../services/tauri";
 import { pushErrorToast } from "../../../services/toasts";
-import type { OpenAppTarget } from "../../../types";
+import type { OpenAppTarget, UiLanguage } from "../../../types";
 import {
   DEFAULT_OPEN_APP_ID,
   DEFAULT_OPEN_APP_TARGETS,
@@ -25,6 +25,7 @@ type OpenAppMenuProps = {
   selectedOpenAppId: string;
   onSelectOpenAppId: (id: string) => void;
   iconById?: Record<string, string>;
+  language?: UiLanguage;
 };
 
 export function OpenAppMenu({
@@ -33,7 +34,10 @@ export function OpenAppMenu({
   selectedOpenAppId,
   onSelectOpenAppId,
   iconById = {},
+  language = "en",
 }: OpenAppMenuProps) {
+  const isZh = language === "zh";
+  const t = (en: string, zh: string) => (isZh ? zh : en);
   const [openMenuOpen, setOpenMenuOpen] = useState(false);
   const openMenuRef = useRef<HTMLDivElement | null>(null);
   const availableTargets =
@@ -62,12 +66,12 @@ export function OpenAppMenu({
 
   const fallbackTarget: OpenTarget = {
     id: DEFAULT_OPEN_APP_ID,
-    label: DEFAULT_OPEN_APP_TARGETS[0]?.label ?? "Open",
+    label: DEFAULT_OPEN_APP_TARGETS[0]?.label ?? t("Open", "打开"),
     icon: getKnownOpenAppIcon(DEFAULT_OPEN_APP_ID) ?? GENERIC_APP_ICON,
     target:
       DEFAULT_OPEN_APP_TARGETS[0] ?? {
         id: DEFAULT_OPEN_APP_ID,
-        label: "Default App",
+        label: t("Default App", "系统默认应用"),
         kind: "default",
         appName: null,
         command: null,
@@ -82,7 +86,7 @@ export function OpenAppMenu({
   const reportOpenError = (error: unknown, target: OpenTarget) => {
     const message = error instanceof Error ? error.message : String(error);
     pushErrorToast({
-      title: "Couldn't open workspace",
+      title: t("Couldn't open workspace", "无法打开工作区"),
       message,
     });
     console.warn("Failed to open workspace in target app", {
@@ -186,17 +190,19 @@ export function OpenAppMenu({
     selectedOpenTarget.target.kind === "finder"
       ? getFileManagerName()
       : selectedOpenTarget.target.kind === "default"
-        ? "Default App"
-      : selectedOpenTarget.label;
+        ? t("Default App", "系统默认应用")
+        : selectedOpenTarget.label;
   const openLabel = selectedCanOpen
     ? selectedOpenTarget.target.kind === "finder"
       ? getRevealInFileManagerLabel()
       : selectedOpenTarget.target.kind === "default"
-        ? "Open with default app"
-      : `Open in ${selectedLabel}`
+        ? t("Open with default app", "用系统默认应用打开")
+        : isZh
+          ? `在 ${selectedLabel} 中打开`
+          : `Open in ${selectedLabel}`
     : selectedOpenTarget.target.kind === "command"
-      ? "Set command in Settings"
-      : "Set app name in Settings";
+      ? t("Set command in Settings", "请先在设置中填写命令")
+      : t("Set app name in Settings", "请先在设置中填写应用名称");
 
   return (
     <div className="open-app-menu" ref={openMenuRef}>
@@ -207,7 +213,7 @@ export function OpenAppMenu({
           onClick={handleOpen}
           disabled={!selectedCanOpen}
           data-tauri-drag-region="false"
-          aria-label={`Open in ${selectedLabel}`}
+          aria-label={isZh ? `在 ${selectedLabel} 中打开` : `Open in ${selectedLabel}`}
           title={openLabel}
         >
           <span className="open-app-label">
@@ -227,8 +233,8 @@ export function OpenAppMenu({
           data-tauri-drag-region="false"
           aria-haspopup="menu"
           aria-expanded={openMenuOpen}
-          aria-label="Select editor"
-          title="Select editor"
+          aria-label={t("Select app", "选择打开方式")}
+          title={t("Select app", "选择打开方式")}
         >
           <ChevronDown size={14} aria-hidden />
         </button>
@@ -251,7 +257,7 @@ export function OpenAppMenu({
               {target.target.kind === "finder"
                 ? getFileManagerName()
                 : target.target.kind === "default"
-                  ? "Default App"
+                  ? t("Default App", "系统默认应用")
                   : target.label}
             </button>
           ))}

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { WorkspaceInfo } from "../../../types";
 
+export type WorkspaceRestoreStatus = "connecting" | "syncing";
+
 type WorkspaceRestoreOptions = {
   workspaces: WorkspaceInfo[];
   hasLoaded: boolean;
@@ -9,6 +11,10 @@ type WorkspaceRestoreOptions = {
     workspace: WorkspaceInfo,
     options?: { preserveState?: boolean },
   ) => Promise<void>;
+  onStatusChange?: (
+    workspaceId: string,
+    status: WorkspaceRestoreStatus | null,
+  ) => void;
 };
 
 export function useWorkspaceRestore({
@@ -16,6 +22,7 @@ export function useWorkspaceRestore({
   hasLoaded,
   connectWorkspace,
   listThreadsForWorkspace,
+  onStatusChange,
 }: WorkspaceRestoreOptions) {
   const restoredWorkspaces = useRef(new Set<string>());
 
@@ -31,13 +38,17 @@ export function useWorkspaceRestore({
       void (async () => {
         try {
           if (!workspace.connected) {
+            onStatusChange?.(workspace.id, "connecting");
             await connectWorkspace(workspace);
           }
+          onStatusChange?.(workspace.id, "syncing");
           await listThreadsForWorkspace(workspace);
         } catch {
           // Silent: connection errors show in debug panel.
+        } finally {
+          onStatusChange?.(workspace.id, null);
         }
       })();
     });
-  }, [connectWorkspace, hasLoaded, listThreadsForWorkspace, workspaces]);
+  }, [connectWorkspace, hasLoaded, listThreadsForWorkspace, onStatusChange, workspaces]);
 }
