@@ -143,8 +143,24 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($signature)) {
             throw "Updater signature file is empty: $($updater.Sig.FullName)"
           }
-          $updaterAssetName = $updater.Artifact.Name
-          $updaterSigAssetName = ($updater.Sig.Name -replace '\s+', '.')
+          $releaseDir = Join-Path $PWD "release-artifacts"
+          New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
+
+          $safeBaseName = "MiCodeMonitor_${version}_x64"
+          $updaterAssetName = if ($updater.Artifact.Name -like "*-setup.exe") {
+            "${safeBaseName}-setup.exe"
+          } elseif ($updater.Artifact.Extension -ieq ".msi") {
+            "${safeBaseName}.msi"
+          } elseif ($updater.Artifact.Extension) {
+            "${safeBaseName}$($updater.Artifact.Extension)"
+          } else {
+            $safeBaseName
+          }
+          $updaterSigAssetName = "${updaterAssetName}.sig"
+          $stagedUpdaterPath = Join-Path $releaseDir $updaterAssetName
+          $stagedUpdaterSigPath = Join-Path $releaseDir $updaterSigAssetName
+          Copy-Item -Path $updater.Artifact.FullName -Destination $stagedUpdaterPath -Force
+          Copy-Item -Path $updater.Sig.FullName -Destination $stagedUpdaterSigPath -Force
 
           $notes = "Windows release $version."
           $latest = @{
@@ -155,12 +171,10 @@ jobs:
                 "windows-x86_64" = @{
                   signature = $signature
                   url = "https://github.com/EasonYan7/micode_monitor/releases/download/$tag/$updaterAssetName"
-                }
+              }
             }
           }
 
-          $releaseDir = Join-Path $PWD "release-artifacts"
-          New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
           $latestPath = Join-Path $releaseDir "latest.json"
           $latest | ConvertTo-Json -Depth 8 | Set-Content -Path $latestPath -Encoding utf8
 
@@ -172,10 +186,13 @@ jobs:
           }
 
           $uploads = New-Object System.Collections.Generic.List[object]
-          $uploads.Add([PSCustomObject]@{ path = $updater.Artifact.FullName; label = $updaterAssetName })
-          $uploads.Add([PSCustomObject]@{ path = $updater.Sig.FullName; label = $updaterSigAssetName })
+          $uploads.Add([PSCustomObject]@{ path = $stagedUpdaterPath; label = $updater.Artifact.Name })
+          $uploads.Add([PSCustomObject]@{ path = $stagedUpdaterSigPath; label = $updater.Sig.Name })
           $uploads.Add([PSCustomObject]@{ path = $latestPath; label = "latest.json" })
           foreach ($file in $installerFiles) {
+            if ($file.FullName -eq $updater.Artifact.FullName) {
+              continue
+            }
             $uploads.Add([PSCustomObject]@{
               path = $file.FullName
               label = ($file.Name -replace '\s+', '.')

@@ -127,6 +127,7 @@
 - [x] Fix Windows VS-wrapper Tauri command resolution by using explicit local `node_modules/.bin/tauri.cmd` in scripts and release workflow
 - [x] Avoid WiX MSI release fragility by switching Windows release bundles to NSIS-only while keeping updater artifacts
 - [x] Fix Windows updater 404 by generating `latest.json` with the real uploaded asset filename, not the GitHub release label
+- [x] Make Windows release upload names ASCII-stable (`MiCodeMonitor_...`) so GitHub asset URLs and updater `latest.json` stay consistent despite localized product names
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
