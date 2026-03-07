@@ -23,6 +23,7 @@ const runMiCodeDoctorMock = vi.mocked(runMiCodeDoctor);
 describe("useAppSettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
   });
 
   afterEach(() => {
@@ -71,6 +72,26 @@ describe("useAppSettings", () => {
     expect(result.current.settings.backendMode).toBe("local");
     expect(result.current.settings.dictationModelId).toBe("base");
     expect(result.current.settings.interruptShortcut).toBeTruthy();
+  });
+
+  it("falls back to locally persisted display settings when backend load fails", async () => {
+    window.localStorage.setItem(
+      "micodemonitor.displaySettingsFallback.v1",
+      JSON.stringify({
+        theme: "dark",
+        language: "en",
+        uiScale: 1.3,
+      }),
+    );
+    getAppSettingsMock.mockRejectedValue(new Error("boom"));
+
+    const { result } = renderHook(() => useAppSettings());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.settings.theme).toBe("dark");
+    expect(result.current.settings.language).toBe("en");
+    expect(result.current.settings.uiScale).toBe(1.3);
   });
 
   it("persists settings via updateAppSettings and updates local state", async () => {

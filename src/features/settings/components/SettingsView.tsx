@@ -146,97 +146,21 @@ const buildWorkspaceOverrideDrafts = (
   return next;
 };
 
-type ApprovalRuleGroup = {
-  type: string;
-  rules: ApprovalRule[];
+const formatApprovalCommand = (command: string[]) => {
+  if (!command.length) {
+    return "(empty)";
+  }
+  return command
+    .map((token) => (/\s/.test(token) ? JSON.stringify(token) : token))
+    .join(" ");
 };
 
-const inferApprovalRuleType = (command: string[]): string => {
-  const joined = command.join(" ").trim().toLowerCase();
-  if (!joined) return "other";
-  if (
-    joined.startsWith("fetching") ||
-    joined.startsWith("fetch ") ||
-    joined.startsWith("抓取") ||
-    joined.startsWith("获取网页") ||
-    joined.startsWith("获取内容")
-  ) {
-    return "fetch";
+const formatApprovalCommandPreview = (command: string[], maxLength = 96) => {
+  const full = formatApprovalCommand(command);
+  if (full.length <= maxLength) {
+    return full;
   }
-  if (
-    joined.startsWith("writing") ||
-    joined.startsWith("write ") ||
-    joined.startsWith("写入") ||
-    joined.startsWith("写")
-  ) {
-    return "write";
-  }
-  if (
-    joined.startsWith("reading") ||
-    joined.startsWith("read ") ||
-    joined.startsWith("读取")
-  ) {
-    return "read";
-  }
-  if (
-    joined.startsWith("running") ||
-    joined.startsWith("executing") ||
-    joined.startsWith("execute ") ||
-    joined.startsWith("run ") ||
-    joined.startsWith("执行")
-  ) {
-    return "run";
-  }
-  if (
-    joined.startsWith("searching") ||
-    joined.startsWith("search ") ||
-    joined.startsWith("搜索")
-  ) {
-    return "search";
-  }
-  if (
-    joined.startsWith("use skill") ||
-    joined.startsWith("using skill") ||
-    joined.startsWith("技能")
-  ) {
-    return "skill";
-  }
-  return "other";
-};
-
-const formatApprovalRuleType = (
-  type: string,
-  t: (en: string, zh: string) => string,
-) => {
-  switch (type) {
-    case "fetch":
-      return t("Fetch", "抓取");
-    case "write":
-      return t("Write", "写入");
-    case "read":
-      return t("Read", "读取");
-    case "run":
-      return t("Run", "执行");
-    case "search":
-      return t("Search", "搜索");
-    case "skill":
-      return t("Skill", "技能");
-    default:
-      return t("Other", "其他");
-  }
-};
-
-const groupApprovalRulesByType = (rules: ApprovalRule[]): ApprovalRuleGroup[] => {
-  const grouped = new Map<string, ApprovalRule[]>();
-  rules.forEach((rule) => {
-    const type = inferApprovalRuleType(rule.command);
-    const current = grouped.get(type) ?? [];
-    current.push(rule);
-    grouped.set(type, current);
-  });
-  return Array.from(grouped.entries())
-    .map(([type, typeRules]) => ({ type, rules: typeRules }))
-    .sort((a, b) => b.rules.length - a.rules.length || a.type.localeCompare(b.type));
+  return `${full.slice(0, maxLength - 1)}…`;
 };
 
 export type SettingsViewProps = {
@@ -301,7 +225,6 @@ type ShortcutSettingKey =
   | "interruptShortcut"
   | "newAgentShortcut"
   | "newWorktreeAgentShortcut"
-  | "archiveThreadShortcut"
   | "toggleProjectsSidebarShortcut"
   | "toggleGitSidebarShortcut"
   | "branchSwitcherShortcut"
@@ -319,7 +242,6 @@ type ShortcutDraftKey =
   | "interrupt"
   | "newAgent"
   | "newWorktreeAgent"
-  | "archiveThread"
   | "projectsSidebar"
   | "gitSidebar"
   | "branchSwitcher"
@@ -340,7 +262,6 @@ const shortcutDraftKeyBySetting: Record<ShortcutSettingKey, ShortcutDraftKey> = 
   interruptShortcut: "interrupt",
   newAgentShortcut: "newAgent",
   newWorktreeAgentShortcut: "newWorktreeAgent",
-  archiveThreadShortcut: "archiveThread",
   toggleProjectsSidebarShortcut: "projectsSidebar",
   toggleGitSidebarShortcut: "gitSidebar",
   branchSwitcherShortcut: "branchSwitcher",
@@ -421,8 +342,14 @@ export function SettingsView({
     (en: string, zh: string) => (isZh ? zh : en),
     [isZh],
   );
+  const isAdvancedSection = useCallback(
+    (section: MiCodeSection) =>
+      section === "shortcuts" || section === "features",
+    [],
+  );
   const fileManagerName = getFileManagerName();
   const [activeSection, setActiveSection] = useState<MiCodeSection>("projects");
+  const [showAdvancedSections, setShowAdvancedSections] = useState(false);
   const [environmentWorkspaceId, setEnvironmentWorkspaceId] = useState<string | null>(
     null,
   );
@@ -506,6 +433,9 @@ export function SettingsView({
       }
     >
   >({});
+  const [expandedApprovalRules, setExpandedApprovalRules] = useState<
+    Record<string, boolean>
+  >({});
   const [shortcutDrafts, setShortcutDrafts] = useState({
     model: appSettings.composerModelShortcut ?? "",
     access: appSettings.composerAccessShortcut ?? "",
@@ -514,7 +444,6 @@ export function SettingsView({
     interrupt: appSettings.interruptShortcut ?? "",
     newAgent: appSettings.newAgentShortcut ?? "",
     newWorktreeAgent: appSettings.newWorktreeAgentShortcut ?? "",
-    archiveThread: appSettings.archiveThreadShortcut ?? "",
     projectsSidebar: appSettings.toggleProjectsSidebarShortcut ?? "",
     gitSidebar: appSettings.toggleGitSidebarShortcut ?? "",
     branchSwitcher: appSettings.branchSwitcherShortcut ?? "",
@@ -677,7 +606,6 @@ export function SettingsView({
       interrupt: appSettings.interruptShortcut ?? "",
       newAgent: appSettings.newAgentShortcut ?? "",
       newWorktreeAgent: appSettings.newWorktreeAgentShortcut ?? "",
-      archiveThread: appSettings.archiveThreadShortcut ?? "",
       projectsSidebar: appSettings.toggleProjectsSidebarShortcut ?? "",
       gitSidebar: appSettings.toggleGitSidebarShortcut ?? "",
       branchSwitcher: appSettings.branchSwitcherShortcut ?? "",
@@ -696,7 +624,6 @@ export function SettingsView({
     appSettings.interruptShortcut,
     appSettings.newAgentShortcut,
     appSettings.newWorktreeAgentShortcut,
-    appSettings.archiveThreadShortcut,
     appSettings.toggleProjectsSidebarShortcut,
     appSettings.toggleGitSidebarShortcut,
     appSettings.branchSwitcherShortcut,
@@ -790,12 +717,10 @@ export function SettingsView({
     });
   }, [activeSection, projects]);
 
-  const handleRemoveApprovalRuleType = useCallback(
-    async (workspaceId: string, rules: ApprovalRule[]) => {
+  const handleRemoveApprovalRule = useCallback(
+    async (workspaceId: string, command: string[]) => {
       try {
-        await Promise.all(
-          rules.map((rule) => removeApprovalRule(workspaceId, rule.command)),
-        );
+        await removeApprovalRule(workspaceId, command);
         const refreshed = await listApprovalRules(workspaceId);
         setApprovalRulesByWorkspace((prev) => ({
           ...prev,
@@ -809,7 +734,7 @@ export function SettingsView({
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         pushErrorToast({
-          title: t("Couldn’t remove approval rule type", "无法删除该类型的审批规则"),
+          title: t("Couldn’t remove approval rule", "无法删除审批规则"),
           message,
         });
       }
@@ -829,9 +754,18 @@ export function SettingsView({
 
   useEffect(() => {
     if (initialSection) {
+      if (isAdvancedSection(initialSection)) {
+        setShowAdvancedSections(true);
+      }
       setActiveSection(initialSection);
     }
-  }, [initialSection]);
+  }, [initialSection, isAdvancedSection]);
+
+  useEffect(() => {
+    if (!showAdvancedSections && isAdvancedSection(activeSection)) {
+      setActiveSection("micode");
+    }
+  }, [activeSection, isAdvancedSection, showAdvancedSections]);
 
   useEffect(() => {
     if (!environmentWorkspace) {
@@ -1048,6 +982,18 @@ export function SettingsView({
       const result = await onRunDoctor(nextMiCodeBin, nextMiCodeArgs);
       setDoctorState({ status: "done", result });
     } catch (error) {
+      const checks = [
+        {
+          id: "micode",
+          label: "MiCode CLI",
+          required: true,
+          status: "failed",
+          summary: error instanceof Error ? error.message : String(error),
+          technicalDetails: null,
+          recommendedAction: null,
+          canAutoInstall: false,
+        },
+      ];
       setDoctorState({
         status: "done",
         result: {
@@ -1060,6 +1006,11 @@ export function SettingsView({
           nodeOk: false,
           nodeVersion: null,
           nodeDetails: null,
+          overallStatus: "manual_action_required",
+          canProceed: false,
+          blocking: true,
+          checks,
+          lastCheckedAt: Date.now(),
         },
       });
     }
@@ -1277,14 +1228,6 @@ export function SettingsView({
             </button>
             <button
               type="button"
-              className={`settings-nav ${activeSection === "shortcuts" ? "active" : ""}`}
-              onClick={() => setActiveSection("shortcuts")}
-            >
-              <Keyboard aria-hidden />
-              {t("Shortcuts", "快捷键")}
-            </button>
-            <button
-              type="button"
               className={`settings-nav ${activeSection === "open-apps" ? "active" : ""}`}
               onClick={() => setActiveSection("open-apps")}
             >
@@ -1307,13 +1250,35 @@ export function SettingsView({
               <TerminalSquare aria-hidden />
               {t("MiCode", "MiCode")}
             </button>
+            {showAdvancedSections ? (
+              <>
+                <button
+                  type="button"
+                  className={`settings-nav ${activeSection === "shortcuts" ? "active" : ""}`}
+                  onClick={() => setActiveSection("shortcuts")}
+                >
+                  <Keyboard aria-hidden />
+                  {t("Shortcuts", "快捷键")}
+                </button>
+                <button
+                  type="button"
+                  className={`settings-nav ${activeSection === "features" ? "active" : ""}`}
+                  onClick={() => setActiveSection("features")}
+                >
+                  <FlaskConical aria-hidden />
+                  {t("Features", "功能")}
+                </button>
+              </>
+            ) : null}
             <button
               type="button"
-              className={`settings-nav ${activeSection === "features" ? "active" : ""}`}
-              onClick={() => setActiveSection("features")}
+              className="ghost settings-nav settings-nav-advanced-toggle"
+              onClick={() => setShowAdvancedSections((current) => !current)}
             >
-              <FlaskConical aria-hidden />
-              {t("Features", "功能")}
+              {showAdvancedSections ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />}
+              {showAdvancedSections
+                ? t("Hide advanced", "隐藏高级")
+                : t("Show advanced", "显示高级")}
             </button>
           </aside>
           <div className="settings-content">
@@ -2465,30 +2430,6 @@ export function SettingsView({
                     {t("Default:", "默认：")} {formatShortcut("cmd+shift+n")}
                   </div>
                 </div>
-                <div className="settings-field">
-                  <div className="settings-field-label">{t("Archive active thread", "归档当前会话")}</div>
-                  <div className="settings-field-row">
-                    <input
-                      className="settings-input settings-input--shortcut"
-                      value={formatShortcut(shortcutDrafts.archiveThread)}
-                      onKeyDown={(event) =>
-                        handleShortcutKeyDown(event, "archiveThreadShortcut")
-                      }
-                      placeholder={t("Type shortcut", "按下快捷键")}
-                      readOnly
-                    />
-                    <button
-                      type="button"
-                      className="ghost settings-button-compact"
-                      onClick={() => void updateShortcut("archiveThreadShortcut", null)}
-                    >
-                      {t("Clear", "清空")}
-                    </button>
-                  </div>
-                  <div className="settings-help">
-                    {t("Default:", "默认：")} {formatShortcut("cmd+ctrl+a")}
-                  </div>
-                </div>
                 <div className="settings-divider" />
                 <div className="settings-subsection-title">{t("Composer", "编辑器")}</div>
                 <div className="settings-subsection-subtitle">
@@ -3076,6 +3017,11 @@ export function SettingsView({
                 </div>
 
                 {doctorState.result && (
+                  (() => {
+                    const pythonCheck = doctorState.result.checks?.find(
+                      (check) => check.id === "python",
+                    );
+                    return (
                   <div
                     className={`settings-doctor ${doctorState.result.ok ? "ok" : "error"}`}
                   >
@@ -3097,11 +3043,22 @@ export function SettingsView({
                           ? `${t("ok", "正常")} (${doctorState.result.nodeVersion ?? t("unknown", "未知")})`
                           : t("missing", "缺失")}
                       </div>
+                      {pythonCheck && (
+                        <div>
+                          Python：
+                          {pythonCheck.status === "ready"
+                            ? `${t("ok", "正常")} (${pythonCheck.detectedVersion ?? t("unknown", "未知")})`
+                            : t("missing", "缺失")}
+                        </div>
+                      )}
                       {doctorState.result.details && (
                         <div>{doctorState.result.details}</div>
                       )}
                       {doctorState.result.nodeDetails && (
                         <div>{doctorState.result.nodeDetails}</div>
+                      )}
+                      {pythonCheck?.technicalDetails && (
+                        <div>{pythonCheck.technicalDetails}</div>
                       )}
                       {doctorState.result.path && (
                         <div className="settings-doctor-path">
@@ -3110,6 +3067,8 @@ export function SettingsView({
                       )}
                     </div>
                   </div>
+                    );
+                  })()
                 )}
               </div>
 
@@ -3119,15 +3078,14 @@ export function SettingsView({
                   </div>
                   <div className="settings-help">
                     {t(
-                      "Saved approvals are grouped by command type per workspace.",
-                      "已保存审批将按工作区、按命令类型分组显示。",
+                      "Saved approvals are shown item-by-item per workspace.",
+                      "已保存审批按工作区逐条显示。",
                     )}
                   </div>
                   <div className="settings-approval-rules">
                     {mainWorkspaces.map((workspace) => {
                       const ruleState = approvalRulesByWorkspace[workspace.id];
                       const rules = ruleState?.rules ?? [];
-                      const groupedRules = groupApprovalRulesByType(rules);
                       return (
                         <div key={workspace.id} className="settings-approval-workspace">
                           <div className="settings-approval-workspace-name">
@@ -3146,30 +3104,58 @@ export function SettingsView({
                               {ruleState.error}
                             </div>
                           ) : null}
-                          {!ruleState?.loading && !ruleState?.error && groupedRules.length === 0 ? (
+                          {!ruleState?.loading && !ruleState?.error && rules.length === 0 ? (
                             <div className="settings-help">{t("No saved rules.", "暂无已保存规则。")}</div>
                           ) : null}
-                          {!ruleState?.loading && !ruleState?.error && groupedRules.length > 0 ? (
+                          {!ruleState?.loading && !ruleState?.error && rules.length > 0 ? (
                             <div className="settings-approval-rule-list">
-                              {groupedRules.map((group) => (
-                                <div
-                                  key={`${workspace.id}:${group.type}`}
-                                  className="settings-approval-rule-row"
-                                >
-                                  <code className="settings-approval-rule-command">
-                                    {`${formatApprovalRuleType(group.type, t)} (${group.rules.length})`}
-                                  </code>
-                                  <button
-                                    type="button"
-                                    className="ghost settings-button-compact"
-                                    onClick={() =>
-                                      void handleRemoveApprovalRuleType(workspace.id, group.rules)
-                                    }
-                                  >
-                                    {t("Remove", "删除")}
-                                  </button>
-                                </div>
-                              ))}
+                              {rules.map((rule, index) => {
+                                const rowKey = `${workspace.id}:${index}:${rule.command.join("\u0000")}`;
+                                const expanded = expandedApprovalRules[rowKey] ?? false;
+                                return (
+                                  <div key={rowKey} className="settings-approval-rule-row">
+                                    <div>
+                                      <code className="settings-approval-rule-command">
+                                        {expanded
+                                          ? formatApprovalCommand(rule.command)
+                                          : formatApprovalCommandPreview(rule.command)}
+                                      </code>
+                                      {expanded ? (
+                                        <div className="settings-help">
+                                          {t("Tokens:", "参数：")} {rule.command.join(" | ")}
+                                        </div>
+                                      ) : (
+                                        <div className="settings-help">
+                                          {t("Click details to inspect full tokens.", "点击详情查看完整参数。")}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="settings-field-row">
+                                      <button
+                                        type="button"
+                                        className="ghost settings-button-compact"
+                                        onClick={() =>
+                                          setExpandedApprovalRules((prev) => ({
+                                            ...prev,
+                                            [rowKey]: !expanded,
+                                          }))
+                                        }
+                                      >
+                                        {expanded ? t("Hide details", "收起详情") : t("Details", "详情")}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="ghost settings-button-compact"
+                                        onClick={() =>
+                                          void handleRemoveApprovalRule(workspace.id, rule.command)
+                                        }
+                                      >
+                                        {t("Remove", "删除")}
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           ) : null}
                         </div>
@@ -3228,31 +3214,33 @@ export function SettingsView({
                   </div>
                 </div>
 
-                <div className="settings-field">
-                  <label className="settings-field-label" htmlFor="backend-mode">
-                    {t("Backend mode", "后端模式")}
-                  </label>
-                  <select
-                    id="backend-mode"
-                    className="settings-select"
-                    value={appSettings.backendMode}
-                    onChange={(event) =>
-                      void onUpdateAppSettings({
-                        ...appSettings,
-                        backendMode: event.target.value as AppSettings["backendMode"],
-                      })
-                    }
-                  >
-                    <option value="local">{t("Local (default)", "本地（默认）")}</option>
-                    <option value="remote">{t("Remote (daemon)", "远程（守护进程）")}</option>
-                  </select>
-                  <div className="settings-help">
-                    {t(
-                      "Remote mode connects to a separate daemon running the backend on another machine (e.g. WSL2/Linux).",
-                      "远程模式会连接另一台机器（如 WSL2/Linux）上运行的独立后端守护进程。",
-                    )}
+                {showAdvancedSections ? (
+                  <div className="settings-field">
+                    <label className="settings-field-label" htmlFor="backend-mode">
+                      {t("Backend mode", "后端模式")}
+                    </label>
+                    <select
+                      id="backend-mode"
+                      className="settings-select"
+                      value={appSettings.backendMode}
+                      onChange={(event) =>
+                        void onUpdateAppSettings({
+                          ...appSettings,
+                          backendMode: event.target.value as AppSettings["backendMode"],
+                        })
+                      }
+                    >
+                      <option value="local">{t("Local (default)", "本地（默认）")}</option>
+                      <option value="remote">{t("Remote (daemon)", "远程（守护进程）")}</option>
+                    </select>
+                    <div className="settings-help">
+                      {t(
+                        "Remote mode connects to a separate daemon running the backend on another machine (e.g. WSL2/Linux).",
+                        "远程模式会连接另一台机器（如 WSL2/Linux）上运行的独立后端守护进程。",
+                      )}
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
 
                 <FileEditorCard

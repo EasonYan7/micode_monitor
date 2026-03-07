@@ -24,13 +24,24 @@ export function SidebarFooter({
   language = "en",
 }: SidebarFooterProps) {
   const isZh = language === "zh";
+  const sessionTitle = isZh ? "\u4f1a\u8bdd\u7528\u91cf\u8bb0\u5f55" : "Session usage";
+  const weeklyTitle = isZh ? "\u6bcf\u5468\u7528\u91cf" : "Weekly";
+  const normalizedSessionValue = sessionValueLabel?.trim().toLowerCase() ?? null;
+  const normalizedCreditsValue = creditsLabel?.trim().toLowerCase() ?? null;
+  const footerMetaLabel =
+    normalizedSessionValue &&
+    normalizedCreditsValue &&
+    normalizedCreditsValue.includes(normalizedSessionValue)
+      ? null
+      : creditsLabel;
+
   return (
     <div className="sidebar-footer">
       <div className="usage-bars">
         <div className="usage-block">
           <div className="usage-label">
             <span className="usage-title">
-              <span>{isZh ? "会话" : "Session"}</span>
+              <span>{sessionTitle}</span>
               {sessionResetLabel && (
                 <span className="usage-reset">· {sessionResetLabel}</span>
               )}
@@ -52,7 +63,7 @@ export function SidebarFooter({
           <div className="usage-block">
             <div className="usage-label">
               <span className="usage-title">
-                <span>{isZh ? "每周" : "Weekly"}</span>
+                <span>{weeklyTitle}</span>
                 {weeklyResetLabel && (
                   <span className="usage-reset">· {weeklyResetLabel}</span>
                 )}
@@ -72,7 +83,7 @@ export function SidebarFooter({
           </div>
         )}
       </div>
-      {creditsLabel && <div className="usage-meta">{creditsLabel}</div>}
+      {footerMetaLabel && <div className="usage-meta">{footerMetaLabel}</div>}
     </div>
   );
 }

@@ -74,7 +74,7 @@ export function useUpdaterController({
   }, [onDebug, systemNotificationsEnabled]);
 
   useTauriEvent(subscribeUpdaterCheck, () => {
-    void checkForUpdates({ announceNoUpdate: true });
+    void checkForUpdates({ announceNoUpdate: true, showError: true });
   });
 
   return {

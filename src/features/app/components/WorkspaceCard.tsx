@@ -1,3 +1,5 @@
+import Check from "lucide-react/dist/esm/icons/check";
+import Circle from "lucide-react/dist/esm/icons/circle";
 import type { MouseEvent } from "react";
 
 import type { WorkspaceInfo } from "../../../types";
@@ -37,6 +39,7 @@ export function WorkspaceCard({
   children,
 }: WorkspaceCardProps) {
   const contentCollapsedClass = isCollapsed ? " collapsed" : "";
+  const isWorktree = (workspace.kind ?? "main") === "worktree";
 
   return (
     <div className="workspace-card">
@@ -54,10 +57,20 @@ export function WorkspaceCard({
         }}
       >
         <div>
-          <div className="workspace-name-row">
-            <div className="workspace-title">
-              <span className="workspace-name">{workspaceName ?? workspace.name}</span>
-              <button
+            <div className="workspace-name-row">
+              <div className="workspace-title">
+                <span className="workspace-name">{workspaceName ?? workspace.name}</span>
+                <span
+                  className={`workspace-status-icon ${
+                    workspace.connected ? "connected" : "disconnected"
+                  }`}
+                  title={workspace.connected ? "Connected" : "Needs connection"}
+                  aria-label={workspace.connected ? "Connected" : "Needs connection"}
+                >
+                  {workspace.connected ? <Check aria-hidden /> : <Circle aria-hidden />}
+                </span>
+                {isWorktree ? <span className="workspace-kind-dot" aria-hidden /> : null}
+                <button
                 className={`workspace-toggle ${isCollapsed ? "" : "expanded"}`}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -107,7 +120,7 @@ export function WorkspaceCard({
               onConnectWorkspace(workspace);
             }}
           >
-            connect
+            Connect
           </span>
         )}
       </div>

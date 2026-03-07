@@ -53,9 +53,14 @@ export function useUpdater({ enabled = true, onDebug }: UseUpdaterOptions) {
     await update?.close();
   }, [clearLatestTimeout]);
 
-  const checkForUpdates = useCallback(async (options?: { announceNoUpdate?: boolean }) => {
+  const checkForUpdates = useCallback(async (options?: { announceNoUpdate?: boolean; showError?: boolean }) => {
     let update: Awaited<ReturnType<typeof check>> | null = null;
+    const showError =
+      options?.showError ?? options?.announceNoUpdate ?? false;
+    const previousUpdate = updateRef.current;
+    updateRef.current = null;
     try {
+      await previousUpdate?.close();
       clearLatestTimeout();
       setState({ stage: "checking" });
       update = await check();
@@ -87,7 +92,11 @@ export function useUpdater({ enabled = true, onDebug }: UseUpdaterOptions) {
         label: "updater/error",
         payload: message,
       });
-      setState({ stage: "error", error: message });
+      if (showError) {
+        setState({ stage: "error", error: message });
+      } else {
+        setState({ stage: "idle" });
+      }
     } finally {
       if (!updateRef.current) {
         await update?.close();
@@ -98,7 +107,7 @@ export function useUpdater({ enabled = true, onDebug }: UseUpdaterOptions) {
   const startUpdate = useCallback(async () => {
     const update = updateRef.current;
     if (!update) {
-      await checkForUpdates();
+      await checkForUpdates({ showError: true });
       return;
     }
 

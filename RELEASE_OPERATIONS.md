@@ -31,6 +31,17 @@ This runbook is the required flow for GUI release and updater publication.
 3. `tauri.windows.release.conf.json` is committed (not just local).
 4. Working tree has no pending release-critical files.
 
+## Asset naming rule (strict)
+
+All uploaded Windows assets must use **dot-style** names (no spaces):
+
+1. `MiCode.Monitor_X.Y.Z_x64-setup.exe`
+2. `MiCode.Monitor_X.Y.Z_x64-setup.exe.sig`
+3. `MiCode.Monitor_X.Y.Z_x64_en-US.msi`
+
+`latest.json` must point to the exact uploaded filename (byte-for-byte match in URL path).
+Do not mix `MiCode Monitor_...` and `MiCode.Monitor_...`.
+
 ## Release steps (strict)
 
 1. Commit release changes.
@@ -59,7 +70,8 @@ On `Releases -> vX.Y.Z`, assets must include:
 4. `MiCode.Monitor_X.Y.Z_x64_en-US.msi`
 5. (optional) msi `.sig`
 
-`latest.json` must reference the same version `X.Y.Z`.
+`latest.json` must reference the same version `X.Y.Z`, and its `platforms.windows-x86_64.url`
+must exactly match the setup exe asset name in this release.
 
 ## Common failure patterns
 

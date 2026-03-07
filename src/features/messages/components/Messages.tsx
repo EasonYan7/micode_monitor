@@ -143,6 +143,35 @@ function basename(path: string) {
   return parts.length ? parts[parts.length - 1] : path;
 }
 
+function safeDisplayText(value: unknown, fallback = ""): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  try {
+    const encoded = JSON.stringify(value);
+    if (typeof encoded === "string" && encoded !== "null") {
+      return encoded;
+    }
+  } catch {
+    // Fall back to String(...).
+  }
+  try {
+    return String(value);
+  } catch {
+    return fallback;
+  }
+}
+
 function parseToolArgs(detail: string) {
   if (!detail) {
     return null;
@@ -228,13 +257,126 @@ function readTargetFromOutput(output: string) {
   return (match[1] ?? "").trim();
 }
 
-function toolNameFromTitle(title: string) {
+type ToolRoute = {
+  server: string;
+  tool: string;
+};
+
+function parseToolRouteFromTitle(title: string): ToolRoute | null {
   if (!title.toLowerCase().startsWith("tool:")) {
+    return null;
+  }
+  const [, routePart = ""] = title.split(":");
+  const segments = routePart
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  if (segments.length === 0) {
+    return null;
+  }
+  if (segments.length === 1) {
+    return { server: "", tool: segments[0] };
+  }
+  return {
+    server: segments.slice(0, -1).join("/"),
+    tool: segments[segments.length - 1],
+  };
+}
+
+function toolNameFromTitle(title: string) {
+  return parseToolRouteFromTitle(title)?.tool ?? "";
+}
+
+function extractSkillNameFromText(text: string) {
+  if (!text) {
     return "";
   }
-  const [, toolPart = ""] = title.split(":");
-  const segments = toolPart.split("/").map((segment) => segment.trim());
-  return segments.length ? segments[segments.length - 1] : "";
+  const normalized = text.replace(/\\/g, "/");
+  const pathMatch = normalized.match(/(?:^|\/)skills\/([A-Za-z0-9._-]+)/i);
+  if (pathMatch?.[1]) {
+    return pathMatch[1];
+  }
+  const dollarMatch = normalized.match(/\$([A-Za-z0-9._-]+)/);
+  if (dollarMatch?.[1]) {
+    return dollarMatch[1];
+  }
+  return "";
+}
+
+const SKILL_NAME_KEYS = [
+  "skill",
+  "skillName",
+  "skill_name",
+  "skillId",
+  "skill_id",
+  "name",
+] as const;
+
+function extractSkillNameFromRecord(record: Record<string, unknown> | null) {
+  if (!record) {
+    return "";
+  }
+  for (const key of SKILL_NAME_KEYS) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) {
+      const trimmed = value.trim().replace(/^\$/, "");
+      if (/^[A-Za-z0-9._-]+$/.test(trimmed)) {
+        return trimmed;
+      }
+      const fromText = extractSkillNameFromText(trimmed);
+      if (fromText) {
+        return fromText;
+      }
+    }
+  }
+  return "";
+}
+
+function extractSkillNameFromArgs(args: Record<string, unknown> | null) {
+  if (!args) {
+    return "";
+  }
+  const directName = extractSkillNameFromRecord(args);
+  if (directName) {
+    return directName;
+  }
+  for (const nestedKey of ["input", "params", "payload", "options", "arguments"]) {
+    const nested = args[nestedKey];
+    if (!nested || typeof nested !== "object" || Array.isArray(nested)) {
+      continue;
+    }
+    const nestedName = extractSkillNameFromRecord(nested as Record<string, unknown>);
+    if (nestedName) {
+      return nestedName;
+    }
+  }
+  return "";
+}
+
+function toolActionLabelFromName(name: string) {
+  const normalized = name.toLowerCase();
+  if (!normalized) {
+    return "call";
+  }
+  if (normalized.includes("search")) {
+    return "search";
+  }
+  if (normalized.includes("read")) {
+    return "read";
+  }
+  if (normalized.includes("write")) {
+    return "write";
+  }
+  if (normalized.includes("run") || normalized.includes("exec")) {
+    return "run";
+  }
+  if (normalized.includes("list")) {
+    return "list";
+  }
+  if (normalized.includes("update")) {
+    return "update";
+  }
+  return "call";
 }
 
 function formatCount(value: number, singular: string, plural: string) {
@@ -303,8 +445,8 @@ function stripInternalJsonPreamble(text: string) {
 }
 
 function parseReasoning(item: Extract<ConversationItem, { kind: "reasoning" }>) {
-  const summary = item.summary ?? "";
-  const content = item.content ?? "";
+  const summary = safeDisplayText(item.summary);
+  const content = safeDisplayText(item.content);
   const hasSummary = summary.trim().length > 0;
   const titleSource = hasSummary ? summary : content;
   const titleLines = titleSource.split("\n");
@@ -561,19 +703,19 @@ function buildToolSummary(
       label: "command",
       value: cleanedCommand || "Command",
       detail: "",
-      output: item.output || "",
+      output: safeDisplayText(item.output),
     };
   }
 
   if (item.toolType === "webSearch") {
     return {
       label: "searched",
-      value: item.detail || "",
+      value: safeDisplayText(item.detail),
     };
   }
 
   if (item.toolType === "imageView") {
-    const file = basename(item.detail || "");
+    const file = basename(safeDisplayText(item.detail));
     return {
       label: "read",
       value: file || "image",
@@ -581,14 +723,34 @@ function buildToolSummary(
   }
 
   if (item.toolType === "mcpToolCall") {
-    const toolName = toolNameFromTitle(item.title);
-    const args = parseToolArgs(item.detail);
+    const route = parseToolRouteFromTitle(item.title);
+    const toolName = route?.tool ?? "";
+    const args = parseToolArgs(safeDisplayText(item.detail));
     const commandPreview = commandPreviewFromArgs(args);
+    const detailText = safeDisplayText(item.detail);
+    const outputText = safeDisplayText(item.output);
+    const routeText = `${route?.server ?? ""}/${route?.tool ?? ""}`.toLowerCase();
+    const fromArgsSkill = extractSkillNameFromArgs(args);
+    const fromCommandSkill = extractSkillNameFromText(commandPreview);
+    const isSkillRoute = routeText.includes("skill");
+    const skillName = fromArgsSkill || fromCommandSkill;
+
+    if (isSkillRoute || skillName) {
+      const resolvedSkill = skillName || extractSkillNameFromText(detailText);
+      const action = toolActionLabelFromName(toolName || route?.server || "");
+      return {
+        label: "skill",
+        value: resolvedSkill ? `${resolvedSkill} (${action})` : `(${action})`,
+        detail: commandPreview || detailText || outputText,
+      };
+    }
+
     if (toolName.toLowerCase().includes("search")) {
       return {
         label: "searched",
         value:
-          firstStringField(args, ["query", "pattern", "text"]) || item.detail,
+          firstStringField(args, ["query", "pattern", "text"]) ||
+          detailText,
       };
     }
     if (toolName.toLowerCase().includes("read")) {
@@ -602,30 +764,33 @@ function buildToolSummary(
         label: "read",
         value: displayValue || "read",
         detail:
-          targetPath && displayValue && targetPath !== displayValue ? targetPath : item.detail || "",
+          targetPath && displayValue && targetPath !== displayValue
+            ? targetPath
+            : detailText,
       };
     }
     if (toolName.toLowerCase().includes("execute")) {
       return {
         label: "run",
         value: commandPreview || "execute",
-        detail: item.detail || "",
+        detail: detailText,
       };
     }
     if (toolName) {
+      const toolPath = route?.server ? `${route.server}/${toolName}` : toolName;
       return {
         label: "tool",
-        value: toolName,
-        detail: item.detail || "",
+        value: toolPath,
+        detail: detailText,
       };
     }
   }
 
   return {
     label: "tool",
-    value: item.title || "",
-    detail: item.detail || "",
-    output: item.output || "",
+    value: safeDisplayText(item.title),
+    detail: safeDisplayText(item.detail),
+    output: safeDisplayText(item.output),
   };
 }
 
@@ -660,8 +825,9 @@ function toolIconForSummary(
     return Search;
   }
 
-  const toolName = toolNameFromTitle(item.title).toLowerCase();
-  const title = item.title.toLowerCase();
+  const safeTitle = safeDisplayText(item.title);
+  const toolName = toolNameFromTitle(safeTitle).toLowerCase();
+  const title = safeTitle.toLowerCase();
   if (toolName.includes("diff") || title.includes("diff")) {
     return Diff;
   }
@@ -803,13 +969,14 @@ const MessageRow = memo(function MessageRow({
   onOpenThreadLink,
 }: MessageRowProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const rawText = safeDisplayText(item.text);
   const strippedAssistantText =
-    item.role === "assistant" ? stripInternalJsonPreamble(item.text) : item.text;
+    item.role === "assistant" ? stripInternalJsonPreamble(rawText) : rawText;
   const displayText =
     item.role === "assistant" &&
     strippedAssistantText.trim().length === 0 &&
-    item.text.trim().length > 0
-      ? item.text
+    rawText.trim().length > 0
+      ? rawText
       : strippedAssistantText;
   const hasText = displayText.trim().length > 0;
   const imageItems = useMemo(() => {
@@ -939,9 +1106,9 @@ const ReviewRow = memo(function ReviewRow({
           Review
         </span>
       </div>
-      {item.text && (
+      {safeDisplayText(item.text) && (
         <Markdown
-          value={item.text}
+          value={safeDisplayText(item.text)}
           className="item-text markdown"
           onOpenFileLink={onOpenFileLink}
           onOpenFileLinkMenu={onOpenFileLinkMenu}
@@ -978,7 +1145,7 @@ const ToolRow = memo(function ToolRow({
   const isFileChange = item.toolType === "fileChange";
   const isCommand = item.toolType === "commandExecution";
   const commandText = isCommand
-    ? item.title.replace(/^Command:\s*/i, "").trim()
+    ? safeDisplayText(item.title).replace(/^Command:\s*/i, "").trim()
     : "";
   const summary = buildToolSummary(item, commandText);
   const changeNames = (item.changes ?? [])
@@ -1002,7 +1169,7 @@ const ToolRow = memo(function ToolRow({
   const shouldFadeCommand =
     isCommand && !isExpanded && (summaryValue?.length ?? 0) > 80;
   const showToolOutput = isExpanded && (!isFileChange || !hasChanges);
-  const normalizedStatus = (item.status ?? "").toLowerCase();
+  const normalizedStatus = safeDisplayText(item.status).toLowerCase();
   const isCommandRunning = isCommand && /in[_\s-]*progress|running|started/.test(normalizedStatus);
   const commandDurationMs =
     typeof item.durationMs === "number" ? item.durationMs : null;
@@ -1075,9 +1242,9 @@ const ToolRow = memo(function ToolRow({
         {isExpanded && summary.detail && !isFileChange && (
           <div className="tool-inline-detail">{summary.detail}</div>
         )}
-        {isExpanded && isCommand && item.detail && (
+        {isExpanded && isCommand && safeDisplayText(item.detail) && (
           <div className="tool-inline-detail tool-inline-muted">
-            cwd: {item.detail}
+            cwd: {safeDisplayText(item.detail)}
           </div>
         )}
         {isExpanded && isFileChange && hasChanges && (
@@ -1109,9 +1276,9 @@ const ToolRow = memo(function ToolRow({
             ))}
           </div>
         )}
-        {isExpanded && isFileChange && !hasChanges && item.detail && (
+        {isExpanded && isFileChange && !hasChanges && safeDisplayText(item.detail) && (
           <Markdown
-            value={item.detail}
+            value={safeDisplayText(item.detail)}
             className="item-text markdown"
             onOpenFileLink={onOpenFileLink}
             onOpenFileLinkMenu={onOpenFileLinkMenu}
