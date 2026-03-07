@@ -1,3 +1,4 @@
+﻿import { useEffect, useMemo, useRef } from "react";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
 import type {
   LocalUsageSnapshot,
@@ -52,6 +53,83 @@ type HomeProps = {
   language?: UiLanguage;
 };
 
+function formatCompactNumber(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return "--";
+  }
+  if (value >= 1_000_000_000) {
+    const scaled = value / 1_000_000_000;
+    return `${scaled.toFixed(scaled >= 10 ? 0 : 1)}b`;
+  }
+  if (value >= 1_000_000) {
+    const scaled = value / 1_000_000;
+    return `${scaled.toFixed(scaled >= 10 ? 0 : 1)}m`;
+  }
+  if (value >= 1_000) {
+    const scaled = value / 1_000;
+    return `${scaled.toFixed(scaled >= 10 ? 0 : 1)}k`;
+  }
+  return String(value);
+}
+
+function formatCount(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return "--";
+  }
+  return new Intl.NumberFormat().format(value);
+}
+
+function formatDuration(valueMs: number | null | undefined) {
+  if (valueMs === null || valueMs === undefined) {
+    return "--";
+  }
+  const totalSeconds = Math.max(0, Math.round(valueMs / 1000));
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  if (totalMinutes > 0) {
+    return `${totalMinutes}m`;
+  }
+  return `${totalSeconds}s`;
+}
+
+function formatDurationCompact(valueMs: number | null | undefined) {
+  if (valueMs === null || valueMs === undefined) {
+    return "--";
+  }
+  const totalMinutes = Math.max(0, Math.round(valueMs / 60000));
+  if (totalMinutes >= 60) {
+    const hours = totalMinutes / 60;
+    return `${hours.toFixed(hours >= 10 ? 0 : 1)}h`;
+  }
+  if (totalMinutes > 0) {
+    return `${totalMinutes}m`;
+  }
+  const seconds = Math.max(0, Math.round(valueMs / 1000));
+  return `${seconds}s`;
+}
+
+function formatDayLabel(value: string | null | undefined, language: UiLanguage) {
+  if (!value) {
+    return "--";
+  }
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) {
+    return value;
+  }
+  const date = new Date(year, month - 1, day);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat(language === "zh" ? "zh-CN" : "en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
 export function Home({
   onOpenProject,
   onAddWorkspace,
@@ -74,117 +152,49 @@ export function Home({
   language = "en",
 }: HomeProps) {
   const isZh = language === "zh";
+  void onAddWorkspace;
+  const homeScrollRef = useRef<HTMLDivElement | null>(null);
+  const keepTopAnchoredRef = useRef(true);
 
-  const formatCompactNumber = (value: number | null | undefined) => {
-    if (value === null || value === undefined) {
-      return "--";
-    }
-    if (value >= 1_000_000_000) {
-      const scaled = value / 1_000_000_000;
-      return `${scaled.toFixed(scaled >= 10 ? 0 : 1)}b`;
-    }
-    if (value >= 1_000_000) {
-      const scaled = value / 1_000_000;
-      return `${scaled.toFixed(scaled >= 10 ? 0 : 1)}m`;
-    }
-    if (value >= 1_000) {
-      const scaled = value / 1_000;
-      return `${scaled.toFixed(scaled >= 10 ? 0 : 1)}k`;
-    }
-    return String(value);
-  };
+  const workspaceCards = useMemo(
+    () =>
+      workspaces
+        .map((workspace) => {
+          const threads = threadsByWorkspace[workspace.id] ?? [];
+          const processingCount = threads.filter(
+            (thread) => threadStatusById[thread.id]?.isProcessing,
+          ).length;
+          const unreadCount = threads.filter(
+            (thread) => threadStatusById[thread.id]?.hasUnread,
+          ).length;
+          const reviewingCount = threads.filter(
+            (thread) => threadStatusById[thread.id]?.isReviewing,
+          ).length;
+          const latestUpdatedAt = threads.reduce<number | null>((latest, thread) => {
+            if (!thread.updatedAt) {
+              return latest;
+            }
+            return latest === null || thread.updatedAt > latest
+              ? thread.updatedAt
+              : latest;
+          }, null);
 
-  const formatCount = (value: number | null | undefined) => {
-    if (value === null || value === undefined) {
-      return "--";
-    }
-    return new Intl.NumberFormat().format(value);
-  };
-
-  const formatDuration = (valueMs: number | null | undefined) => {
-    if (valueMs === null || valueMs === undefined) {
-      return "--";
-    }
-    const totalSeconds = Math.max(0, Math.round(valueMs / 1000));
-    const totalMinutes = Math.floor(totalSeconds / 60);
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    if (totalMinutes > 0) {
-      return `${totalMinutes}m`;
-    }
-    return `${totalSeconds}s`;
-  };
-
-  const formatDurationCompact = (valueMs: number | null | undefined) => {
-    if (valueMs === null || valueMs === undefined) {
-      return "--";
-    }
-    const totalMinutes = Math.max(0, Math.round(valueMs / 60000));
-    if (totalMinutes >= 60) {
-      const hours = totalMinutes / 60;
-      return `${hours.toFixed(hours >= 10 ? 0 : 1)}h`;
-    }
-    if (totalMinutes > 0) {
-      return `${totalMinutes}m`;
-    }
-    const seconds = Math.max(0, Math.round(valueMs / 1000));
-    return `${seconds}s`;
-  };
-
-  const formatDayLabel = (value: string | null | undefined) => {
-    if (!value) {
-      return "--";
-    }
-    const [year, month, day] = value.split("-").map(Number);
-    if (!year || !month || !day) {
-      return value;
-    }
-    const date = new Date(year, month - 1, day);
-    if (Number.isNaN(date.getTime())) {
-      return value;
-    }
-    return new Intl.DateTimeFormat(isZh ? "zh-CN" : "en-US", {
-      month: "short",
-      day: "numeric",
-    }).format(date);
-  };
-
-  const workspaceCards = workspaces
-    .map((workspace) => {
-      const threads = threadsByWorkspace[workspace.id] ?? [];
-      const processingCount = threads.filter(
-        (thread) => threadStatusById[thread.id]?.isProcessing,
-      ).length;
-      const unreadCount = threads.filter(
-        (thread) => threadStatusById[thread.id]?.hasUnread,
-      ).length;
-      const reviewingCount = threads.filter(
-        (thread) => threadStatusById[thread.id]?.isReviewing,
-      ).length;
-      const latestUpdatedAt = threads.reduce<number | null>((latest, thread) => {
-        if (!thread.updatedAt) {
-          return latest;
-        }
-        return latest === null || thread.updatedAt > latest ? thread.updatedAt : latest;
-      }, null);
-
-      return {
-        id: workspace.id,
-        name: workspace.name,
-        connected: workspace.connected,
-        kind: workspace.kind ?? "main",
-        threadCount: threads.length,
-        processingCount,
-        unreadCount,
-        reviewingCount,
-        latestUpdatedAt,
-      };
-    })
-    .sort((a, b) => (b.latestUpdatedAt ?? 0) - (a.latestUpdatedAt ?? 0))
-    .slice(0, 6);
+          return {
+            id: workspace.id,
+            name: workspace.name,
+            connected: workspace.connected,
+            kind: workspace.kind ?? "main",
+            threadCount: threads.length,
+            processingCount,
+            unreadCount,
+            reviewingCount,
+            latestUpdatedAt,
+          };
+        })
+        .sort((a, b) => (b.latestUpdatedAt ?? 0) - (a.latestUpdatedAt ?? 0))
+        .slice(0, 6),
+    [threadStatusById, threadsByWorkspace, workspaces],
+  );
 
   const totalThreads = workspaceCards.reduce(
     (sum, workspace) => sum + workspace.threadCount,
@@ -204,7 +214,7 @@ export function Home({
       ? `先继续 ${activeWorkspace.name}，这里最近有 ${activeWorkspace.threadCount} 个会话。`
       : `Resume ${activeWorkspace.name} first. It has ${activeWorkspace.threadCount} recent conversations.`
     : isZh
-      ? "先添加一个项目，财多多会把最近进展和工作入口整理给你。"
+      ? "先添加一个项目，财多多会把最近进展和下一步整理给你。"
       : "Add your first project and Rich will organize recent progress and next actions for you.";
 
   const usageTotals = localUsageSnapshot?.totals ?? null;
@@ -225,8 +235,7 @@ export function Home({
     0,
   );
   const peakAgentDay = usageDays.reduce<
-    | { day: string; agentTimeMs: number }
-    | null
+    { day: string; agentTimeMs: number } | null
   >((best, day) => {
     const value = day.agentTimeMs ?? 0;
     if (value <= 0) {
@@ -246,31 +255,80 @@ export function Home({
     ),
   );
   const updatedLabel = localUsageSnapshot
-    ? `Updated ${formatRelativeTime(localUsageSnapshot.updatedAt, language)}`
+    ? `${isZh ? "更新于" : "Updated"} ${formatRelativeTime(localUsageSnapshot.updatedAt, language)}`
     : null;
   const showUsageSkeleton = isLoadingLocalUsage && !localUsageSnapshot;
   const showUsageEmpty = !isLoadingLocalUsage && !localUsageSnapshot;
   const tokenLabel = "tokens";
   const latestAgentsLabel = isZh ? "最近动态" : "Recent activity";
-  const overviewLabel = isZh ? "工作区总览" : "Workspace overview";
+  const overviewLabel = isZh ? "项目总览" : "Workspace overview";
   const noActivityTitle = isZh ? "还没有最近动态" : "No recent activity yet";
   const noActivitySubtitle = isZh
-    ? "开始一个对话后，这里会显示最新结果和可继续的工作。"
+    ? "开始一个会话后，这里会展示最新结果和可以继续的工作。"
     : "Start a conversation and this space will surface the latest results and resumable work.";
   const topModelsLabel = isZh ? "热门模型" : "Top models";
-  const noModelsLabel = isZh ? "暂时还没有模型数据" : "No model data yet";
+  const noModelsLabel = isZh ? "暂无模型数据" : "No model data yet";
+  const layoutSignature = [
+    workspaceCards.length,
+    latestAgentRuns.length,
+    isLoadingLatestAgents ? 1 : 0,
+    usageDays.length,
+    localUsageSnapshot?.topModels?.length ?? 0,
+    isLoadingLocalUsage ? 1 : 0,
+    usageMetric,
+  ].join(":");
+
+  useEffect(() => {
+    const element = homeScrollRef.current;
+    if (!element) {
+      return;
+    }
+
+    const handleScroll = () => {
+      keepTopAnchoredRef.current = element.scrollTop <= 32;
+    };
+
+    handleScroll();
+    element.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      element.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    const element = homeScrollRef.current;
+    if (!element || !keepTopAnchoredRef.current) {
+      return;
+    }
+
+    let frameA = 0;
+    let frameB = 0;
+    frameA = window.requestAnimationFrame(() => {
+      element.scrollTop = 0;
+      frameB = window.requestAnimationFrame(() => {
+        if (keepTopAnchoredRef.current) {
+          element.scrollTop = 0;
+        }
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameA);
+      window.cancelAnimationFrame(frameB);
+    };
+  }, [layoutSignature]);
 
   return (
-    <div className="home-scroll">
+    <div className="home-scroll" ref={homeScrollRef}>
       <div className="home">
         <section className="home-hero">
           <div className="home-brand-row">
-            <span className="home-brand-pill">Amy Wealth Desk</span>
+            <span className="home-brand-pill">财多多</span>
             <span className="home-brand-persona">
-              {isZh ? "财多多 / Rich" : "Caiduoduo / Rich"}
+              {isZh ? "你的项目协作台" : "Your project companion"}
             </span>
           </div>
-          <div className="home-title">{isZh ? "财多多" : "Rich"}</div>
+          <div className="home-title">Rich</div>
           <div className="home-subtitle">
             {isZh
               ? "面向本地项目的智能协作与任务工作台。"
@@ -278,7 +336,7 @@ export function Home({
           </div>
           <div className="home-hero-copy">
             {isZh
-              ? "先看清项目、最近进展和下一步，再进入具体工作区，不会一打开就被技术面板淹没。"
+              ? "首页现在先回答三个问题：我该继续哪个项目、最近发生了什么、以及使用趋势有没有异常。这样做的原因是你打开软件后的第一步应该是判断下一步，而不是先被技术面板淹没。"
               : "Start from projects, recent momentum, and next steps, then drop into the workspace when you are ready."}
           </div>
           <div className="home-actions">
@@ -286,22 +344,18 @@ export function Home({
               className="home-button primary"
               onClick={onOpenProject}
               data-tauri-drag-region="false"
+              type="button"
             >
               <span className="home-icon" aria-hidden>
                 +
               </span>
-              {isZh ? "打开项目" : "Open project"}
+              {isZh ? "打开工作区" : "Open workspace"}
             </button>
-            <button
-              className="home-button secondary"
-              onClick={onAddWorkspace}
-              data-tauri-drag-region="false"
-            >
-              <span className="home-icon" aria-hidden>
-                ·
-              </span>
-              {isZh ? "添加工作区" : "Add workspace"}
-            </button>
+          </div>
+          <div className="home-action-note">
+            {isZh
+              ? "AI 只会读取当前工作区内的内容，不会访问工作区外的文件。"
+              : "AI only reads content inside the selected workspace, not files outside it."}
           </div>
           <div className="home-recommendation">
             <div className="home-recommendation-label">
@@ -347,13 +401,13 @@ export function Home({
                               ? "已连接"
                               : "Connected"
                             : isZh
-                              ? "待连接"
-                              : "Needs connection"}
+                              ? "需处理"
+                              : "Needs attention"}
                         </span>
                         <span className="home-overview-kind">
                           {workspace.kind === "worktree"
                             ? isZh
-                              ? "工作树"
+                              ? "派生工作区"
                               : "Worktree"
                             : isZh
                               ? "主工作区"
@@ -365,8 +419,8 @@ export function Home({
                       {workspace.latestUpdatedAt
                         ? formatRelativeTime(workspace.latestUpdatedAt, language)
                         : isZh
-                          ? "暂无活动"
-                          : "No activity"}
+                          ? "刚添加"
+                          : "Just added"}
                     </div>
                   </div>
                   <div className="home-overview-stats">
@@ -394,13 +448,7 @@ export function Home({
                     </div>
                   </div>
                   <div className="home-overview-footer">
-                    {workspace.reviewingCount > 0
-                      ? isZh
-                        ? `${workspace.reviewingCount} 个会话正在 Review`
-                        : `${workspace.reviewingCount} conversations in review`
-                      : isZh
-                        ? "点击进入工作区"
-                        : "Open workspace"}
+                    {isZh ? "点击进入工作区" : "Open workspace"}
                   </div>
                 </button>
               ))}
@@ -420,57 +468,57 @@ export function Home({
         </section>
 
         <section className="home-latest">
-          <div className="home-latest-header">
-            <div className="home-latest-label">{latestAgentsLabel}</div>
+          <div className="home-section-header">
+            <div className="home-section-title">{latestAgentsLabel}</div>
             <div className="home-section-meta">
-              {isZh ? "优先展示最近值得继续的工作。" : "Recent momentum, designed for quick resumption."}
+              {isZh ? "优先展示最近值得继续的工作。" : "Prioritize recent work worth resuming."}
             </div>
           </div>
-          {latestAgentRuns.length > 0 ? (
+          {isLoadingLatestAgents && latestAgentRuns.length === 0 ? (
+            <div className="home-latest-grid home-latest-grid-loading">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div className="home-latest-card" key={index}>
+                  <div className="home-latest-card-skeleton">
+                    <span className="home-latest-skeleton home-latest-skeleton-title" />
+                    <span className="home-latest-skeleton home-latest-skeleton-time" />
+                    <span className="home-latest-skeleton home-latest-skeleton-line" />
+                    <span className="home-latest-skeleton home-latest-skeleton-line short" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : latestAgentRuns.length > 0 ? (
             <div className="home-latest-grid home-latest-timeline">
-              {latestAgentRuns.map((run) => (
+              {latestAgentRuns.slice(0, 4).map((run) => (
                 <button
                   className="home-latest-card home-latest-card-button"
-                  key={run.threadId}
+                  key={`${run.workspaceId}:${run.threadId}`}
                   onClick={() => onSelectThread(run.workspaceId, run.threadId)}
                   type="button"
                 >
                   <div className="home-latest-card-header">
                     <div className="home-latest-project">
                       <span className="home-latest-project-name">{run.projectName}</span>
-                      {run.groupName && (
+                      {run.groupName ? (
                         <span className="home-latest-group">{run.groupName}</span>
-                      )}
+                      ) : null}
                     </div>
-                    <div className="home-latest-time">
+                    <span className="home-latest-time">
                       {formatRelativeTime(run.timestamp, language)}
-                    </div>
+                    </span>
                   </div>
-                  <div className="home-latest-message">
-                    {run.message.trim() || (isZh ? "智能体已回复。" : "Agent replied.")}
-                  </div>
+                  <div className="home-latest-message">{run.message}</div>
                   <div className="home-latest-footer">
                     <span className="home-latest-resume">
                       {isZh ? "继续这项工作" : "Resume this work"}
                     </span>
-                    {run.isProcessing && (
-                      <div className="home-latest-status">{isZh ? "进行中" : "Running"}</div>
-                    )}
+                    {run.isProcessing ? (
+                      <span className="home-latest-status">
+                        {isZh ? "进行中" : "Running"}
+                      </span>
+                    ) : null}
                   </div>
                 </button>
-              ))}
-            </div>
-          ) : isLoadingLatestAgents ? (
-            <div className="home-latest-grid home-latest-grid-loading" aria-label="Loading agents">
-              {Array.from({ length: 3 }).map((_, index) => (
-                <div className="home-latest-card home-latest-card-skeleton" key={index}>
-                  <div className="home-latest-card-header">
-                    <span className="home-latest-skeleton home-latest-skeleton-title" />
-                    <span className="home-latest-skeleton home-latest-skeleton-time" />
-                  </div>
-                  <span className="home-latest-skeleton home-latest-skeleton-line" />
-                  <span className="home-latest-skeleton home-latest-skeleton-line short" />
-                </div>
               ))}
             </div>
           ) : (
@@ -484,9 +532,7 @@ export function Home({
         <section className="home-usage">
           <div className="home-section-header">
             <div>
-              <div className="home-section-title">
-                {isZh ? "趋势洞察" : "Trend insight"}
-              </div>
+              <div className="home-section-title">{isZh ? "趋势洞察" : "Trend insight"}</div>
               <div className="home-usage-intro">
                 {isZh
                   ? "把使用量放在辅助位，帮助你判断节奏和成本。"
@@ -494,7 +540,7 @@ export function Home({
               </div>
             </div>
             <div className="home-section-meta-row">
-              {updatedLabel && <div className="home-section-meta">{updatedLabel}</div>}
+              {updatedLabel ? <div className="home-section-meta">{updatedLabel}</div> : null}
               <button
                 type="button"
                 className={
@@ -504,8 +550,8 @@ export function Home({
                 }
                 onClick={onRefreshLocalUsage}
                 disabled={isLoadingLocalUsage}
-                aria-label="Refresh usage"
-                title="Refresh usage"
+                aria-label={isZh ? "刷新用量" : "Refresh usage"}
+                title={isZh ? "刷新用量" : "Refresh usage"}
               >
                 <RefreshCw
                   className={
@@ -520,14 +566,14 @@ export function Home({
           </div>
           <div className="home-usage-controls">
             <div className="home-usage-control-group">
-              <span className="home-usage-control-label">Workspace</span>
+              <span className="home-usage-control-label">
+                {isZh ? "项目范围" : "Workspace"}
+              </span>
               <div className="home-usage-select-wrap">
                 <select
                   className="home-usage-select"
                   value={usageWorkspaceId ?? ""}
-                  onChange={(event) =>
-                    onUsageWorkspaceChange(event.target.value || null)
-                  }
+                  onChange={(event) => onUsageWorkspaceChange(event.target.value || null)}
                   disabled={usageWorkspaceOptions.length === 0}
                 >
                   <option value="">{isZh ? "全部工作区" : "All workspaces"}</option>
@@ -586,16 +632,16 @@ export function Home({
           ) : showUsageEmpty ? (
             <div className="home-usage-empty">
               <div className="home-usage-empty-title">
-                {isZh ? "暂时还没有使用数据" : "No usage data yet"}
+                {isZh ? "暂无用量数据" : "No usage data yet"}
               </div>
               <div className="home-usage-empty-subtitle">
                 {isZh
-                  ? "开始一次智能体会话后，这里会积累本地使用趋势。"
+                  ? "开始一次智能体会话后，这里会累积本地使用趋势。"
                   : "Run an agent session to start tracking local usage."}
               </div>
-              {localUsageError && (
+              {localUsageError ? (
                 <div className="home-usage-error">{localUsageError}</div>
-              )}
+              ) : null}
             </div>
           ) : (
             <>
@@ -603,9 +649,7 @@ export function Home({
                 {usageMetric === "tokens" ? (
                   <>
                     <div className="home-usage-card">
-                      <div className="home-usage-label">
-                        {isZh ? "最近 7 天" : "Last 7 days"}
-                      </div>
+                      <div className="home-usage-label">{isZh ? "最近 7 天" : "Last 7 days"}</div>
                       <div className="home-usage-value">
                         <span className="home-usage-number">
                           {formatCompactNumber(usageTotals?.last7DaysTokens)}
@@ -613,14 +657,11 @@ export function Home({
                         <span className="home-usage-suffix">{tokenLabel}</span>
                       </div>
                       <div className="home-usage-caption">
-                        {isZh ? "日均" : "Avg"}{" "}
-                        {formatCompactNumber(usageTotals?.averageDailyTokens)} / {isZh ? "天" : "day"}
+                        {isZh ? "日均" : "Avg"} {formatCompactNumber(usageTotals?.averageDailyTokens)} / {isZh ? "天" : "day"}
                       </div>
                     </div>
                     <div className="home-usage-card">
-                      <div className="home-usage-label">
-                        {isZh ? "最近 30 天" : "Last 30 days"}
-                      </div>
+                      <div className="home-usage-label">{isZh ? "最近 30 天" : "Last 30 days"}</div>
                       <div className="home-usage-value">
                         <span className="home-usage-number">
                           {formatCompactNumber(usageTotals?.last30DaysTokens)}
@@ -632,25 +673,19 @@ export function Home({
                       </div>
                     </div>
                     <div className="home-usage-card">
-                      <div className="home-usage-label">
-                        {isZh ? "缓存命中率" : "Cache hit rate"}
-                      </div>
+                      <div className="home-usage-label">{isZh ? "缓存命中率" : "Cache hit rate"}</div>
                       <div className="home-usage-value">
                         <span className="home-usage-number">
-                          {usageTotals
-                            ? `${usageTotals.cacheHitRatePercent.toFixed(1)}%`
-                            : "--"}
+                          {usageTotals ? `${usageTotals.cacheHitRatePercent.toFixed(1)}%` : "--"}
                         </span>
                       </div>
-                      <div className="home-usage-caption">
-                        {isZh ? "最近 7 天" : "Last 7 days"}
-                      </div>
+                      <div className="home-usage-caption">{isZh ? "最近 7 天" : "Last 7 days"}</div>
                     </div>
                     <div className="home-usage-card">
                       <div className="home-usage-label">{isZh ? "峰值日" : "Peak day"}</div>
                       <div className="home-usage-value">
                         <span className="home-usage-number">
-                          {formatDayLabel(usageTotals?.peakDay)}
+                          {formatDayLabel(usageTotals?.peakDay, language)}
                         </span>
                       </div>
                       <div className="home-usage-caption">
@@ -661,32 +696,20 @@ export function Home({
                 ) : (
                   <>
                     <div className="home-usage-card">
-                      <div className="home-usage-label">
-                        {isZh ? "最近 7 天" : "Last 7 days"}
-                      </div>
+                      <div className="home-usage-label">{isZh ? "最近 7 天" : "Last 7 days"}</div>
                       <div className="home-usage-value">
-                        <span className="home-usage-number">
-                          {formatDurationCompact(last7AgentMs)}
-                        </span>
-                        <span className="home-usage-suffix">
-                          {isZh ? "智能体时长" : "agent time"}
-                        </span>
+                        <span className="home-usage-number">{formatDurationCompact(last7AgentMs)}</span>
+                        <span className="home-usage-suffix">agent time</span>
                       </div>
                       <div className="home-usage-caption">
                         {isZh ? "日均" : "Avg"} {formatDurationCompact(averageDailyAgentMs)} / {isZh ? "天" : "day"}
                       </div>
                     </div>
                     <div className="home-usage-card">
-                      <div className="home-usage-label">
-                        {isZh ? "最近 30 天" : "Last 30 days"}
-                      </div>
+                      <div className="home-usage-label">{isZh ? "最近 30 天" : "Last 30 days"}</div>
                       <div className="home-usage-value">
-                        <span className="home-usage-number">
-                          {formatDurationCompact(last30AgentMs)}
-                        </span>
-                        <span className="home-usage-suffix">
-                          {isZh ? "智能体时长" : "agent time"}
-                        </span>
+                        <span className="home-usage-number">{formatDurationCompact(last30AgentMs)}</span>
+                        <span className="home-usage-suffix">agent time</span>
                       </div>
                       <div className="home-usage-caption">
                         {isZh ? "总计" : "Total"} {formatDuration(last30AgentMs)}
@@ -695,26 +718,18 @@ export function Home({
                     <div className="home-usage-card">
                       <div className="home-usage-label">{isZh ? "运行次数" : "Runs"}</div>
                       <div className="home-usage-value">
-                        <span className="home-usage-number">
-                          {formatCount(last7AgentRuns)}
-                        </span>
-                        <span className="home-usage-suffix">
-                          {isZh ? "次" : "runs"}
-                        </span>
+                        <span className="home-usage-number">{formatCount(last7AgentRuns)}</span>
+                        <span className="home-usage-suffix">{isZh ? "次" : "runs"}</span>
                       </div>
-                      <div className="home-usage-caption">
-                        {isZh ? "最近 7 天" : "Last 7 days"}
-                      </div>
+                      <div className="home-usage-caption">{isZh ? "最近 7 天" : "Last 7 days"}</div>
                     </div>
                     <div className="home-usage-card">
                       <div className="home-usage-label">{isZh ? "峰值日" : "Peak day"}</div>
                       <div className="home-usage-value">
-                        <span className="home-usage-number">
-                          {formatDayLabel(peakAgentDayLabel)}
-                        </span>
+                        <span className="home-usage-number">{formatDayLabel(peakAgentDayLabel, language)}</span>
                       </div>
                       <div className="home-usage-caption">
-                        {formatDurationCompact(peakAgentTimeMs)} {isZh ? "智能体时长" : "agent time"}
+                        {formatDurationCompact(peakAgentTimeMs)} agent time
                       </div>
                     </div>
                   </>
@@ -725,13 +740,11 @@ export function Home({
                   {last7Days.map((day) => {
                     const value =
                       usageMetric === "tokens" ? day.totalTokens : day.agentTimeMs ?? 0;
-                    const height = Math.max(6, Math.round((value / maxUsageValue) * 100));
+                    const height = Math.max(8, Math.round((value / maxUsageValue) * 100));
                     const tooltip =
                       usageMetric === "tokens"
-                        ? `${formatDayLabel(day.day)} · ${formatCount(day.totalTokens)} ${tokenLabel}`
-                        : `${formatDayLabel(day.day)} · ${formatDuration(day.agentTimeMs ?? 0)} ${
-                            isZh ? "智能体时长" : "agent time"
-                          }`;
+                        ? `${formatDayLabel(day.day, language)} · ${formatCount(day.totalTokens)} ${tokenLabel}`
+                        : `${formatDayLabel(day.day, language)} · ${formatDuration(day.agentTimeMs ?? 0)} agent time`;
                     return (
                       <div
                         className="home-usage-bar"
@@ -743,7 +756,7 @@ export function Home({
                           style={{ height: `${height}%` }}
                         />
                         <span className="home-usage-bar-label">
-                          {formatDayLabel(day.day)}
+                          {formatDayLabel(day.day, language)}
                         </span>
                       </div>
                     );
@@ -753,9 +766,9 @@ export function Home({
               <div className="home-usage-models">
                 <div className="home-usage-models-label">
                   {topModelsLabel}
-                  {usageMetric === "time" && (
+                  {usageMetric === "time" ? (
                     <span className="home-usage-models-hint">Tokens</span>
-                  )}
+                  ) : null}
                 </div>
                 <div className="home-usage-models-list">
                   {localUsageSnapshot?.topModels?.length ? (
@@ -775,9 +788,9 @@ export function Home({
                     <span className="home-usage-model-empty">{noModelsLabel}</span>
                   )}
                 </div>
-                {localUsageError && (
+                {localUsageError ? (
                   <div className="home-usage-error">{localUsageError}</div>
-                )}
+                ) : null}
               </div>
             </>
           )}

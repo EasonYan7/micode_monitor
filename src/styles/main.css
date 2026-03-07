@@ -368,6 +368,32 @@
   min-height: var(--main-topbar-height);
 }
 
+.home-topbar-spacer {
+  visibility: hidden;
+  pointer-events: none;
+  border-bottom: none;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.home-topbar-spacer .actions {
+  display: none;
+}
+
+.home-shell {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  min-height: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.home-shell-content {
+  min-height: 0;
+  min-width: 0;
+}
+
 .app.sidebar-collapsed .main-topbar {
   padding-left: calc(
     var(--main-panel-padding)

@@ -1,3 +1,16 @@
+.startup-gate-app {
+  min-height: 100%;
+}
+
+.startup-gate-app-blocked {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.startup-gate-app-ready {
+  visibility: visible;
+}
+
 .startup-gate-shell {
   position: fixed;
   inset: 0;
@@ -239,8 +252,27 @@
   gap: 12px;
 }
 
+.startup-gate-check-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .startup-gate-check-label {
   font-weight: 700;
+}
+
+.startup-gate-check-kind {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(106, 163, 255, 0.14);
+  color: #bdd9ff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .startup-gate-check-state,

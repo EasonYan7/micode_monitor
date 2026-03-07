@@ -110,9 +110,12 @@ describe("StartupEnvironmentGate", () => {
       </StartupEnvironmentGate>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("app ready")).toBeTruthy();
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByText("app ready")).toBeTruthy();
+      },
+      { timeout: 3000 },
+    );
     expect(environmentInstallDependencyMock).not.toHaveBeenCalled();
   });
 
@@ -147,8 +150,45 @@ describe("StartupEnvironmentGate", () => {
     await waitFor(() => {
       expect(environmentInstallDependencyMock).toHaveBeenCalledWith("node", null, null);
     });
-    await waitFor(() => {
-      expect(screen.getByText("app ready")).toBeTruthy();
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByText("app ready")).toBeTruthy();
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it("shows optional development hints without blocking the app", async () => {
+    environmentCheckStartupMock.mockResolvedValue(
+      buildStatus({
+        checks: [
+          ...buildStatus().checks,
+          {
+            id: "msvcLinker",
+            label: "MSVC linker",
+            required: false,
+            status: "failed",
+            detectedVersion: null,
+            summary: "link.exe is missing in this shell.",
+            technicalDetails: "Run `where link` in PowerShell.",
+            recommendedAction: "Install Visual Studio Build Tools 2022.",
+            canAutoInstall: false,
+          },
+        ],
+      }),
+    );
+
+    render(
+      <StartupEnvironmentGate>
+        <div>app ready</div>
+      </StartupEnvironmentGate>,
+    );
+
+    await waitFor(
+      () => {
+        expect(screen.getByText("app ready")).toBeTruthy();
+      },
+      { timeout: 3000 },
+    );
   });
 });

@@ -97,7 +97,12 @@ export function DesktopLayout({
       <section className="main">
         {updateToastNode}
         {errorToastsNode}
-        {showHome && homeNode}
+        {showHome && (
+          <div className="home-shell">
+            <MainTopbar leftNode={null} className="home-topbar-spacer" />
+            <div className="home-shell-content">{homeNode}</div>
+          </div>
+        )}
 
         {showWorkspace && (
           <>

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { pickImageFiles } from "../../../services/tauri";
+import { IMAGE_UPLOADS_ENABLED } from "../constants";
 
 type UseComposerImagesArgs = {
   activeThreadId: string | null;
@@ -17,10 +18,13 @@ export function useComposerImages({
     [activeThreadId, activeWorkspaceId],
   );
 
-  const activeImages = imagesByThread[draftKey] ?? [];
+  const activeImages = IMAGE_UPLOADS_ENABLED ? imagesByThread[draftKey] ?? [] : [];
 
   const attachImages = useCallback(
     (paths: string[]) => {
+      if (!IMAGE_UPLOADS_ENABLED) {
+        return;
+      }
       if (paths.length === 0) {
         return;
       }
@@ -34,6 +38,9 @@ export function useComposerImages({
   );
 
   const pickImages = useCallback(async () => {
+    if (!IMAGE_UPLOADS_ENABLED) {
+      return;
+    }
     const picked = await pickImageFiles();
     if (picked.length === 0) {
       return;
@@ -43,6 +50,9 @@ export function useComposerImages({
 
   const removeImage = useCallback(
     (path: string) => {
+      if (!IMAGE_UPLOADS_ENABLED) {
+        return;
+      }
       setImagesByThread((prev) => {
         const existing = prev[draftKey] ?? [];
         const next = existing.filter((entry) => entry !== path);
@@ -57,6 +67,9 @@ export function useComposerImages({
   );
 
   const clearActiveImages = useCallback(() => {
+    if (!IMAGE_UPLOADS_ENABLED) {
+      return;
+    }
     setImagesByThread((prev) => {
       if (!(draftKey in prev)) {
         return prev;
@@ -67,10 +80,16 @@ export function useComposerImages({
   }, [draftKey]);
 
   const setImagesForThread = useCallback((threadId: string, images: string[]) => {
+    if (!IMAGE_UPLOADS_ENABLED) {
+      return;
+    }
     setImagesByThread((prev) => ({ ...prev, [threadId]: images }));
   }, []);
 
   const removeImagesForThread = useCallback((threadId: string) => {
+    if (!IMAGE_UPLOADS_ENABLED) {
+      return;
+    }
     setImagesByThread((prev) => {
       if (!(threadId in prev)) {
         return prev;
