@@ -2317,6 +2317,17 @@ impl WorkspaceSession {
                                 }),
                             );
                         }
+                        // Recreate the session so the next turn is not sent over an aborted
+                        // connection. On Windows the abort signal from a tool-level sub-request
+                        // can poison the whole ACP session; without this the queued follow-up
+                        // message would immediately fail with another "Request was aborted".
+                        if let Ok(new_session) = self.create_session_for_cwd(self.entry.path.clone()).await {
+                            if is_background_thread {
+                                self.background_threads.lock().await.insert(thread_id.clone(), new_session);
+                            } else {
+                                self.thread_store.lock().await.set_session_id(&thread_id, new_session);
+                            }
+                        }
                         return Ok(json!({
                             "result": {
                                 "stopReason": "cancelled",

@@ -66,7 +66,7 @@ const defaultSettings: AppSettings = {
   gitDiffIgnoreWhitespaceChanges: false,
   experimentalCollabEnabled: false,
   collaborationModesEnabled: true,
-  steerEnabled: true,
+  steerEnabled: false,
   unifiedExecEnabled: true,
   experimentalAppsEnabled: false,
   personality: "friendly",
@@ -161,6 +161,7 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
   return {
     ...settings,
     agentProvider: "micode-acp",
+    steerEnabled: false,
     agentBin: settings.agentBin?.trim()
       ? settings.agentBin.trim()
       : (settings.micodeBin?.trim() ? settings.micodeBin.trim() : null),
