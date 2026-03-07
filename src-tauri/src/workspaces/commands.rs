@@ -46,6 +46,65 @@ fn spawn_with_app(
     spawn_workspace_session(entry, default_bin, agent_args, app.clone(), agent_home)
 }
 
+#[cfg(target_os = "windows")]
+fn windows_resolve_command_on_path(candidates: &[&str]) -> Option<String> {
+    for candidate in candidates {
+        let output = std::process::Command::new("where")
+            .arg(candidate)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            continue;
+        }
+        let value = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+            .map(ToString::to_string);
+        if value.is_some() {
+            return value;
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn resolve_windows_editor_command(app_name: &str) -> Result<String, String> {
+    let normalized = app_name.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        "visual studio code" | "vscode" | "vs code" => {
+            if let Some(path) = windows_resolve_command_on_path(&["code.cmd", "code.exe", "code"]) {
+                return Ok(path);
+            }
+            if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+                let bin_dir = PathBuf::from(local_app_data)
+                    .join("Programs")
+                    .join("Microsoft VS Code")
+                    .join("bin");
+                for candidate in [bin_dir.join("code.cmd"), bin_dir.join("code.exe")] {
+                    if candidate.is_file() {
+                        return Ok(candidate.to_string_lossy().to_string());
+                    }
+                }
+            }
+            Err(
+                "VS Code could not be opened because the `code` launcher was not found. Install VS Code, or enable its shell command and try again. You can also switch to Default App in Settings."
+                    .to_string(),
+            )
+        }
+        "cursor" => windows_resolve_command_on_path(&["cursor.exe", "cursor.cmd", "cursor"])
+            .ok_or_else(|| {
+                "Cursor could not be opened because its launcher was not found on PATH. Update the editor command in Settings, or switch to Default App.".to_string()
+            }),
+        "zed" => windows_resolve_command_on_path(&["zed.exe", "zed.cmd", "zed"]).ok_or_else(|| {
+            "Zed could not be opened because its launcher was not found on PATH. Update the editor command in Settings, or switch to Default App.".to_string()
+        }),
+        _ => Ok(app_name.to_string()),
+    }
+}
+
 #[tauri::command]
 pub(crate) async fn read_workspace_file(
     workspace_id: String,
@@ -834,8 +893,15 @@ pub(crate) async fn open_workspace_in(
     let status = if let Some(command) = command {
         let mut cmd = std::process::Command::new(command);
         cmd.args(args).arg(path);
-        cmd.status()
-            .map_err(|error| format!("Failed to open app ({target_label}): {error}"))?
+        cmd.status().map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                format!(
+                    "Configured command was not found ({target_label}). Update the command in Settings, or switch to Default App."
+                )
+            } else {
+                format!("Failed to open app ({target_label}): {error}")
+            }
+        })?
     } else if let Some(app) = app {
         #[cfg(target_os = "macos")]
         {
@@ -849,19 +915,18 @@ pub(crate) async fn open_workspace_in(
         }
         #[cfg(target_os = "windows")]
         {
-            // On Windows app display names like "Visual Studio Code" are not executable names.
-            // Prefer known CLI launchers when available.
-            let normalized_app = app.trim().to_ascii_lowercase();
-            let executable = match normalized_app.as_str() {
-                "visual studio code" | "vscode" | "vs code" => "code".to_string(),
-                "cursor" => "cursor".to_string(),
-                "zed" => "zed".to_string(),
-                _ => app,
-            };
+            let executable = resolve_windows_editor_command(&app)?;
             let mut cmd = std::process::Command::new(executable);
             cmd.args(args).arg(path);
-            cmd.status()
-                .map_err(|error| format!("Failed to open app ({target_label}): {error}"))?
+            cmd.status().map_err(|error| {
+                if error.kind() == std::io::ErrorKind::NotFound {
+                    format!(
+                        "The selected editor launcher was not found ({target_label}). Install the editor or update its command in Settings."
+                    )
+                } else {
+                    format!("Failed to open app ({target_label}): {error}")
+                }
+            })?
         }
         #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
         {
@@ -903,7 +968,7 @@ pub(crate) async fn open_workspace_in(
         .map(|code| format!("exit code {code}"))
         .unwrap_or_else(|| "terminated by signal".to_string());
     Err(format!(
-        "Failed to open app ({target_label} returned {exit_detail})."
+        "Failed to open app ({target_label} returned {exit_detail}). Check that the editor is installed and its launcher command is available."
     ))
 }
 

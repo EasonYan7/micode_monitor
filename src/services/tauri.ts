@@ -7,6 +7,7 @@ import type {
   AppSettings,
   DebugEntry,
   MiCodeDoctorResult,
+  StartupEnvironmentStatus,
   DictationModelStatus,
   DictationSessionState,
   LocalUsageSnapshot,
@@ -725,6 +726,42 @@ export async function runMiCodeInstallWindows(): Promise<{
   stderr: string;
 }> {
   return invoke("micode_install_windows");
+}
+
+export async function environmentCheckStartup(
+  micodeBin: string | null,
+  micodeArgs: string | null,
+): Promise<StartupEnvironmentStatus> {
+  return invoke<StartupEnvironmentStatus>("environment_check_startup", {
+    micodeBin,
+    micodeArgs,
+  });
+}
+
+export async function environmentRetryCheck(
+  micodeBin: string | null,
+  micodeArgs: string | null,
+): Promise<StartupEnvironmentStatus> {
+  return invoke<StartupEnvironmentStatus>("environment_retry_check", {
+    micodeBin,
+    micodeArgs,
+  });
+}
+
+export async function environmentGetCachedStatus(): Promise<StartupEnvironmentStatus | null> {
+  return invoke<StartupEnvironmentStatus | null>("environment_get_cached_status");
+}
+
+export async function environmentInstallDependency(
+  dependencyId: string,
+  micodeBin: string | null,
+  micodeArgs: string | null,
+): Promise<StartupEnvironmentStatus> {
+  return invoke<StartupEnvironmentStatus>("environment_install_dependency", {
+    dependencyId,
+    micodeBin,
+    micodeArgs,
+  });
 }
 
 export async function getWorkspaceFiles(workspaceId: string) {

@@ -62,6 +62,7 @@
 - [x] Fallback MCP status source: when ACP returns empty/error, read configured servers from `settings.json` for `/mcp` display
 - [x] Resolve MiCode home with global default (`~/.micode|~/.codex`) for all workspaces; only use workspace `.micodemonitor` as legacy fallback
 - [x] Add startup doctor hint for missing MiCode CLI (show localized toast instead of silent failure)
+- [x] Add blocking startup environment gate with structured checks/install-retry flow for Node/MiCode ACP/Python (exclude VS Code from startup gating)
 - [x] Enforce slash command-only send path: slash-prefixed input is never forwarded to AI text prompt; `/mcp *` always runs local MCP handler
 - [x] Keep Token terminology untranslated in Chinese UI (replace “代币” labels with “Token”)
 - [x] Hide composer "Default" controls: remove collaboration selector when only default mode exists and hide thinking selector when no reasoning options

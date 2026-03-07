@@ -1,5 +1,38 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StartupEnvironmentCheck {
+    pub(crate) id: String,
+    pub(crate) label: String,
+    pub(crate) required: bool,
+    pub(crate) status: String,
+    #[serde(default)]
+    pub(crate) detected_version: Option<String>,
+    pub(crate) summary: String,
+    #[serde(default)]
+    pub(crate) technical_details: Option<String>,
+    #[serde(default)]
+    pub(crate) recommended_action: Option<String>,
+    #[serde(default)]
+    pub(crate) can_auto_install: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StartupEnvironmentStatus {
+    pub(crate) overall_status: String,
+    pub(crate) can_proceed: bool,
+    pub(crate) blocking: bool,
+    #[serde(default)]
+    pub(crate) checks: Vec<StartupEnvironmentCheck>,
+    pub(crate) last_checked_at: i64,
+    #[serde(default, rename = "micodeBin")]
+    pub(crate) micode_bin: Option<String>,
+    #[serde(default, rename = "micodeArgs")]
+    pub(crate) micode_args: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct GitFileStatus {
     pub(crate) path: String,
