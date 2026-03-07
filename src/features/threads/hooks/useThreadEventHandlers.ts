@@ -34,6 +34,7 @@ type ThreadEventHandlersOptions = {
   onReviewExited?: (workspaceId: string, threadId: string) => void;
   approvalAllowlistRef: MutableRefObject<Record<string, string[][]>>;
   pendingInterruptsRef: MutableRefObject<Set<string>>;
+  activeTurnIdByThread: Record<string, string | null>;
 };
 
 const DEBUG_MAX_STRING_LENGTH = 1200;
@@ -150,8 +151,11 @@ export function useThreadEventHandlers({
   onReviewExited,
   approvalAllowlistRef,
   pendingInterruptsRef,
+  activeTurnIdByThread,
 }: ThreadEventHandlersOptions) {
   const assistantStreamDebugRef = useRef<Record<string, StreamedAssistantDebugEntry>>({});
+  const activeTurnIdByThreadRef = useRef(activeTurnIdByThread);
+  activeTurnIdByThreadRef.current = activeTurnIdByThread;
   const onApprovalRequest = useThreadApprovalEvents({
     dispatch,
     approvalAllowlistRef,
@@ -204,6 +208,7 @@ export function useThreadEventHandlers({
     pushThreadErrorMessage,
     safeMessageActivity,
     recordThreadActivity,
+    activeTurnIdByThreadRef,
   });
 
   const onBackgroundThreadAction = useCallback(

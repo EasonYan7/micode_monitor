@@ -24,6 +24,7 @@ type UseThreadTurnEventsOptions = {
   pushThreadErrorMessage: (threadId: string, message: string) => void;
   safeMessageActivity: () => void;
   recordThreadActivity: (workspaceId: string, threadId: string, timestamp?: number) => void;
+  activeTurnIdByThreadRef: MutableRefObject<Record<string, string | null>>;
 };
 
 export function useThreadTurnEvents({
@@ -39,6 +40,7 @@ export function useThreadTurnEvents({
   pushThreadErrorMessage,
   safeMessageActivity,
   recordThreadActivity,
+  activeTurnIdByThreadRef,
 }: UseThreadTurnEventsOptions) {
   const shouldClearCompletedPlan = useCallback((threadId: string, turnId: string) => {
     const plan = planByThreadRef.current[threadId];
@@ -130,6 +132,10 @@ export function useThreadTurnEvents({
 
   const onTurnCompleted = useCallback(
     (_workspaceId: string, threadId: string, turnId: string) => {
+      const currentActiveTurnId = activeTurnIdByThreadRef.current[threadId];
+      if (currentActiveTurnId && currentActiveTurnId !== turnId) {
+        return;
+      }
       const threadItems = itemsByThread[threadId] ?? [];
       const latestItem = threadItems[threadItems.length - 1] ?? null;
       const shouldAddCompletionHint =
