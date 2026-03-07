@@ -3,6 +3,7 @@ use tauri::Manager;
 use tauri::{RunEvent, WindowEvent};
 
 mod backend;
+mod default_config;
 mod dictation;
 mod debug_logs;
 mod event_sink;
@@ -51,6 +52,9 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            if let Err(err) = default_config::ensure_default_config_files() {
+                eprintln!("Warning: Failed to initialize default config files: {err}");
+            }
             let state = state::AppState::load(&app.handle());
             let menu_is_zh = state
                 .app_settings
