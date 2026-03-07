@@ -20,6 +20,7 @@ import { TerminalDock } from "../../terminal/components/TerminalDock";
 import { TerminalPanel } from "../../terminal/components/TerminalPanel";
 import type { ReviewPromptState, ReviewPromptStep } from "../../threads/hooks/useReviewPrompt";
 import type { WorkspaceLaunchScriptsState } from "../../app/hooks/useWorkspaceLaunchScripts";
+import type { WorkspaceRestoreStatus } from "../../workspaces/hooks/useWorkspaceRestore";
 import type {
   AccessMode,
   ApprovalDecision,
@@ -114,6 +115,7 @@ type LayoutNodesOptions = {
   threadListLoadingByWorkspace: Record<string, boolean>;
   threadListPagingByWorkspace: Record<string, boolean>;
   threadListCursorByWorkspace: Record<string, string | null>;
+  workspaceRestoreStatusById: Record<string, WorkspaceRestoreStatus | null>;
   activeWorkspaceId: string | null;
   activeThreadId: string | null;
   activeItems: ConversationItem[];
@@ -178,6 +180,7 @@ type LayoutNodesOptions = {
   onWorkspaceDragLeave: (event: DragEvent<HTMLElement>) => void;
   onWorkspaceDrop: (event: DragEvent<HTMLElement>) => void;
   updaterState: UpdateState;
+  workspaceOpeningToastNode?: ReactNode;
   onUpdate: () => void;
   onDismissUpdate: () => void;
   errorToasts: ErrorToast[];
@@ -487,10 +490,11 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       threadsByWorkspace={options.threadsByWorkspace}
       threadParentById={options.threadParentById}
       threadStatusById={options.threadStatusById}
-      threadListLoadingByWorkspace={options.threadListLoadingByWorkspace}
-      threadListPagingByWorkspace={options.threadListPagingByWorkspace}
-      threadListCursorByWorkspace={options.threadListCursorByWorkspace}
-      activeWorkspaceId={options.activeWorkspaceId}
+        threadListLoadingByWorkspace={options.threadListLoadingByWorkspace}
+        threadListPagingByWorkspace={options.threadListPagingByWorkspace}
+        threadListCursorByWorkspace={options.threadListCursorByWorkspace}
+        workspaceRestoreStatusById={options.workspaceRestoreStatusById}
+        activeWorkspaceId={options.activeWorkspaceId}
       activeThreadId={options.activeThreadId}
       accountRateLimits={options.activeRateLimits}
       activeTokenUsage={options.activeTokenUsage}
@@ -615,6 +619,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       onDismissDictationError={options.onDismissDictationError}
       dictationHint={options.dictationHint}
       onDismissDictationHint={options.onDismissDictationHint}
+      language={options.language}
       reviewPrompt={options.reviewPrompt}
       onReviewPromptClose={options.onReviewPromptClose}
       onReviewPromptShowPreset={options.onReviewPromptShowPreset}
@@ -648,11 +653,14 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
   );
 
   const updateToastNode = (
-    <UpdateToast
-      state={options.updaterState}
-      onUpdate={options.onUpdate}
-      onDismiss={options.onDismissUpdate}
-    />
+    <>
+      {options.workspaceOpeningToastNode ?? null}
+      <UpdateToast
+        state={options.updaterState}
+        onUpdate={options.onUpdate}
+        onDismiss={options.onDismissUpdate}
+      />
+    </>
   );
 
   const errorToastsNode = (
@@ -716,6 +724,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       onLaunchScriptDraftChange={options.onLaunchScriptDraftChange}
       onSaveLaunchScript={options.onSaveLaunchScript}
       launchScriptsState={options.launchScriptsState}
+      language={options.language}
       extraActionsNode={options.mainHeaderActionsNode}
     />
   ) : null;
@@ -726,7 +735,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
         <button
           className="icon-button back-button"
           onClick={options.onExitDiff}
-          aria-label="Back to chat"
+          aria-label={options.language === "zh" ? "返回会话" : "Back to chat"}
         >
           <ArrowLeft aria-hidden />
         </button>
@@ -768,6 +777,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
         openAppIconById={options.openAppIconById}
         selectedOpenAppId={options.selectedOpenAppId}
         onSelectOpenAppId={options.onSelectOpenAppId}
+        language={options.language}
       />
     );
   } else if (options.filePanelMode === "prompts") {
@@ -961,8 +971,12 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
 
   const compactGitBackNode = (
     <div className="compact-git-back">
-      <button onClick={options.onBackFromDiff}>‹ Back</button>
-      <span className="workspace-title">Diff</span>
+      <button onClick={options.onBackFromDiff}>
+        {options.language === "zh" ? "返回" : "Back"}
+      </button>
+      <span className="workspace-title">
+        {options.language === "zh" ? "差异" : "Diff"}
+      </span>
     </div>
   );
 
@@ -989,3 +1003,4 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
     compactGitBackNode,
   };
 }
+

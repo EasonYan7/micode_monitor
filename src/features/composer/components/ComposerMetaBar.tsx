@@ -1,6 +1,6 @@
-import type { CSSProperties } from "react";
+﻿import type { CSSProperties } from "react";
 import { BrainCog } from "lucide-react";
-import type { AccessMode, ThreadTokenUsage } from "../../../types";
+import type { AccessMode, ThreadTokenUsage, UiLanguage } from "../../../types";
 
 type ComposerMetaBarProps = {
   disabled: boolean;
@@ -17,6 +17,7 @@ type ComposerMetaBarProps = {
   accessMode: AccessMode;
   onSelectAccessMode: (mode: AccessMode) => void;
   contextUsage?: ThreadTokenUsage | null;
+  language?: UiLanguage;
 };
 
 export function ComposerMetaBar({
@@ -34,7 +35,10 @@ export function ComposerMetaBar({
   accessMode,
   onSelectAccessMode,
   contextUsage = null,
+  language = "en",
 }: ComposerMetaBarProps) {
+  const isZh = language === "zh";
+  const t = (en: string, zh: string) => (isZh ? zh : en);
   const contextWindow = contextUsage?.modelContextWindow ?? null;
   const lastTokens = contextUsage?.last.totalTokens ?? 0;
   const totalTokens = contextUsage?.total.totalTokens ?? 0;
@@ -68,7 +72,7 @@ export function ComposerMetaBar({
         {collaborationModes.length > 0 && hasCollaborationChoice && (
           canUsePlanToggle ? (
             <div className="composer-select-wrap composer-plan-toggle-wrap">
-              <label className="composer-plan-toggle" aria-label="Plan mode">
+              <label className="composer-plan-toggle" aria-label={t("Plan mode", "规划模式")}>
                 <input
                   className="composer-plan-toggle-input"
                   type="checkbox"
@@ -94,26 +98,25 @@ export function ComposerMetaBar({
                   </svg>
                 </span>
                 <span className="composer-plan-toggle-label">
-                  {planMode?.label || "Plan"}
+                  {planMode?.label || t("Plan", "规划")}
                 </span>
               </label>
             </div>
           ) : (
             <div className="composer-select-wrap">
-            <span className="composer-icon" aria-hidden>
-              <svg viewBox="0 0 24 24" fill="none">
-                <path
-                  d="m6.5 7.5 1 1 2-2M6.5 12.5l1 1 2-2M6.5 17.5l1 1 2-2M11 7.5h7M11 12.5h7M11 17.5h7"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
+              <span className="composer-icon" aria-hidden>
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="m6.5 7.5 1 1 2-2M6.5 12.5l1 1 2-2M6.5 17.5l1 1 2-2M11 7.5h7M11 12.5h7M11 17.5h7"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
               <select
                 className="composer-select composer-select--model composer-select--collab"
-                aria-label="Collaboration mode"
+                aria-label={t("Collaboration mode", "协作模式")}
                 value={selectedCollaborationModeId ?? ""}
                 onChange={(event) =>
                   onSelectCollaborationMode(event.target.value || null)
@@ -132,12 +135,7 @@ export function ComposerMetaBar({
         <div className="composer-select-wrap composer-select-wrap--model">
           <span className="composer-icon composer-icon--model" aria-hidden>
             <svg viewBox="0 0 24 24" fill="none">
-              <path
-                d="M12 4v2"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
+              <path d="M12 4v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
               <path
                 d="M8 7.5h8a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-2.5 2.5H8A2.5 2.5 0 0 1 5.5 15v-5A2.5 2.5 0 0 1 8 7.5Z"
                 stroke="currentColor"
@@ -146,28 +144,18 @@ export function ComposerMetaBar({
               />
               <circle cx="9.5" cy="12.5" r="1" fill="currentColor" />
               <circle cx="14.5" cy="12.5" r="1" fill="currentColor" />
-              <path
-                d="M9.5 15.5h5"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
-              <path
-                d="M5.5 11H4M20 11h-1.5"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
+              <path d="M9.5 15.5h5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              <path d="M5.5 11H4M20 11h-1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
             </svg>
           </span>
           <select
             className="composer-select composer-select--model"
-            aria-label="Model"
+            aria-label={t("Model", "模型")}
             value={selectedModelId ?? ""}
             onChange={(event) => onSelectModel(event.target.value)}
             disabled={disabled}
           >
-            {models.length === 0 && <option value="">No models</option>}
+            {models.length === 0 && <option value="">{t("No models", "暂无模型")}</option>}
             {models.map((model) => (
               <option key={model.id} value={model.id}>
                 {model.displayName || model.model}
@@ -182,7 +170,7 @@ export function ComposerMetaBar({
             </span>
             <select
               className="composer-select composer-select--effort"
-              aria-label="Thinking mode"
+              aria-label={t("Thinking mode", "思考强度")}
               value={selectedEffort ?? ""}
               onChange={(event) => onSelectEffort(event.target.value)}
               disabled={disabled}
@@ -215,16 +203,14 @@ export function ComposerMetaBar({
           </span>
           <select
             className="composer-select composer-select--approval"
-            aria-label="Agent access"
+            aria-label={t("Agent access", "访问权限")}
             disabled={disabled}
             value={accessMode}
-            onChange={(event) =>
-              onSelectAccessMode(event.target.value as AccessMode)
-            }
+            onChange={(event) => onSelectAccessMode(event.target.value as AccessMode)}
           >
-            <option value="read-only">Read only</option>
-            <option value="current">On-Request</option>
-            <option value="full-access">Full access</option>
+            <option value="read-only">{t("Read only", "只读")}</option>
+            <option value="current">{t("On-Request", "按需申请")}</option>
+            <option value="full-access">{t("Full access", "完全访问")}</option>
           </select>
         </div>
       </div>
@@ -233,13 +219,17 @@ export function ComposerMetaBar({
           className="composer-context-ring"
           data-tooltip={
             contextFreePercent === null
-              ? "Context free --"
-              : `Context free ${Math.round(contextFreePercent)}%`
+              ? t("Context free --", "上下文剩余 --")
+              : isZh
+                ? `上下文剩余 ${Math.round(contextFreePercent)}%`
+                : `Context free ${Math.round(contextFreePercent)}%`
           }
           aria-label={
             contextFreePercent === null
-              ? "Context free --"
-              : `Context free ${Math.round(contextFreePercent)}%`
+              ? t("Context free --", "上下文剩余 --")
+              : isZh
+                ? `上下文剩余 ${Math.round(contextFreePercent)}%`
+                : `Context free ${Math.round(contextFreePercent)}%`
           }
           style={
             {

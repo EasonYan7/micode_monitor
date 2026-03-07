@@ -455,7 +455,7 @@ async fn check_python_dependency(path_env: Option<String>) -> StartupEnvironment
         ("python3", ["--version", ""]),
     ];
 
-    let mut last_error: Option<String> = None;
+    let mut errors: Vec<(String, String)> = Vec::new();
     for (program, args) in candidates {
         let filtered_args = args.into_iter().filter(|value| !value.is_empty()).collect::<Vec<_>>();
         match run_version_probe(program, &filtered_args, path_env.as_deref()).await {
@@ -468,12 +468,25 @@ async fn check_python_dependency(path_env: Option<String>) -> StartupEnvironment
                 )
             }
             Err(detail) => {
-                last_error = Some(detail);
+                errors.push((program.to_string(), detail));
             }
         }
     }
 
-    let detail = last_error.unwrap_or_else(|| "Python was not found.".to_string());
+    let detail = errors
+        .iter()
+        .find_map(|(_, detail)| is_windows_store_python_detail(detail).then(|| detail.clone()))
+        .or_else(|| {
+            errors
+                .iter()
+                .find(|(program, detail)| {
+                    *program == "python"
+                        && !detail.to_ascii_lowercase().contains("returned no version output")
+                })
+                .map(|(_, detail)| detail.clone())
+        })
+        .or_else(|| errors.first().map(|(_, detail)| detail.clone()))
+        .unwrap_or_else(|| "Python was not found.".to_string());
     let store_alias = is_windows_store_python_detail(&detail);
     failed_check(
         "python",

@@ -3,6 +3,7 @@ import Circle from "lucide-react/dist/esm/icons/circle";
 import type { MouseEvent } from "react";
 
 import type { WorkspaceInfo } from "../../../types";
+import type { WorkspaceRestoreStatus } from "../../workspaces/hooks/useWorkspaceRestore";
 
 type WorkspaceCardProps = {
   workspace: WorkspaceInfo;
@@ -11,6 +12,8 @@ type WorkspaceCardProps = {
   isCollapsed: boolean;
   addMenuOpen: boolean;
   addMenuWidth: number;
+  restoreStatus?: WorkspaceRestoreStatus | null;
+  language?: "en" | "zh";
   onSelectWorkspace: (id: string) => void;
   onShowWorkspaceMenu: (event: MouseEvent, workspaceId: string) => void;
   onToggleWorkspaceCollapse: (workspaceId: string, collapsed: boolean) => void;
@@ -31,6 +34,8 @@ export function WorkspaceCard({
   isCollapsed,
   addMenuOpen,
   addMenuWidth,
+  restoreStatus = null,
+  language = "en",
   onSelectWorkspace,
   onShowWorkspaceMenu,
   onToggleWorkspaceCollapse,
@@ -40,6 +45,16 @@ export function WorkspaceCard({
 }: WorkspaceCardProps) {
   const contentCollapsedClass = isCollapsed ? " collapsed" : "";
   const isWorktree = (workspace.kind ?? "main") === "worktree";
+  const restoreHint =
+    restoreStatus === "connecting"
+      ? language === "zh"
+        ? "正在努力打开工作区..."
+        : "Opening workspace..."
+      : restoreStatus === "syncing"
+        ? language === "zh"
+          ? "正在同步历史记录..."
+          : "Syncing history..."
+        : null;
 
   return (
     <div className="workspace-card">
@@ -110,9 +125,14 @@ export function WorkspaceCard({
             >
               +
             </button>
+            {restoreHint ? (
+              <div className="workspace-restore-hint" role="status" aria-live="polite">
+                {restoreHint}
+              </div>
+            ) : null}
           </div>
         </div>
-        {!workspace.connected && (
+        {!workspace.connected && !restoreHint && (
           <span
             className="connect"
             onClick={(event) => {

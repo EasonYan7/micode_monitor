@@ -21,6 +21,7 @@ use crate::types::WorkspaceEntry;
 
 const ACP_PROTOCOL_VERSION: u32 = 1;
 const TURN_START_TIMEOUT: Duration = Duration::from_secs(6 * 60 * 60);
+const ACP_INITIALIZE_TIMEOUT: Duration = Duration::from_secs(120);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct LocalThreadRecord {
@@ -2588,6 +2589,7 @@ pub(crate) fn build_micode_path_env(agent_bin: Option<&str>) -> Option<String> {
                     .join("bin"),
             );
         }
+        extras.extend(collect_windows_python_dirs());
     } else {
         extras.extend(
             [
@@ -2641,6 +2643,53 @@ pub(crate) fn build_micode_path_env(agent_bin: Option<&str>) -> Option<String> {
     }
     let joined = env::join_paths(paths).ok()?;
     Some(joined.to_string_lossy().to_string())
+}
+
+fn collect_windows_python_dirs() -> Vec<PathBuf> {
+    if !cfg!(windows) {
+        return Vec::new();
+    }
+
+    let mut extras = Vec::new();
+
+    if let Ok(local_app_data) = env::var("LOCALAPPDATA") {
+        let base = PathBuf::from(local_app_data).join("Programs").join("Python");
+        if let Ok(entries) = std::fs::read_dir(&base) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_dir() {
+                    continue;
+                }
+                let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+                    continue;
+                };
+                if name.to_ascii_lowercase().starts_with("python") {
+                    extras.push(path);
+                }
+            }
+        }
+    }
+
+    for env_key in ["ProgramFiles", "ProgramFiles(x86)"] {
+        if let Ok(root) = env::var(env_key) {
+            if let Ok(entries) = std::fs::read_dir(PathBuf::from(root)) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if !path.is_dir() {
+                        continue;
+                    }
+                    let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+                        continue;
+                    };
+                    if name.to_ascii_lowercase().starts_with("python") {
+                        extras.push(path);
+                    }
+                }
+            }
+        }
+    }
+
+    extras
 }
 
 pub(crate) fn build_micode_command_with_bin(agent_bin: Option<String>) -> Command {
@@ -2756,7 +2805,7 @@ pub(crate) async fn check_acp_handshake(
         .await
         .map_err(|e| e.to_string())?;
     let mut lines = BufReader::new(stdout).lines();
-    let deadline = std::time::Instant::now() + Duration::from_secs(60);
+    let deadline = std::time::Instant::now() + ACP_INITIALIZE_TIMEOUT;
     let mut ok = false;
     loop {
         let now = std::time::Instant::now();
@@ -3335,21 +3384,22 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
     });
 
     let init_params = build_initialize_params(&client_version);
-    let init_result = timeout(
-        Duration::from_secs(60),
-        session.send_acp_request("initialize", init_params),
-    )
-    .await;
+    let init_result = timeout(ACP_INITIALIZE_TIMEOUT, session.send_acp_request("initialize", init_params)).await;
     let init_response = match init_result {
         Ok(response) => response,
         Err(_) => {
             let mut child = session.child.lock().await;
             let _ = child.kill().await;
             return Err(if cfg!(windows) {
-                "MiCode ACP did not respond to initialize. Check `micode.cmd --experimental-acp` in Terminal. If PowerShell blocks `micode`, use `micode.cmd` or run `Set-ExecutionPolicy RemoteSigned`.".to_string()
+                format!(
+                    "MiCode ACP did not respond to initialize within {} seconds. Check `micode.cmd --experimental-acp` in Terminal. If PowerShell blocks `micode`, use `micode.cmd` or run `Set-ExecutionPolicy RemoteSigned`.",
+                    ACP_INITIALIZE_TIMEOUT.as_secs()
+                )
             } else {
-                "MiCode ACP did not respond to initialize. Check that `micode --experimental-acp` works in Terminal."
-                    .to_string()
+                format!(
+                    "MiCode ACP did not respond to initialize within {} seconds. Check that `micode --experimental-acp` works in Terminal.",
+                    ACP_INITIALIZE_TIMEOUT.as_secs()
+                )
             });
         }
     };

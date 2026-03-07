@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Check from "lucide-react/dist/esm/icons/check";
+import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import Copy from "lucide-react/dist/esm/icons/copy";
 import Terminal from "lucide-react/dist/esm/icons/terminal";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import type { BranchInfo, OpenAppTarget, WorkspaceInfo } from "../../../types";
+import type { BranchInfo, OpenAppTarget, UiLanguage, WorkspaceInfo } from "../../../types";
 import type { ReactNode } from "react";
 import { BranchList } from "../../git/components/BranchList";
 import { filterBranches, findExactBranch } from "../../git/utils/branchSearch";
@@ -64,6 +65,7 @@ type MainHeaderProps = {
     onCancel: () => void;
     onCommit: () => void;
   };
+  language?: UiLanguage;
 };
 
 export function MainHeader({
@@ -99,7 +101,10 @@ export function MainHeader({
   onSaveLaunchScript,
   launchScriptsState,
   worktreeRename,
+  language = "en",
 }: MainHeaderProps) {
+  const isZh = language === "zh";
+  const t = (en: string, zh: string) => (isZh ? zh : en);
   const [menuOpen, setMenuOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [branchQuery, setBranchQuery] = useState("");
@@ -139,6 +144,8 @@ export function MainHeader({
     () => `cd "${relativeWorktreePath}"`,
     [relativeWorktreePath],
   );
+  const branchLabel =
+    branchName && branchName !== "unknown" ? branchName : t("unknown", "未知分支");
 
   useEffect(() => {
     if (!menuOpen && !infoOpen) {
@@ -198,7 +205,7 @@ export function MainHeader({
       <div className="workspace-header">
         <div className="workspace-title-line">
           <span className="workspace-context-badge">
-            {workspace.connected ? "Live workspace" : "Setup workspace"}
+            {workspace.connected ? t("Connected", "已连接") : t("Preparing", "准备中")}
           </span>
           <span className="workspace-title">
             {parentName ? parentName : workspace.name}
@@ -212,15 +219,15 @@ export function MainHeader({
                 aria-haspopup="dialog"
                 aria-expanded={infoOpen}
                 data-tauri-drag-region="false"
-                title="Worktree info"
+                title={t("Worktree info", "工作树信息")}
               >
-                {worktreeLabel || branchName}
+                {worktreeLabel || branchLabel}
               </button>
               {infoOpen && (
                 <div className="worktree-info-popover popover-surface" role="dialog">
                   {worktreeRename && (
                     <div className="worktree-info-rename">
-                      <span className="worktree-info-label">Name</span>
+                      <span className="worktree-info-label">{t("Name", "名称")}</span>
                       <div className="worktree-info-command">
                         <input
                           ref={renameInputRef}
@@ -293,7 +300,7 @@ export function MainHeader({
                             onClick={worktreeRename.upstream.onConfirm}
                             disabled={worktreeRename.upstream.isSubmitting}
                           >
-                            Update upstream
+                            {t("Update upstream", "同步更新上游")}
                           </button>
                           {worktreeRename.upstream.error && (
                             <div className="worktree-info-error">
@@ -304,10 +311,11 @@ export function MainHeader({
                       )}
                     </div>
                   )}
-                  <div className="worktree-info-title">Worktree</div>
+                  <div className="worktree-info-title">{t("Worktree", "工作树")}</div>
                   <div className="worktree-info-row">
                     <span className="worktree-info-label">
-                      Terminal{parentPath ? " (repo root)" : ""}
+                      {t("Terminal", "终端")}
+                      {parentPath ? t(" (repo root)", "（仓库根目录）") : ""}
                     </span>
                     <div className="worktree-info-command">
                       <code className="worktree-info-code">
@@ -320,18 +328,18 @@ export function MainHeader({
                           await navigator.clipboard.writeText(cdCommand);
                         }}
                         data-tauri-drag-region="false"
-                        aria-label="Copy command"
-                        title="Copy command"
+                        aria-label={t("Copy command", "复制命令")}
+                        title={t("Copy command", "复制命令")}
                       >
                         <Copy aria-hidden />
                       </button>
                     </div>
                     <span className="worktree-info-subtle">
-                      Open this worktree in your terminal.
+                      {t("Open this worktree in your terminal.", "在终端中打开这个工作树。")}
                     </span>
                   </div>
                   <div className="worktree-info-row">
-                    <span className="worktree-info-label">Reveal</span>
+                    <span className="worktree-info-label">{t("Reveal", "显示位置")}</span>
                     <button
                       type="button"
                       className="worktree-info-reveal"
@@ -356,9 +364,9 @@ export function MainHeader({
                 aria-expanded={menuOpen}
                 data-tauri-drag-region="false"
               >
-                <span className="workspace-branch">{branchName}</span>
+                <span className="workspace-branch">{branchLabel}</span>
                 <span className="workspace-branch-caret" aria-hidden>
-                  ›
+                  <ChevronDown size={12} />
                 </span>
               </button>
               {menuOpen && (
@@ -410,11 +418,11 @@ export function MainHeader({
                             }
                           }
                         }}
-                        placeholder="Search or create branch"
+                        placeholder={t("Search or create branch", "搜索或创建分支")}
                         className="branch-input"
                         autoFocus
                         data-tauri-drag-region="false"
-                        aria-label="Search branches"
+                        aria-label={t("Search branches", "搜索分支")}
                       />
                       <button
                         type="button"
@@ -441,7 +449,7 @@ export function MainHeader({
                         }}
                         data-tauri-drag-region="false"
                       >
-                        Create
+                        {t("Create", "创建")}
                       </button>
                     </div>
                     {branchValidationMessage && (
@@ -449,7 +457,7 @@ export function MainHeader({
                     )}
                     {canCreate && !branchValidationMessage && (
                       <div className="branch-create-hint">
-                        Create branch “{trimmedQuery}”
+                        {isZh ? `创建分支“${trimmedQuery}”` : `Create branch "${trimmedQuery}"`}
                       </div>
                     )}
                   </div>
@@ -463,7 +471,7 @@ export function MainHeader({
                     itemRole="menuitem"
                     itemDataTauriDragRegion="false"
                     emptyClassName="branch-empty"
-                    emptyText="No branches found"
+                    emptyText={t("No branches found", "没有找到分支")}
                     onSelect={async (branch) => {
                       if (branch.name === branchName) {
                         return;
@@ -545,6 +553,7 @@ export function MainHeader({
           selectedOpenAppId={selectedOpenAppId}
           onSelectOpenAppId={onSelectOpenAppId}
           iconById={openAppIconById}
+          language={language}
         />
         {showTerminalButton && (
           <button
@@ -552,8 +561,8 @@ export function MainHeader({
             className={`ghost main-header-action${isTerminalOpen ? " is-active" : ""}`}
             onClick={onToggleTerminal}
             data-tauri-drag-region="false"
-            aria-label="Toggle terminal panel"
-            title="Terminal"
+            aria-label={t("Toggle terminal panel", "切换终端面板")}
+            title={t("Terminal", "终端")}
           >
             <Terminal size={14} aria-hidden />
           </button>
@@ -564,8 +573,8 @@ export function MainHeader({
           onClick={handleCopyClick}
           disabled={!canCopyThread || !onCopyThread}
           data-tauri-drag-region="false"
-          aria-label="Copy thread"
-          title="Copy thread"
+          aria-label={t("Copy thread", "复制会话")}
+          title={t("Copy thread", "复制会话")}
         >
           <span className="main-header-icon" aria-hidden>
             <Copy className="main-header-icon-copy" size={14} />
@@ -577,3 +586,5 @@ export function MainHeader({
     </header>
   );
 }
+
+

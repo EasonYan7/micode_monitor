@@ -5,6 +5,7 @@ import type {
   UiLanguage,
   WorkspaceInfo,
 } from "../../../types";
+import type { WorkspaceRestoreStatus } from "../../workspaces/hooks/useWorkspaceRestore";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
@@ -53,6 +54,7 @@ type SidebarProps = {
   threadListLoadingByWorkspace: Record<string, boolean>;
   threadListPagingByWorkspace: Record<string, boolean>;
   threadListCursorByWorkspace: Record<string, string | null>;
+  workspaceRestoreStatusById?: Record<string, WorkspaceRestoreStatus | null>;
   activeWorkspaceId: string | null;
   activeThreadId: string | null;
   accountRateLimits: RateLimitSnapshot | null;
@@ -105,6 +107,7 @@ export function Sidebar({
   threadListLoadingByWorkspace,
   threadListPagingByWorkspace,
   threadListCursorByWorkspace,
+  workspaceRestoreStatusById = {},
   activeWorkspaceId,
   activeThreadId,
   accountRateLimits,
@@ -183,6 +186,7 @@ export function Sidebar({
     creditsLabel,
     showWeekly,
   } = getUsageLabels(accountRateLimits, usageShowRemaining, activeTokenUsage, language);
+  const showUsageFooter = Boolean(activeWorkspaceId || activeThreadId);
   const debouncedQuery = useDebouncedValue(searchQuery, 150);
   const normalizedQuery = debouncedQuery.trim().toLowerCase();
 
@@ -555,11 +559,13 @@ export function Sidebar({
                       isCollapsed={isCollapsed}
                       addMenuOpen={addMenuOpen}
                       addMenuWidth={ADD_MENU_WIDTH}
+                      restoreStatus={workspaceRestoreStatusById[entry.id] ?? null}
                       onSelectWorkspace={onSelectWorkspace}
                       onShowWorkspaceMenu={showWorkspaceMenu}
                       onToggleWorkspaceCollapse={onToggleWorkspaceCollapse}
                       onConnectWorkspace={onConnectWorkspace}
                       onToggleAddMenu={setAddMenuAnchor}
+                      language={language}
                     >
                       {addMenuOpen && addMenuAnchor &&
                         createPortal(
@@ -627,6 +633,7 @@ export function Sidebar({
                           threadListLoadingByWorkspace={threadListLoadingByWorkspace}
                           threadListPagingByWorkspace={threadListPagingByWorkspace}
                           threadListCursorByWorkspace={threadListCursorByWorkspace}
+                          workspaceRestoreStatusById={workspaceRestoreStatusById}
                           expandedWorkspaces={expandedWorkspaces}
                           activeWorkspaceId={activeWorkspaceId}
                           activeThreadId={activeThreadId}
@@ -686,17 +693,19 @@ export function Sidebar({
           )}
         </div>
       </div>
-      <SidebarFooter
-        sessionPercent={sessionPercent}
-        weeklyPercent={weeklyPercent}
-        sessionValueLabel={sessionValueLabel}
-        weeklyValueLabel={weeklyValueLabel}
-        sessionResetLabel={sessionResetLabel}
-        weeklyResetLabel={weeklyResetLabel}
-        creditsLabel={creditsLabel}
-        showWeekly={showWeekly}
-        language={language}
-      />
+      {showUsageFooter && (
+        <SidebarFooter
+          sessionPercent={sessionPercent}
+          weeklyPercent={weeklyPercent}
+          sessionValueLabel={sessionValueLabel}
+          weeklyValueLabel={weeklyValueLabel}
+          sessionResetLabel={sessionResetLabel}
+          weeklyResetLabel={weeklyResetLabel}
+          creditsLabel={creditsLabel}
+          showWeekly={showWeekly}
+          language={language}
+        />
+      )}
       <SidebarCornerActions
         onOpenSettings={onOpenSettings}
         onOpenDebug={onOpenDebug}

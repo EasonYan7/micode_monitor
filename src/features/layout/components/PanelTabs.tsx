@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 import Folder from "lucide-react/dist/esm/icons/folder";
 import GitBranch from "lucide-react/dist/esm/icons/git-branch";
 import ScrollText from "lucide-react/dist/esm/icons/scroll-text";
+import type { UiLanguage } from "../../../types";
 
 export type PanelTabId = "git" | "files" | "prompts";
 
@@ -15,6 +16,7 @@ type PanelTabsProps = {
   active: PanelTabId;
   onSelect: (id: PanelTabId) => void;
   tabs?: PanelTab[];
+  language?: UiLanguage;
 };
 
 const defaultTabs: PanelTab[] = [
@@ -23,10 +25,28 @@ const defaultTabs: PanelTab[] = [
   { id: "prompts", label: "Prompts", icon: <ScrollText aria-hidden /> },
 ];
 
-export function PanelTabs({ active, onSelect, tabs = defaultTabs }: PanelTabsProps) {
+export function PanelTabs({
+  active,
+  onSelect,
+  tabs = defaultTabs,
+  language = "en",
+}: PanelTabsProps) {
+  const isZh = language === "zh";
+  const localizedTabs = tabs.map((tab) => ({
+    ...tab,
+    label:
+      tab.id === "git"
+        ? "Git"
+        : tab.id === "files"
+          ? (isZh ? "文件" : "Files")
+          : isZh
+            ? "提示词"
+            : "Prompts",
+  }));
+
   return (
-    <div className="panel-tabs" role="tablist" aria-label="Panel">
-      {tabs.map((tab) => {
+    <div className="panel-tabs" role="tablist" aria-label={isZh ? "侧边面板" : "Panel"}>
+      {localizedTabs.map((tab) => {
         const isActive = active === tab.id;
         return (
           <button

@@ -144,8 +144,32 @@ export function useThreads({
       onWorkspaceConnected(workspaceId);
       void refreshAccountRateLimits(workspaceId);
       void refreshAccountInfo(workspaceId);
+      // CLI 进程重连时，重置该 workspace 下所有悬挂的 processing 状态。
+      // CLI 进程已重启，旧 turn 的 turn/completed 事件不会再到达，
+      // 必须在此手动清除，否则 UI 将永远显示"工作中..."。
+      const threadIds = new Set<string>();
+      (state.threadsByWorkspace[workspaceId] ?? []).forEach((t) => threadIds.add(t.id));
+      const activeId = state.activeThreadIdByWorkspace[workspaceId];
+      if (activeId) {
+        threadIds.add(activeId);
+      }
+      threadIds.forEach((threadId) => {
+        if (state.threadStatusById[threadId]?.isProcessing) {
+          markProcessing(threadId, false);
+          setActiveTurnId(threadId, null);
+        }
+      });
     },
-    [onWorkspaceConnected, refreshAccountRateLimits, refreshAccountInfo],
+    [
+      onWorkspaceConnected,
+      refreshAccountRateLimits,
+      refreshAccountInfo,
+      state.threadsByWorkspace,
+      state.activeThreadIdByWorkspace,
+      state.threadStatusById,
+      markProcessing,
+      setActiveTurnId,
+    ],
   );
 
   const handleAccountUpdated = useCallback(
@@ -232,6 +256,7 @@ export function useThreads({
     onReviewExited: handleReviewExited,
     approvalAllowlistRef,
     pendingInterruptsRef,
+    activeTurnIdByThread: state.activeTurnIdByThread,
   });
 
   const handleAccountLoginCompleted = useCallback(
