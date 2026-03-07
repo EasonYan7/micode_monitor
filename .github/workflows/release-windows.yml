@@ -143,7 +143,7 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($signature)) {
             throw "Updater signature file is empty: $($updater.Sig.FullName)"
           }
-          $updaterAssetName = ($updater.Artifact.Name -replace '\s+', '.')
+          $updaterAssetName = $updater.Artifact.Name
           $updaterSigAssetName = ($updater.Sig.Name -replace '\s+', '.')
 
           $notes = "Windows release $version."
@@ -152,10 +152,10 @@ jobs:
             notes = $notes
             pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
             platforms = @{
-              "windows-x86_64" = @{
-                signature = $signature
-                url = "https://github.com/EasonYan7/micode_monitor/releases/download/$tag/$updaterAssetName"
-              }
+                "windows-x86_64" = @{
+                  signature = $signature
+                  url = "https://github.com/EasonYan7/micode_monitor/releases/download/$tag/$updaterAssetName"
+                }
             }
           }
 

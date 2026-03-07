@@ -126,6 +126,7 @@
 - [x] Pause auto Windows build workflow on `windows-main` and align Windows release build to VS-aware wrapper for safer future releases
 - [x] Fix Windows VS-wrapper Tauri command resolution by using explicit local `node_modules/.bin/tauri.cmd` in scripts and release workflow
 - [x] Avoid WiX MSI release fragility by switching Windows release bundles to NSIS-only while keeping updater artifacts
+- [x] Fix Windows updater 404 by generating `latest.json` with the real uploaded asset filename, not the GitHub release label
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
