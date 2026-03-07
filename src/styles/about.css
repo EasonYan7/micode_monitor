@@ -15,14 +15,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 32px 32px 20px;
+  gap: 8px;
+  padding: 28px 28px 16px;
   text-align: center;
-  border-radius: 28px;
-  background:
-    linear-gradient(135deg, rgba(214, 175, 82, 0.14), transparent 46%),
-    rgba(16, 26, 24, 0.88);
-  border: 1px solid rgba(214, 175, 82, 0.16);
 }
 
 .about-header {
@@ -40,16 +35,9 @@
 }
 
 .about-title {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: 0.02em;
-}
-
-.about-name-en {
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-faint);
 }
 
 .about-version {
@@ -58,10 +46,9 @@
 }
 
 .about-tagline {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-muted);
-  max-width: 320px;
-  line-height: 1.6;
+  max-width: 260px;
 }
 
 .about-divider {

@@ -39,22 +39,19 @@ export function AboutView() {
           <img
             className="about-icon"
             src="/app-icon.png"
-            alt="财多多 icon"
+            alt="MiCode Monitor icon"
           />
-          <div>
-            <div className="about-title">财多多</div>
-            <div className="about-name-en">Rich</div>
-          </div>
+          <div className="about-title">MiCode Monitor</div>
         </div>
         <div className="about-version">{version ? `Version ${version}` : "Version -"}</div>
-        <div className="about-tagline">面向本地项目的智能协作与任务工作台。</div>
+        <div className="about-tagline">Monitor the situation of your MiCode agents</div>
         <div className="about-divider" />
         <div className="about-links">
           <button type="button" className="about-link" onClick={handleOpenGitHub}>
-            项目主页
+            GitHub
           </button>
         </div>
-        <div className="about-footer">Built by Eason Yan and contributors</div>
+        <div className="about-footer">Made by Eason Yan and contributors</div>
       </div>
     </div>
   );

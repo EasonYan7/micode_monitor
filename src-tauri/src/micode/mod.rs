@@ -1,9 +1,7 @@
 use serde_json::{json, Map, Value};
 use std::io::ErrorKind;
 use std::path::PathBuf;
-use std::process::Stdio;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, State};
@@ -25,7 +23,7 @@ use crate::remote_backend;
 use crate::shared::{micode_core, workspaces_core};
 use crate::shared::process_core::tokio_command;
 use crate::state::AppState;
-use crate::types::{StartupEnvironmentCheck, StartupEnvironmentStatus, WorkspaceEntry};
+use crate::types::WorkspaceEntry;
 
 pub(crate) async fn spawn_workspace_session(
     entry: WorkspaceEntry,
@@ -129,428 +127,106 @@ fn mcp_status_has_entries(value: &Value) -> bool {
         .unwrap_or(false)
 }
 
-fn now_ts() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64
-}
-
-fn normalize_trimmed(value: Option<String>) -> Option<String> {
-    value.and_then(|raw| {
-        let trimmed = raw.trim();
-        if trimmed.is_empty() {
-            None
-        } else {
-            Some(trimmed.to_string())
-        }
-    })
-}
-
-fn ready_check(
-    id: &str,
-    label: &str,
-    version: Option<String>,
-    summary: String,
-) -> StartupEnvironmentCheck {
-    StartupEnvironmentCheck {
-        id: id.to_string(),
-        label: label.to_string(),
-        required: true,
-        status: "ready".to_string(),
-        detected_version: version,
-        summary,
-        technical_details: None,
-        recommended_action: None,
-        can_auto_install: false,
-    }
-}
-
-fn failed_check(
-    id: &str,
-    label: &str,
-    summary: String,
-    technical_details: Option<String>,
-    recommended_action: Option<String>,
-    can_auto_install: bool,
-) -> StartupEnvironmentCheck {
-    StartupEnvironmentCheck {
-        id: id.to_string(),
-        label: label.to_string(),
-        required: true,
-        status: "failed".to_string(),
-        detected_version: None,
-        summary,
-        technical_details,
-        recommended_action,
-        can_auto_install,
-    }
-}
-
-fn is_ready(check: &StartupEnvironmentCheck) -> bool {
-    check.status == "ready"
-}
-
-fn build_startup_environment_status(
-    checks: Vec<StartupEnvironmentCheck>,
+#[tauri::command]
+pub(crate) async fn micode_doctor(
     micode_bin: Option<String>,
-    micode_args: Option<String>,
-) -> StartupEnvironmentStatus {
-    let can_proceed = checks.iter().filter(|check| check.required).all(is_ready);
-    StartupEnvironmentStatus {
-        overall_status: if can_proceed {
-            "ready".to_string()
-        } else {
-            "manual_action_required".to_string()
-        },
-        can_proceed,
-        blocking: !can_proceed,
-        checks,
-        last_checked_at: now_ts(),
-        micode_bin,
-        micode_args,
-    }
-}
-
-async fn run_version_probe(program: &str, args: &[&str], path_env: Option<&str>) -> Result<String, String> {
-    let mut command = tokio_command(program);
-    if let Some(path_env) = path_env {
-        command.env("PATH", path_env);
-    }
-    command.args(args);
-    command.stdout(Stdio::piped());
-    command.stderr(Stdio::piped());
-    let output = timeout(Duration::from_secs(5), command.output())
-        .await
-        .map_err(|_| format!("Timed out while checking {program}."))?
-        .map_err(|error| {
-            if error.kind() == ErrorKind::NotFound {
-                format!("{program} not found on PATH.")
-            } else {
-                error.to_string()
-            }
-        })?;
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        let version = if stdout.is_empty() { stderr } else { stdout };
-        if version.is_empty() {
-            Err(format!("{program} returned no version output."))
-        } else {
-            Ok(version)
+    _micode_args: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
+    let default_bin = {
+        let settings = state.app_settings.lock().await;
+        settings.agent_bin.clone()
+    };
+    let resolved = micode_bin
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+        .or(default_bin);
+    let path_env = build_micode_path_env(resolved.as_deref());
+    let version = check_micode_installation(resolved.clone()).await?;
+    // Doctor should validate baseline ACP availability first.
+    // Additional runtime args can be valid for real sessions but still break handshake probes.
+    let app_server_ok = check_acp_handshake(resolved.clone(), None).await?;
+    let (node_ok, node_version, node_details) = {
+        let mut node_command = tokio_command("node");
+        if let Some(ref path_env) = path_env {
+            node_command.env("PATH", path_env);
         }
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let detail = if stderr.is_empty() { stdout } else { stderr };
-        Err(if detail.is_empty() {
-            format!("{program} failed to start.")
-        } else {
-            detail
-        })
-    }
-}
-
-fn node_recommended_action() -> Option<String> {
-    Some(if cfg!(windows) {
-        "财多多需要先准备好 Node.js，才能启动 MiCode CLI。你可以使用自动安装按钮，或手动安装 Node.js 后再重试。".to_string()
-    } else {
-        "Install Node.js and make sure `node --version` works in Terminal, then retry.".to_string()
-    })
-}
-
-fn micode_recommended_action() -> Option<String> {
-    Some(if cfg!(windows) {
-        "MiCode CLI is required for chat and workspace actions. Use the automatic install button, or run the official installer manually, then retry.".to_string()
-    } else {
-        "Install MiCode CLI and make sure `micode --version` works in Terminal, then retry.".to_string()
-    })
-}
-
-fn python_recommended_action(store_alias: bool) -> Option<String> {
-    Some(if cfg!(windows) {
-        if store_alias {
-            "Windows only found the Microsoft Store Python alias, which cannot run your tasks reliably. Use the automatic install button to install the real Python runtime, then retry.".to_string()
-        } else {
-            "Python is required before tasks that run Python scripts can start. Use the automatic install button, or install Python manually, then retry.".to_string()
-        }
-    } else {
-        "Install Python and make sure `python3 --version` works in Terminal, then retry.".to_string()
-    })
-}
-
-fn summarize_acp_error(detail: &str) -> (String, Option<String>) {
-    let normalized = detail.to_ascii_lowercase();
-    if normalized.contains("executionpolicy")
-        || normalized.contains("remote signed")
-        || normalized.contains("powershell")
-    {
-        (
-            "MiCode CLI was found, but Windows blocked ACP startup because of PowerShell policy.".to_string(),
-            Some(
-                "Allow `micode.cmd` to run in PowerShell (for example with `Set-ExecutionPolicy RemoteSigned`), then retry.".to_string(),
-            ),
-        )
-    } else if normalized.contains("timed out")
-        || normalized.contains("did not respond to initialize")
-    {
-        (
-            "MiCode CLI started, but its ACP app-server did not finish initialization.".to_string(),
-            Some(
-                "Open Terminal and verify `micode --experimental-acp` (or `micode.cmd --experimental-acp` on Windows) can start normally, then retry.".to_string(),
-            ),
-        )
-    } else {
-        (
-            "MiCode CLI was found, but its ACP app-server failed to start correctly.".to_string(),
-            Some(
-                "Check your MiCode installation and login state, then retry. The detailed error is available below.".to_string(),
-            ),
-        )
-    }
-}
-
-fn is_windows_store_python_detail(detail: &str) -> bool {
-    let normalized = detail.to_ascii_lowercase();
-    normalized.contains("microsoft store")
-        || normalized.contains("app execution aliases")
-        || normalized.contains("windowsapps")
-}
-
-async fn check_node_dependency(path_env: Option<String>) -> StartupEnvironmentCheck {
-    match run_version_probe("node", &["--version"], path_env.as_deref()).await {
-        Ok(version) => ready_check(
-            "node",
-            "Node.js",
-            Some(version.clone()),
-            format!("Node.js is available ({version})."),
-        ),
-        Err(detail) => failed_check(
-            "node",
-            "Node.js",
-            "Node.js 缺失或无法启动，因此财多多无法启动 MiCode CLI。".to_string(),
-            Some(detail),
-            node_recommended_action(),
-            cfg!(windows),
-        ),
-    }
-}
-
-async fn check_micode_dependency(resolved_bin: Option<String>) -> StartupEnvironmentCheck {
-    match check_micode_installation(resolved_bin).await {
-        Ok(Some(version)) => ready_check(
-            "micode",
-            "MiCode CLI",
-            Some(version.clone()),
-            format!("MiCode CLI is available ({version})."),
-        ),
-        Ok(None) => failed_check(
-            "micode",
-            "MiCode CLI",
-            "MiCode CLI could not be verified.".to_string(),
-            None,
-            micode_recommended_action(),
-            cfg!(windows),
-        ),
-        Err(detail) => failed_check(
-            "micode",
-            "MiCode CLI",
-            "MiCode CLI 缺失或无法启动，因此财多多暂时无法继续。".to_string(),
-            Some(detail),
-            micode_recommended_action(),
-            cfg!(windows),
-        ),
-    }
-}
-
-async fn check_app_server_dependency(
-    resolved_bin: Option<String>,
-    micode_args: Option<String>,
-    micode_ready: bool,
-) -> StartupEnvironmentCheck {
-    if !micode_ready {
-        return failed_check(
-            "appServer",
-            "ACP app-server",
-            "MiCode CLI must be available before ACP app-server can be verified.".to_string(),
-            None,
-            micode_recommended_action(),
-            false,
-        );
-    }
-
-    match check_acp_handshake(resolved_bin, micode_args).await {
-        Ok(true) => ready_check(
-            "appServer",
-            "ACP app-server",
-            None,
-            "MiCode ACP app-server initialized successfully.".to_string(),
-        ),
-        Ok(false) => failed_check(
-            "appServer",
-            "ACP app-server",
-            "MiCode ACP app-server did not complete initialization.".to_string(),
-            None,
-            Some("Retry after reinstalling or repairing MiCode CLI.".to_string()),
-            false,
-        ),
-        Err(detail) => {
-            let (summary, action) = summarize_acp_error(&detail);
-            failed_check(
-                "appServer",
-                "ACP app-server",
-                summary,
-                Some(detail),
-                action,
+        node_command.arg("--version");
+        node_command.stdout(std::process::Stdio::piped());
+        node_command.stderr(std::process::Stdio::piped());
+        match timeout(Duration::from_secs(5), node_command.output()).await {
+            Ok(result) => match result {
+                Ok(output) => {
+                    if output.status.success() {
+                        let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                        (
+                            !version.is_empty(),
+                            if version.is_empty() {
+                                None
+                            } else {
+                                Some(version)
+                            },
+                            None,
+                        )
+                    } else {
+                        let stderr = String::from_utf8_lossy(&output.stderr);
+                        let stdout = String::from_utf8_lossy(&output.stdout);
+                        let detail = if stderr.trim().is_empty() {
+                            stdout.trim()
+                        } else {
+                            stderr.trim()
+                        };
+                        (
+                            false,
+                            None,
+                            Some(if detail.is_empty() {
+                                "Node failed to start.".to_string()
+                            } else {
+                                detail.to_string()
+                            }),
+                        )
+                    }
+                }
+                Err(err) => {
+                    if err.kind() == ErrorKind::NotFound {
+                        (false, None, Some("Node not found on PATH.".to_string()))
+                    } else {
+                        (false, None, Some(err.to_string()))
+                    }
+                }
+            },
+            Err(_) => (
                 false,
-            )
+                None,
+                Some("Timed out while checking Node.".to_string()),
+            ),
         }
-    }
-}
-
-async fn check_python_dependency(path_env: Option<String>) -> StartupEnvironmentCheck {
-    let candidates: [(&str, [&str; 2]); 3] = [
-        ("python", ["--version", ""]),
-        ("py", ["-3", "--version"]),
-        ("python3", ["--version", ""]),
-    ];
-
-    let mut last_error: Option<String> = None;
-    for (program, args) in candidates {
-        let filtered_args = args.into_iter().filter(|value| !value.is_empty()).collect::<Vec<_>>();
-        match run_version_probe(program, &filtered_args, path_env.as_deref()).await {
-            Ok(version) => {
-                return ready_check(
-                    "python",
-                    "Python",
-                    Some(version.clone()),
-                    format!("Python is available ({version})."),
-                )
-            }
-            Err(detail) => {
-                last_error = Some(detail);
-            }
-        }
-    }
-
-    let detail = last_error.unwrap_or_else(|| "Python was not found.".to_string());
-    let store_alias = is_windows_store_python_detail(&detail);
-    failed_check(
-        "python",
-        "Python",
-        if store_alias {
-            "Windows only found the Microsoft Store Python placeholder, so Python tasks would hang or fail.".to_string()
-        } else {
-            "Python is missing or cannot start, so Python-based tasks would fail.".to_string()
-        },
-        Some(detail),
-        python_recommended_action(store_alias),
-        cfg!(windows),
-    )
-}
-
-async fn environment_check_startup_inner(
-    micode_bin: Option<String>,
-    micode_args: Option<String>,
-    default_bin: Option<String>,
-) -> StartupEnvironmentStatus {
-    let resolved_bin = normalize_trimmed(micode_bin).or(default_bin);
-    let resolved_args = normalize_trimmed(micode_args);
-    let path_env = build_micode_path_env(resolved_bin.as_deref());
-
-    let node = check_node_dependency(path_env.clone()).await;
-    let micode = check_micode_dependency(resolved_bin.clone()).await;
-    let app_server =
-        check_app_server_dependency(resolved_bin.clone(), resolved_args.clone(), is_ready(&micode))
-            .await;
-    let python = check_python_dependency(path_env).await;
-
-    build_startup_environment_status(
-        vec![node, micode, app_server, python],
-        resolved_bin,
-        resolved_args,
-    )
-}
-
-fn install_error(message: &str) -> String {
-    format!("{message} Please complete the install manually, then click retry.")
-}
-
-fn command_exists(program: &str) -> bool {
-    let checker = if cfg!(windows) { "where" } else { "which" };
-    std::process::Command::new(checker)
-        .arg(program)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|status| status.success())
-        .unwrap_or(false)
-}
-
-async fn run_install_command(program: &str, args: &[&str], timeout_secs: u64) -> Result<(), String> {
-    let mut command = tokio_command(program);
-    command.args(args);
-    command.stdout(Stdio::piped());
-    command.stderr(Stdio::piped());
-    let output = timeout(Duration::from_secs(timeout_secs), command.output())
-        .await
-        .map_err(|_| format!("{program} install timed out."))?
-        .map_err(|error| format!("Failed to run {program}: {error}"))?;
-    if output.status.success() {
-        return Ok(());
-    }
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let detail = if stderr.is_empty() { stdout } else { stderr };
-    Err(if detail.is_empty() {
-        format!("{program} install failed with exit code {}.", output.status.code().unwrap_or(-1))
+    };
+    let details = if app_server_ok {
+        None
     } else {
-        detail
-    })
-}
-
-async fn install_node_dependency() -> Result<(), String> {
-    #[cfg(not(target_os = "windows"))]
-    {
-        return Err(install_error("Automatic Node.js installation is currently only supported on Windows."));
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        if command_exists("winget") {
-            run_install_command("winget", &["install", "--id", "OpenJS.NodeJS", "-e"], 900).await
-        } else if command_exists("choco") {
-            run_install_command("choco", &["install", "-y", "nodejs"], 900).await
+        Some(if cfg!(windows) {
+            "Failed ACP initialize handshake (`micode.cmd --experimental-acp`). If PowerShell blocks `micode`, use `micode.cmd` or run `Set-ExecutionPolicy RemoteSigned`.".to_string()
         } else {
-            Err(install_error(
-                "Automatic Node.js installation needs winget or choco, but neither command is available.",
-            ))
-        }
-    }
+            "Failed ACP initialize handshake (`micode --experimental-acp`).".to_string()
+        })
+    };
+    Ok(json!({
+        "ok": version.is_some() && app_server_ok,
+        "agentBin": resolved,
+        "micodeBin": resolved,
+        "version": version,
+        "appServerOk": app_server_ok,
+        "details": details,
+        "path": path_env,
+        "nodeOk": node_ok,
+        "nodeVersion": node_version,
+        "nodeDetails": node_details,
+    }))
 }
 
-async fn install_python_dependency() -> Result<(), String> {
-    #[cfg(not(target_os = "windows"))]
-    {
-        return Err(install_error("Automatic Python installation is currently only supported on Windows."));
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        if command_exists("winget") {
-            run_install_command("winget", &["install", "--id", "Python.Python.3.12", "-e"], 900)
-                .await
-        } else if command_exists("choco") {
-            run_install_command("choco", &["install", "-y", "python"], 900).await
-        } else {
-            Err(install_error(
-                "Automatic Python installation needs winget or choco, but neither command is available.",
-            ))
-        }
-    }
-}
-
-async fn install_micode_dependency_windows_inner() -> Result<(), String> {
+#[tauri::command]
+pub(crate) async fn micode_install_windows() -> Result<Value, String> {
     #[cfg(not(target_os = "windows"))]
     {
         return Err("MiCode auto-install is only supported on Windows.".to_string());
@@ -565,143 +241,35 @@ async fn install_micode_dependency_windows_inner() -> Result<(), String> {
             .arg("Bypass")
             .arg("-Command")
             .arg(script)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
         let output = timeout(Duration::from_secs(600), command.output())
             .await
             .map_err(|_| "MiCode install timed out after 10 minutes.".to_string())?
             .map_err(|err| format!("Failed to run installer: {err}"))?;
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        if output.status.success() {
-            Ok(())
-        } else {
+        let ok = output.status.success();
+        let code = output.status.code().unwrap_or(-1);
+        if !ok {
             let detail = if stderr.trim().is_empty() {
-                stdout.trim().to_string()
+                stdout.trim()
             } else {
-                stderr.trim().to_string()
+                stderr.trim()
             };
-            Err(if detail.is_empty() {
-                format!(
-                    "MiCode installer failed with exit code {}.",
-                    output.status.code().unwrap_or(-1)
-                )
+            return Err(if detail.is_empty() {
+                format!("MiCode installer failed with exit code {code}.")
             } else {
-                detail
-            })
+                format!("MiCode installer failed ({code}): {detail}")
+            });
         }
+        Ok(json!({
+            "ok": true,
+            "code": code,
+            "stdout": stdout,
+            "stderr": stderr
+        }))
     }
-}
-
-async fn cache_environment_status(
-    state: &AppState,
-    status: StartupEnvironmentStatus,
-) -> StartupEnvironmentStatus {
-    *state.startup_environment_status.lock().await = Some(status.clone());
-    status
-}
-
-#[tauri::command]
-pub(crate) async fn micode_doctor(
-    micode_bin: Option<String>,
-    micode_args: Option<String>,
-    state: State<'_, AppState>,
-) -> Result<Value, String> {
-    let default_bin = {
-        let settings = state.app_settings.lock().await;
-        settings.agent_bin.clone()
-    };
-    let status = environment_check_startup_inner(micode_bin.clone(), micode_args.clone(), default_bin).await;
-    let path_env = build_micode_path_env(status.micode_bin.as_deref());
-    let node = status.checks.iter().find(|check| check.id == "node");
-    let micode = status.checks.iter().find(|check| check.id == "micode");
-    let app_server = status.checks.iter().find(|check| check.id == "appServer");
-    let details = status
-        .checks
-        .iter()
-        .filter(|check| check.required && !is_ready(check))
-        .find_map(|check| Some(check.summary.clone()));
-    Ok(json!({
-        "ok": status.can_proceed,
-        "agentBin": status.micode_bin,
-        "micodeBin": status.micode_bin,
-        "version": micode.and_then(|check| check.detected_version.clone()),
-        "appServerOk": app_server.map(is_ready).unwrap_or(false),
-        "details": details,
-        "path": path_env,
-        "nodeOk": node.map(is_ready).unwrap_or(false),
-        "nodeVersion": node.and_then(|check| check.detected_version.clone()),
-        "nodeDetails": node.and_then(|check| check.technical_details.clone()),
-        "overallStatus": status.overall_status,
-        "canProceed": status.can_proceed,
-        "blocking": status.blocking,
-        "checks": status.checks,
-        "lastCheckedAt": status.last_checked_at,
-    }))
-}
-
-#[tauri::command]
-pub(crate) async fn micode_install_windows() -> Result<Value, String> {
-    install_micode_dependency_windows_inner().await?;
-    Ok(json!({ "ok": true }))
-}
-
-#[tauri::command]
-pub(crate) async fn environment_check_startup(
-    micode_bin: Option<String>,
-    micode_args: Option<String>,
-    state: State<'_, AppState>,
-) -> Result<StartupEnvironmentStatus, String> {
-    let default_bin = {
-        let settings = state.app_settings.lock().await;
-        settings.agent_bin.clone()
-    };
-    let status = environment_check_startup_inner(micode_bin, micode_args, default_bin).await;
-    Ok(cache_environment_status(&state, status).await)
-}
-
-#[tauri::command]
-pub(crate) async fn environment_retry_check(
-    micode_bin: Option<String>,
-    micode_args: Option<String>,
-    state: State<'_, AppState>,
-) -> Result<StartupEnvironmentStatus, String> {
-    environment_check_startup(micode_bin, micode_args, state).await
-}
-
-#[tauri::command]
-pub(crate) async fn environment_get_cached_status(
-    state: State<'_, AppState>,
-) -> Result<Option<StartupEnvironmentStatus>, String> {
-    Ok(state.startup_environment_status.lock().await.clone())
-}
-
-#[tauri::command]
-pub(crate) async fn environment_install_dependency(
-    dependency_id: String,
-    micode_bin: Option<String>,
-    micode_args: Option<String>,
-    state: State<'_, AppState>,
-) -> Result<StartupEnvironmentStatus, String> {
-    match dependency_id.trim() {
-        "node" => install_node_dependency().await?,
-        "micode" => install_micode_dependency_windows_inner().await?,
-        "python" => install_python_dependency().await?,
-        "appServer" => {
-            return Err(
-                "ACP app-server is verified automatically after MiCode CLI is installed or repaired."
-                    .to_string(),
-            )
-        }
-        _ => return Err(format!("Unsupported dependency id: {dependency_id}")),
-    }
-
-    let default_bin = {
-        let settings = state.app_settings.lock().await;
-        settings.agent_bin.clone()
-    };
-    let status = environment_check_startup_inner(micode_bin, micode_args, default_bin).await;
-    Ok(cache_environment_status(&state, status).await)
 }
 
 #[tauri::command]
@@ -1863,54 +1431,4 @@ fn sanitize_run_worktree_name(value: &str) -> String {
         }
     }
     format!("feat/{}", cleaned.trim_start_matches('/'))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{
-        build_startup_environment_status, failed_check, is_windows_store_python_detail,
-        ready_check, summarize_acp_error,
-    };
-
-    #[test]
-    fn startup_environment_status_blocks_when_required_check_fails() {
-        let status = build_startup_environment_status(
-            vec![
-                ready_check("node", "Node.js", Some("v22.0.0".to_string()), "ok".to_string()),
-                failed_check(
-                    "python",
-                    "Python",
-                    "Python missing".to_string(),
-                    Some("python not found".to_string()),
-                    Some("Install Python".to_string()),
-                    true,
-                ),
-            ],
-            None,
-            None,
-        );
-
-        assert!(!status.can_proceed);
-        assert!(status.blocking);
-        assert_eq!(status.overall_status, "manual_action_required");
-    }
-
-    #[test]
-    fn detects_windows_store_python_alias_messages() {
-        assert!(is_windows_store_python_detail(
-            "Python was not found; run without arguments to install from the Microsoft Store."
-        ));
-        assert!(is_windows_store_python_detail(
-            "C:\\Users\\mi\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe"
-        ));
-        assert!(!is_windows_store_python_detail("python not found on PATH"));
-    }
-
-    #[test]
-    fn acp_summary_mentions_powershell_policy_when_applicable() {
-        let (summary, action) =
-            summarize_acp_error("PowerShell blocked execution because of ExecutionPolicy");
-        assert!(summary.contains("PowerShell"));
-        assert!(action.unwrap_or_default().contains("RemoteSigned"));
-    }
 }
