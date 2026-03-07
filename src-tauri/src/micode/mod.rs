@@ -253,7 +253,7 @@ async fn run_version_probe(program: &str, args: &[&str], path_env: Option<&str>)
 
 fn node_recommended_action() -> Option<String> {
     Some(if cfg!(windows) {
-        "MiCodeMonitor needs Node.js before it can start MiCode CLI. Use the automatic install button, or install Node.js manually, then retry.".to_string()
+        "财多多需要先准备好 Node.js，才能启动 MiCode CLI。你可以使用自动安装按钮，或手动安装 Node.js 后再重试。".to_string()
     } else {
         "Install Node.js and make sure `node --version` works in Terminal, then retry.".to_string()
     })
@@ -328,7 +328,7 @@ async fn check_node_dependency(path_env: Option<String>) -> StartupEnvironmentCh
         Err(detail) => failed_check(
             "node",
             "Node.js",
-            "Node.js is missing or cannot start, so MiCodeMonitor cannot launch MiCode CLI.".to_string(),
+            "Node.js 缺失或无法启动，因此财多多无法启动 MiCode CLI。".to_string(),
             Some(detail),
             node_recommended_action(),
             cfg!(windows),
@@ -355,7 +355,7 @@ async fn check_micode_dependency(resolved_bin: Option<String>) -> StartupEnviron
         Err(detail) => failed_check(
             "micode",
             "MiCode CLI",
-            "MiCode CLI is missing or cannot start, so MiCodeMonitor cannot continue.".to_string(),
+            "MiCode CLI 缺失或无法启动，因此财多多暂时无法继续。".to_string(),
             Some(detail),
             micode_recommended_action(),
             cfg!(windows),
