@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { QueuedMessage, WorkspaceInfo } from "../../../types";
 
 type UseQueuedSendOptions = {
@@ -67,6 +67,8 @@ export function useQueuedSend({
   const [hasStartedByThread, setHasStartedByThread] = useState<
     Record<string, boolean>
   >({});
+  const pendingSendRef = useRef(false);
+  const [pendingSendVersion, setPendingSendVersion] = useState(0);
 
   const activeQueue = useMemo(
     () => (activeThreadId ? queuedByThread[activeThreadId] ?? [] : []),
@@ -185,7 +187,7 @@ export function useQueuedSend({
       if (activeThreadId && isReviewing) {
         return;
       }
-      if (isProcessing && activeThreadId && !steerEnabled) {
+      if ((isProcessing || pendingSendRef.current) && activeThreadId && !steerEnabled) {
         const item: QueuedMessage = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           text: trimmed,
@@ -196,7 +198,13 @@ export function useQueuedSend({
         clearActiveImages();
         return;
       }
-      await executeSlashOrSend(trimmed, nextImages);
+      pendingSendRef.current = true;
+      try {
+        await executeSlashOrSend(trimmed, nextImages);
+      } finally {
+        pendingSendRef.current = false;
+        setPendingSendVersion((n) => n + 1);
+      }
       clearActiveImages();
     },
     [
@@ -268,6 +276,9 @@ export function useQueuedSend({
     if (!activeThreadId || isProcessing || isReviewing) {
       return;
     }
+    if (pendingSendRef.current) {
+      return;
+    }
     if (inFlightByThread[activeThreadId]) {
       return;
     }
@@ -284,12 +295,16 @@ export function useQueuedSend({
       [threadId]: (prev[threadId] ?? []).slice(1),
     }));
     (async () => {
+      pendingSendRef.current = true;
       try {
         await executeSlashOrSend(nextItem.text, nextItem.images ?? []);
       } catch {
         setInFlightByThread((prev) => ({ ...prev, [threadId]: null }));
         setHasStartedByThread((prev) => ({ ...prev, [threadId]: false }));
         prependQueuedMessage(threadId, nextItem);
+      } finally {
+        pendingSendRef.current = false;
+        setPendingSendVersion((n) => n + 1);
       }
     })();
   }, [
@@ -297,6 +312,7 @@ export function useQueuedSend({
     inFlightByThread,
     isProcessing,
     isReviewing,
+    pendingSendVersion,
     prependQueuedMessage,
     queuedByThread,
     executeSlashOrSend,
