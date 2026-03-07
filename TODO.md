@@ -122,6 +122,7 @@
 - [x] Fix Chinese UI leakage and mojibake in header/file panel/composer, and enlarge About page card by 50%
 - [x] Enlarge About window itself and make it resizable so enlarged content is fully visible
 - [x] Disable voice input entry points in Settings and composer UI with a clear "coming later" tooltip
+- [x] Fix thread hook test fixtures for active-turn tracking so CI `npm run build` typecheck passes again
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

@@ -26,6 +26,7 @@ type SetupOverrides = {
   pendingInterrupts?: string[];
   planByThread?: Record<string, TurnPlan | null>;
   itemsByThread?: Record<string, { kind: string; status?: string }[]>;
+  activeTurnIdByThread?: Record<string, string | null>;
 };
 
 const makeOptions = (overrides: SetupOverrides = {}) => {
@@ -44,6 +45,9 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
   const planByThreadRef = {
     current: overrides.planByThread ?? {},
   };
+  const activeTurnIdByThreadRef = {
+    current: overrides.activeTurnIdByThread ?? {},
+  };
   const itemsByThread = overrides.itemsByThread ?? {};
 
   const { result } = renderHook(() =>
@@ -60,6 +64,7 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
       pushThreadErrorMessage,
       safeMessageActivity,
       recordThreadActivity,
+      activeTurnIdByThreadRef,
     }),
   );
 
@@ -76,6 +81,7 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
     recordThreadActivity,
     pendingInterruptsRef,
     planByThreadRef,
+    activeTurnIdByThreadRef,
   };
 };
 
@@ -347,6 +353,9 @@ describe("useThreadTurnEvents", () => {
     const planByThreadRef = {
       current: {} as Record<string, TurnPlan | null>,
     };
+    const activeTurnIdByThreadRef = {
+      current: {} as Record<string, string | null>,
+    };
     const itemsByThread = {};
 
     const { result, rerender } = renderHook(() =>
@@ -363,6 +372,7 @@ describe("useThreadTurnEvents", () => {
         pushThreadErrorMessage,
         safeMessageActivity,
         recordThreadActivity,
+        activeTurnIdByThreadRef,
       }),
     );
 
