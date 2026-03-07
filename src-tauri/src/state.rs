@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 use crate::dictation::DictationState;
 use crate::shared::micode_core::MiCodeLoginCancelState;
 use crate::storage::{read_settings, read_workspaces};
-use crate::types::{AppSettings, WorkspaceEntry};
+use crate::types::{AppSettings, StartupEnvironmentStatus, WorkspaceEntry};
 
 pub(crate) struct AppState {
     pub(crate) workspaces: Mutex<HashMap<String, WorkspaceEntry>>,
@@ -25,6 +25,7 @@ pub(crate) struct AppState {
     pub(crate) app_settings: Mutex<AppSettings>,
     pub(crate) dictation: Mutex<DictationState>,
     pub(crate) micode_login_cancels: Mutex<HashMap<String, MiCodeLoginCancelState>>,
+    pub(crate) startup_environment_status: Mutex<Option<StartupEnvironmentStatus>>,
 }
 
 impl AppState {
@@ -59,6 +60,7 @@ impl AppState {
             app_settings: Mutex::new(app_settings),
             dictation: Mutex::new(DictationState::default()),
             micode_login_cancels: Mutex::new(HashMap::new()),
+            startup_environment_status: Mutex::new(None),
         }
     }
 }

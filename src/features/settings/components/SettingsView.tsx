@@ -982,6 +982,18 @@ export function SettingsView({
       const result = await onRunDoctor(nextMiCodeBin, nextMiCodeArgs);
       setDoctorState({ status: "done", result });
     } catch (error) {
+      const checks = [
+        {
+          id: "micode",
+          label: "MiCode CLI",
+          required: true,
+          status: "failed",
+          summary: error instanceof Error ? error.message : String(error),
+          technicalDetails: null,
+          recommendedAction: null,
+          canAutoInstall: false,
+        },
+      ];
       setDoctorState({
         status: "done",
         result: {
@@ -994,6 +1006,11 @@ export function SettingsView({
           nodeOk: false,
           nodeVersion: null,
           nodeDetails: null,
+          overallStatus: "manual_action_required",
+          canProceed: false,
+          blocking: true,
+          checks,
+          lastCheckedAt: Date.now(),
         },
       });
     }
@@ -3000,6 +3017,11 @@ export function SettingsView({
                 </div>
 
                 {doctorState.result && (
+                  (() => {
+                    const pythonCheck = doctorState.result.checks?.find(
+                      (check) => check.id === "python",
+                    );
+                    return (
                   <div
                     className={`settings-doctor ${doctorState.result.ok ? "ok" : "error"}`}
                   >
@@ -3021,11 +3043,22 @@ export function SettingsView({
                           ? `${t("ok", "正常")} (${doctorState.result.nodeVersion ?? t("unknown", "未知")})`
                           : t("missing", "缺失")}
                       </div>
+                      {pythonCheck && (
+                        <div>
+                          Python：
+                          {pythonCheck.status === "ready"
+                            ? `${t("ok", "正常")} (${pythonCheck.detectedVersion ?? t("unknown", "未知")})`
+                            : t("missing", "缺失")}
+                        </div>
+                      )}
                       {doctorState.result.details && (
                         <div>{doctorState.result.details}</div>
                       )}
                       {doctorState.result.nodeDetails && (
                         <div>{doctorState.result.nodeDetails}</div>
+                      )}
+                      {pythonCheck?.technicalDetails && (
+                        <div>{pythonCheck.technicalDetails}</div>
                       )}
                       {doctorState.result.path && (
                         <div className="settings-doctor-path">
@@ -3034,6 +3067,8 @@ export function SettingsView({
                       )}
                     </div>
                   </div>
+                    );
+                  })()
                 )}
               </div>
 
