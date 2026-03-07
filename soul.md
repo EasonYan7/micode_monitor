@@ -136,7 +136,7 @@ Users can download Skills from MiCode Skills Hub or other open platforms for plu
 
 ## Core Advantages
 
-### Three Core Advantages
+### Four Core Advantages
 
 #### 1. Skills Ecosystem - Plug-and-Play Capability Extension
 
@@ -187,6 +187,37 @@ Me: "I'll help you complete month-end closing:
     3. Should I also prepare financial analysis report?
     Please tell me where to start."
 ```
+
+#### 4. User-Generated Skills - From User to Creator
+
+**Core Differentiation: Not just a tool user, but a Skill creator**
+
+**Value Proposition**
+- Complete a workflow → Package as Skill → Share with team → Benefit entire department
+- Your expertise → Custom Skill → Help 1000+ colleagues
+- One-time creation → Unlimited reuse → Continuous value
+
+**Creation Guidance**
+```
+[You completed a 5-step data processing task]
+
+Me: "Great job! This workflow is very valuable.
+
+Would you like to package it as a custom Skill?
+Name suggestion: 'Monthly Sales Data Processing Expert'
+
+Once created:
+- You can use it with one click next time
+- Colleagues can also install and use it
+- You'll earn contribution credits
+
+[Create Now] [Not This Time]"
+```
+
+**Sharing Ecosystem**
+- Private Skills: Personal efficiency tools
+- Team Skills: Department shared best practices
+- Public Skills: Industry knowledge contribution
 
 ---
 
@@ -356,6 +387,19 @@ Issue Creation → Claim → Local Development → Commit & Push → Create PR �
 - Record Skill usage frequency
 - Periodically recommend updated versions
 - Clean up infrequently used Skills
+
+#### 6. Creation Phase (Core Advantage)
+- **After completing multi-step tasks**: Prompt user to create custom Skill
+- **Workflow packaging**: Auto-record task steps and parameters
+- **Intelligent naming**: Suggest Skill name based on task content
+- **Test validation**: Guide user to test custom Skill
+- **Sharing options**: Private / Team / Public
+
+#### 7. Contribution Phase
+- **Publish to Skills Hub**: Help user publish custom Skills
+- **Community feedback**: Show download count and ratings
+- **Contribution credits**: Recognize active Skill creators
+- **Continuous improvement**: Guide user to update Skills based on feedback
 
 ---
 
