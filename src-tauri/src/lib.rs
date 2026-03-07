@@ -7,7 +7,6 @@ mod dictation;
 mod debug_logs;
 mod event_sink;
 mod files;
-mod git;
 mod git_utils;
 mod local_usage;
 mod menu;
@@ -124,33 +123,11 @@ pub fn run() {
             micode::set_thread_name,
             micode::collaboration_mode_list,
             workspaces::connect_workspace,
-            git::get_git_status,
-            git::list_git_roots,
-            git::get_git_diffs,
-            git::get_git_log,
-            git::get_git_commit_diff,
-            git::get_git_remote,
-            git::stage_git_file,
-            git::stage_git_all,
-            git::unstage_git_file,
-            git::revert_git_file,
-            git::revert_git_all,
-            git::commit_git,
-            git::push_git,
-            git::pull_git,
-            git::fetch_git,
-            git::sync_git,
-            git::get_github_issues,
-            git::get_github_pull_requests,
-            git::get_github_pull_request_diff,
-            git::get_github_pull_request_comments,
             workspaces::list_workspace_files,
             workspaces::read_workspace_file,
             workspaces::open_workspace_in,
             workspaces::get_open_app_icon,
-            git::list_git_branches,
-            git::checkout_git_branch,
-            git::create_git_branch,
+            workspaces::list_git_branches,
             micode::model_list,
             micode::account_rate_limits,
             micode::account_read,

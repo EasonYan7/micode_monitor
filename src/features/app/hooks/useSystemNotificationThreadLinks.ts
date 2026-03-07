@@ -12,7 +12,7 @@ type Params = {
   workspacesById: Map<string, WorkspaceInfo>;
   refreshWorkspaces: () => Promise<WorkspaceInfo[] | undefined>;
   connectWorkspace: (workspace: WorkspaceInfo) => Promise<void>;
-  setActiveTab: (tab: "projects" | "micode" | "git" | "log") => void;
+  setActiveTab: (tab: "projects" | "micode" | "files" | "log") => void;
   setCenterMode: (mode: "chat" | "diff") => void;
   setSelectedDiffPath: (path: string | null) => void;
   setActiveWorkspaceId: (workspaceId: string | null) => void;

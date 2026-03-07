@@ -40,12 +40,6 @@ import { useLayoutNodes } from "./features/layout/hooks/useLayoutNodes";
 import { useWorkspaceDropZone } from "./features/workspaces/hooks/useWorkspaceDropZone";
 import { useThreads } from "./features/threads/hooks/useThreads";
 import { useWindowDrag } from "./features/layout/hooks/useWindowDrag";
-import { useGitPanelController } from "./features/app/hooks/useGitPanelController";
-import { useGitRemote } from "./features/git/hooks/useGitRemote";
-import { useGitRepoScan } from "./features/git/hooks/useGitRepoScan";
-import { usePullRequestComposer } from "./features/git/hooks/usePullRequestComposer";
-import { useGitActions } from "./features/git/hooks/useGitActions";
-import { useAutoExitEmptyDiff } from "./features/git/hooks/useAutoExitEmptyDiff";
 import { useModels } from "./features/models/hooks/useModels";
 import { useCollaborationModes } from "./features/collaboration/hooks/useCollaborationModes";
 import { useCollaborationModeSelection } from "./features/collaboration/hooks/useCollaborationModeSelection";
@@ -53,9 +47,6 @@ import { useSkills } from "./features/skills/hooks/useSkills";
 import { useApps } from "./features/apps/hooks/useApps";
 import { useCustomPrompts } from "./features/prompts/hooks/useCustomPrompts";
 import { useWorkspaceFileListing } from "./features/app/hooks/useWorkspaceFileListing";
-import { useGitBranches } from "./features/git/hooks/useGitBranches";
-import { useBranchSwitcher } from "./features/git/hooks/useBranchSwitcher";
-import { useBranchSwitcherShortcut } from "./features/git/hooks/useBranchSwitcherShortcut";
 import { useDebugLog } from "./features/debug/hooks/useDebugLog";
 import { useWorkspaceRefreshOnFocus } from "./features/workspaces/hooks/useWorkspaceRefreshOnFocus";
 import { useWorkspaceRestore } from "./features/workspaces/hooks/useWorkspaceRestore";
@@ -83,10 +74,8 @@ import { useWorktreePrompt } from "./features/workspaces/hooks/useWorktreePrompt
 import { useWorkspaceController } from "./features/app/hooks/useWorkspaceController";
 import { useWorkspaceSelection } from "./features/workspaces/hooks/useWorkspaceSelection";
 import { useLocalUsage } from "./features/home/hooks/useLocalUsage";
-import { useGitHubPanelController } from "./features/app/hooks/useGitHubPanelController";
 import { useSettingsModalState } from "./features/app/hooks/useSettingsModalState";
 import { usePersistComposerSettings } from "./features/app/hooks/usePersistComposerSettings";
-import { useSyncSelectedDiffPath } from "./features/app/hooks/useSyncSelectedDiffPath";
 import { useMenuAcceleratorController } from "./features/app/hooks/useMenuAcceleratorController";
 import { useAppMenuEvents } from "./features/app/hooks/useAppMenuEvents";
 import { useWorkspaceActions } from "./features/app/hooks/useWorkspaceActions";
@@ -99,11 +88,10 @@ import { useTerminalController } from "./features/terminal/hooks/useTerminalCont
 import { useWorkspaceLaunchScript } from "./features/app/hooks/useWorkspaceLaunchScript";
 import { useWorkspaceLaunchScripts } from "./features/app/hooks/useWorkspaceLaunchScripts";
 import { useWorktreeSetupScript } from "./features/app/hooks/useWorktreeSetupScript";
-import { useGitCommitController } from "./features/app/hooks/useGitCommitController";
 import { WorkspaceHome } from "./features/workspaces/components/WorkspaceHome";
 import { useWorkspaceHome } from "./features/workspaces/hooks/useWorkspaceHome";
 import { useWorkspaceAgentMd } from "./features/workspaces/hooks/useWorkspaceAgentMd";
-import { pickWorkspacePath, runMiCodeInstallWindows } from "./services/tauri";
+import { runMiCodeInstallWindows } from "./services/tauri";
 import type {
   AccessMode,
   AppSettings,
@@ -295,12 +283,6 @@ const SettingsView = lazy(() =>
   })),
 );
 
-const GitHubPanelData = lazy(() =>
-  import("./features/git/components/GitHubPanelData").then((module) => ({
-    default: module.GitHubPanelData,
-  })),
-);
-
 
 function MainApp() {
   useStartupViewportSync();
@@ -412,15 +394,17 @@ function MainApp() {
     debugOpen,
     setDebugOpen,
     debugEntries,
+    debugViewMode,
+    setDebugViewMode,
     showDebugButton,
     addDebugEntry,
     handleCopyDebug,
     clearDebugEntries,
-  } = useDebugLog();
+  } = useDebugLog(appSettings.language ?? "en");
   useLiquidGlassEffect({ reduceTransparency, onDebug: addDebugEntry });
   const [accessMode, setAccessMode] = useState<AccessMode>("current");
   const [activeTab, setActiveTab] = useState<
-    "projects" | "micode" | "git" | "log"
+    "projects" | "micode" | "files" | "log"
   >("micode");
   const tabletTab = activeTab === "projects" ? "micode" : activeTab;
   const {
@@ -545,104 +529,67 @@ function MainApp() {
     );
   }, [appSettings.defaultAccessMode]);
 
-  const {
-    gitIssues,
-    gitIssuesTotal,
-    gitIssuesLoading,
-    gitIssuesError,
-    gitPullRequests,
-    gitPullRequestsTotal,
-    gitPullRequestsLoading,
-    gitPullRequestsError,
-    gitPullRequestDiffs,
-    gitPullRequestDiffsLoading,
-    gitPullRequestDiffsError,
-    gitPullRequestComments,
-    gitPullRequestCommentsLoading,
-    gitPullRequestCommentsError,
-    handleGitIssuesChange,
-    handleGitPullRequestsChange,
-    handleGitPullRequestDiffsChange,
-    handleGitPullRequestCommentsChange,
-    resetGitHubPanelState,
-  } = useGitHubPanelController();
-
-  const {
-    centerMode,
-    setCenterMode,
-    selectedDiffPath,
-    setSelectedDiffPath,
-    diffScrollRequestId,
-    gitPanelMode,
-    setGitPanelMode,
-    gitDiffViewStyle,
-    setGitDiffViewStyle,
-    filePanelMode,
-    setFilePanelMode,
-    selectedPullRequest,
-    setSelectedPullRequest,
-    selectedCommitSha,
-    setSelectedCommitSha,
-    diffSource,
-    setDiffSource,
-    gitStatus,
-    refreshGitStatus,
-    queueGitStatusRefresh,
-    refreshGitDiffs,
-    gitLogEntries,
-    gitLogTotal,
-    gitLogAhead,
-    gitLogBehind,
-    gitLogAheadEntries,
-    gitLogBehindEntries,
-    gitLogUpstream,
-    gitLogLoading,
-    gitLogError,
-    refreshGitLog,
-    gitCommitDiffs,
-    shouldLoadDiffs,
-    activeDiffs,
-    activeDiffLoading,
-    activeDiffError,
-    handleSelectDiff,
-    handleSelectCommit,
-    handleActiveDiffPath,
-    handleGitPanelModeChange,
-    activeWorkspaceIdRef,
-    activeWorkspaceRef,
-  } = useGitPanelController({
-    activeWorkspace,
-    gitDiffPreloadEnabled: appSettings.preloadGitDiffs,
-    gitDiffIgnoreWhitespaceChanges: appSettings.gitDiffIgnoreWhitespaceChanges,
-    isCompact,
-    isTablet,
-    activeTab,
-    tabletTab,
-    setActiveTab,
-    prDiffs: gitPullRequestDiffs,
-    prDiffsLoading: gitPullRequestDiffsLoading,
-    prDiffsError: gitPullRequestDiffsError,
-  });
-
-  const shouldLoadGitHubPanelData =
-    gitPanelMode === "issues" ||
-    gitPanelMode === "prs" ||
-    (shouldLoadDiffs && diffSource === "pr");
-
+  const [centerMode, setCenterMode] = useState<"chat" | "diff">("chat");
+  const [selectedDiffPath, setSelectedDiffPath] = useState<string | null>(null);
+  const [gitDiffViewStyle, setGitDiffViewStyle] = useState<"split" | "unified">(
+    "split",
+  );
+  const [filePanelMode, setFilePanelMode] = useState<"files" | "prompts">("files");
+  const diffScrollRequestId = 0;
+  const gitPanelMode: "diff" | "log" | "issues" | "prs" = "diff";
+  const diffSource: "local" | "pr" | "commit" = "local";
+  const selectedCommitSha = null;
+  const gitStatus = {
+    branchName: "",
+    files: [],
+    stagedFiles: [],
+    unstagedFiles: [],
+    totalAdditions: 0,
+    totalDeletions: 0,
+    error: null,
+  };
+  const gitIssues: never[] = [];
+  const gitPullRequests: never[] = [];
+  const gitLogEntries: never[] = [];
+  const gitLogAheadEntries: never[] = [];
+  const gitLogBehindEntries: never[] = [];
+  const gitRemoteUrl = null;
+  const gitRootCandidates: string[] = [];
+  const gitRootScanDepth = 3;
+  const gitRootScanLoading = false;
+  const gitRootScanError = null;
+  const gitRootScanHasScanned = false;
+  const gitLogTotal = 0;
+  const gitLogAhead = 0;
+  const gitLogBehind = 0;
+  const gitLogUpstream = null;
+  const gitLogLoading = false;
+  const gitLogError = null;
+  const gitIssuesTotal = 0;
+  const gitIssuesLoading = false;
+  const gitIssuesError = null;
+  const gitPullRequestsTotal = 0;
+  const gitPullRequestsLoading = false;
+  const gitPullRequestsError = null;
+  const gitPullRequestCommentsLoading = false;
+  const gitPullRequestCommentsError = null;
+  const activeDiffs: never[] = [];
+  const activeDiffLoading = false;
+  const activeDiffError = null;
+  const queueGitStatusRefresh = () => {};
+  const handleSelectDiff = () => {};
+  const handleActiveDiffPath = () => {};
+  const handleGitPanelModeChange = () => {};
+  const setGitRootScanDepth = () => {};
+  const scanGitRoots = () => {};
+  const activeWorkspaceIdRef = useRef<string | null>(activeWorkspaceId);
+  const activeWorkspaceRef = useRef<WorkspaceInfo | null>(activeWorkspace);
   useEffect(() => {
-    resetGitHubPanelState();
-  }, [activeWorkspaceId, resetGitHubPanelState]);
-  const { remote: gitRemoteUrl } = useGitRemote(activeWorkspace);
-  const {
-    repos: gitRootCandidates,
-    isLoading: gitRootScanLoading,
-    error: gitRootScanError,
-    depth: gitRootScanDepth,
-    hasScanned: gitRootScanHasScanned,
-    scan: scanGitRoots,
-    setDepth: setGitRootScanDepth,
-    clear: clearGitRootCandidates,
-  } = useGitRepoScan(activeWorkspace);
+    activeWorkspaceIdRef.current = activeWorkspaceId;
+  }, [activeWorkspaceId]);
+  useEffect(() => {
+    activeWorkspaceRef.current = activeWorkspace;
+  }, [activeWorkspace]);
   const {
     models,
     selectedModel,
@@ -731,111 +678,38 @@ function MainApp() {
     getWorkspacePromptsDir,
     getGlobalPromptsDir,
   } = useCustomPrompts({ activeWorkspace, onDebug: addDebugEntry });
-  const { branches, checkoutBranch, createBranch } = useGitBranches({
-    activeWorkspace,
-    onDebug: addDebugEntry
-  });
-  const handleCheckoutBranch = async (name: string) => {
-    await checkoutBranch(name);
-    refreshGitStatus();
-  };
-  const handleCreateBranch = async (name: string) => {
-    await createBranch(name);
-    refreshGitStatus();
-  };
-  const currentBranch = gitStatus.branchName ?? null;
-  const {
-    branchSwitcher,
-    openBranchSwitcher,
-    closeBranchSwitcher,
-    handleBranchSelect,
-  } = useBranchSwitcher({
-    activeWorkspace,
-    checkoutBranch: handleCheckoutBranch,
-    setActiveWorkspaceId,
-  });
-  const isBranchSwitcherEnabled =
-    Boolean(activeWorkspace?.connected) && activeWorkspace?.kind !== "worktree";
-  useBranchSwitcherShortcut({
-    shortcut: appSettings.branchSwitcherShortcut,
-    isEnabled: isBranchSwitcherEnabled,
-    onTrigger: openBranchSwitcher,
-  });
   const alertError = useCallback((error: unknown) => {
     pushErrorToast({
       title: "Error",
       message: error instanceof Error ? error.message : String(error),
     });
   }, []);
-  const {
-    applyWorktreeChanges: handleApplyWorktreeChanges,
-    revertAllGitChanges: handleRevertAllGitChanges,
-    revertGitFile: handleRevertGitFile,
-    stageGitAll: handleStageGitAll,
-    stageGitFile: handleStageGitFile,
-    unstageGitFile: handleUnstageGitFile,
-    worktreeApplyError,
-    worktreeApplyLoading,
-    worktreeApplySuccess,
-  } = useGitActions({
-    activeWorkspace,
-    onRefreshGitStatus: refreshGitStatus,
-    onRefreshGitDiffs: refreshGitDiffs,
-    onError: alertError,
-  });
+  const branches: never[] = [];
+  const handleCheckoutBranch = async (_name: string) => {};
+  const handleCreateBranch = async (_name: string) => {};
+  const handleApplyWorktreeChanges = async () => {};
+  const handleRevertAllGitChanges = async () => {};
+  const handleRevertGitFile = async (_path: string) => {};
+  const handleStageGitAll = async () => {};
+  const handleStageGitFile = async (_path: string) => {};
+  const handleUnstageGitFile = async (_path: string) => {};
+  const worktreeApplyError = null;
+  const worktreeApplyLoading = false;
+  const worktreeApplySuccess = false;
 
   const resolvedModel = selectedModel?.model ?? null;
   const resolvedEffort = reasoningSupported ? selectedEffort : null;
-  const activeGitRoot = activeWorkspace?.settings.gitRoot ?? null;
-  const normalizePath = useCallback((value: string) => {
-    return value.replace(/\\/g, "/").replace(/\/+$/, "");
-  }, []);
-  const handleSetGitRoot = useCallback(
-    async (path: string | null) => {
-      if (!activeWorkspace) {
-        return;
-      }
-      await updateWorkspaceSettings(activeWorkspace.id, {
-        gitRoot: path,
-      });
-      clearGitRootCandidates();
-      refreshGitStatus();
-    },
-    [
-      activeWorkspace,
-      clearGitRootCandidates,
-      refreshGitStatus,
-      updateWorkspaceSettings,
-    ],
-  );
-  const handlePickGitRoot = useCallback(async () => {
-    if (!activeWorkspace) {
-      return;
-    }
-    const selection = await pickWorkspacePath();
-    if (!selection) {
-      return;
-    }
-    const workspacePath = normalizePath(activeWorkspace.path);
-    const selectedPath = normalizePath(selection);
-    let nextRoot: string | null = null;
-    if (selectedPath === workspacePath) {
-      nextRoot = null;
-    } else if (selectedPath.startsWith(`${workspacePath}/`)) {
-      nextRoot = selectedPath.slice(workspacePath.length + 1);
-    } else {
-      nextRoot = selectedPath;
-    }
-    await handleSetGitRoot(nextRoot);
-  }, [activeWorkspace, handleSetGitRoot, normalizePath]);
+  const activeGitRoot = null;
+  const handleSetGitRoot = useCallback(async (_path: string | null) => {}, []);
+  const handlePickGitRoot = useCallback(async () => {}, []);
   const fileStatus =
     gitStatus.error
-      ? "Git status unavailable"
+      ? "File status unavailable"
       : gitStatus.files.length > 0
         ? `${gitStatus.files.length} file${
             gitStatus.files.length === 1 ? "" : "s"
           } changed`
-        : "Working tree clean";
+        : "No modified files";
 
   usePersistComposerSettings({
     appSettingsLoading,
@@ -870,16 +744,6 @@ function MainApp() {
       appSettings.composerListContinuation,
     ],
   );
-
-
-  useSyncSelectedDiffPath({
-    diffSource,
-    centerMode,
-    gitPullRequestDiffs,
-    gitCommitDiffs,
-    selectedDiffPath,
-    setSelectedDiffPath,
-  });
 
   const { collaborationModePayload } = useCollaborationModeSelection({
     selectedCollaborationMode,
@@ -1025,19 +889,6 @@ function MainApp() {
       recordPendingThreadLinkRef.current = () => {};
     };
   }, [recordPendingThreadLink]);
-
-  useAutoExitEmptyDiff({
-    centerMode,
-    autoExitEnabled: diffSource === "local",
-    activeDiffCount: activeDiffs.length,
-    activeDiffLoading,
-    activeDiffError,
-    activeThreadId,
-    isCompact,
-    setCenterMode,
-    setSelectedDiffPath,
-    setActiveTab,
-  });
 
   const { handleCopyThread } = useCopyThread({
     activeItems,
@@ -1435,7 +1286,7 @@ function MainApp() {
     attachImages,
     pickImages,
     removeImage,
-    clearActiveImages,
+    clearActiveImages: _clearActiveImages,
     removeImagesForThread,
     activeQueue,
     handleSend,
@@ -1549,37 +1400,28 @@ function MainApp() {
     onDebug: addDebugEntry,
   });
 
-  const {
-    commitMessage,
-    commitMessageLoading,
-    commitMessageError,
-    commitLoading,
-    pullLoading,
-    fetchLoading,
-    pushLoading,
-    syncLoading,
-    commitError,
-    pullError,
-    fetchError,
-    pushError,
-    syncError,
-    onCommitMessageChange: handleCommitMessageChange,
-    onGenerateCommitMessage: handleGenerateCommitMessage,
-    onCommit: handleCommit,
-    onCommitAndPush: handleCommitAndPush,
-    onCommitAndSync: handleCommitAndSync,
-    onPull: handlePull,
-    onFetch: handleFetch,
-    onPush: handlePush,
-    onSync: handleSync,
-  } = useGitCommitController({
-    activeWorkspace,
-    activeWorkspaceId,
-    activeWorkspaceIdRef,
-    gitStatus,
-    refreshGitStatus,
-    refreshGitLog,
-  });
+  const commitMessage = "";
+  const commitMessageLoading = false;
+  const commitMessageError = null;
+  const commitLoading = false;
+  const pullLoading = false;
+  const fetchLoading = false;
+  const pushLoading = false;
+  const syncLoading = false;
+  const commitError = null;
+  const pullError = null;
+  const fetchError = null;
+  const pushError = null;
+  const syncError = null;
+  const handleCommitMessageChange = (_value: string) => {};
+  const handleGenerateCommitMessage = async () => {};
+  const handleCommit = async () => {};
+  const handleCommitAndPush = async () => {};
+  const handleCommitAndSync = async () => {};
+  const handlePull = async () => {};
+  const handleFetch = async () => {};
+  const handlePush = async () => {};
+  const handleSync = async () => {};
 
   const handleSendPromptToNewAgent = useCallback(
     async (text: string) => {
@@ -1821,34 +1663,16 @@ function MainApp() {
     },
   });
 
-  const {
-    handleSelectPullRequest,
-    resetPullRequestSelection,
-    composerSendLabel,
-    handleComposerSend,
-    handleComposerQueue,
-  } = usePullRequestComposer({
-    activeWorkspace,
-    selectedPullRequest,
-    gitPullRequestDiffs,
-    filePanelMode,
-    gitPanelMode,
-    centerMode,
-    isCompact,
-    setSelectedPullRequest,
-    setDiffSource,
-    setSelectedDiffPath,
-    setCenterMode,
-    setGitPanelMode,
-    setPrefillDraft,
-    setActiveTab,
-    connectWorkspace,
-    startThreadForWorkspace,
-    sendUserMessageToThread,
-    clearActiveImages,
-    handleSend,
-    queueMessage,
-  });
+  const resetPullRequestSelection = useCallback(() => {}, []);
+  const composerSendLabel = undefined;
+  const handleComposerSend = useCallback(
+    (text: string, images: string[]) => handleSend(text, images),
+    [handleSend],
+  );
+  const handleComposerQueue = useCallback(
+    (text: string, images: string[]) => queueMessage(text, images),
+    [queueMessage],
+  );
   const handleComposerSendWithDraftStart = useCallback(
     (text: string, images: string[]) =>
       runWithDraftStart(() => handleComposerSend(text, images)),
@@ -1955,7 +1779,7 @@ function MainApp() {
     );
   };
 
-  const showGitDetail = Boolean(selectedDiffPath) && isPhone;
+  const showGitDetail = false;
   const { handleCycleAgent, handleCycleWorkspace } = useWorkspaceCycling({
     workspaces,
     groupedWorkspaces,
@@ -2248,8 +2072,7 @@ function MainApp() {
     gitPanelMode,
     onGitPanelModeChange: handleGitPanelModeChange,
     gitDiffViewStyle,
-    gitDiffIgnoreWhitespaceChanges:
-      appSettings.gitDiffIgnoreWhitespaceChanges && diffSource !== "pr",
+    gitDiffIgnoreWhitespaceChanges: false,
     worktreeApplyLabel: "apply",
     worktreeApplyTitle: activeParentWorkspace?.name
       ? `Apply changes to ${activeParentWorkspace.name}`
@@ -2284,18 +2107,13 @@ function MainApp() {
     gitPullRequestsTotal,
     gitPullRequestsLoading,
     gitPullRequestsError,
-    selectedPullRequestNumber: selectedPullRequest?.number ?? null,
-    selectedPullRequest: diffSource === "pr" ? selectedPullRequest : null,
-    selectedPullRequestComments: diffSource === "pr" ? gitPullRequestComments : [],
+    selectedPullRequestNumber: null,
+    selectedPullRequest: null,
+    selectedPullRequestComments: [],
     selectedPullRequestCommentsLoading: gitPullRequestCommentsLoading,
     selectedPullRequestCommentsError: gitPullRequestCommentsError,
-    onSelectPullRequest: (pullRequest) => {
-      setSelectedCommitSha(null);
-      handleSelectPullRequest(pullRequest);
-    },
-    onSelectCommit: (entry) => {
-      handleSelectCommit(entry.sha);
-    },
+    onSelectPullRequest: () => {},
+    onSelectCommit: () => {},
     gitRemoteUrl,
     gitRoot: activeGitRoot,
     gitRootCandidates,
@@ -2441,6 +2259,7 @@ function MainApp() {
     showComposer,
     plan: activePlan,
     debugEntries,
+    debugViewMode,
     debugOpen,
     terminalOpen,
     terminalTabs,
@@ -2451,6 +2270,7 @@ function MainApp() {
     terminalState,
     onClearDebug: clearDebugEntries,
     onCopyDebug: handleCopyDebug,
+    onDebugViewModeChange: setDebugViewMode,
     onResizeDebug: onDebugPanelResizeStart,
     onResizeTerminal: onTerminalPanelResizeStart,
     onBackFromDiff: () => {
@@ -2567,21 +2387,6 @@ function MainApp() {
     >
       <div className="drag-strip" id="titlebar" data-tauri-drag-region />
       <TitlebarExpandControls {...sidebarToggleProps} />
-      {shouldLoadGitHubPanelData ? (
-        <Suspense fallback={null}>
-          <GitHubPanelData
-            activeWorkspace={activeWorkspace}
-            gitPanelMode={gitPanelMode}
-            shouldLoadDiffs={shouldLoadDiffs}
-            diffSource={diffSource}
-            selectedPullRequestNumber={selectedPullRequest?.number ?? null}
-            onIssuesChange={handleGitIssuesChange}
-            onPullRequestsChange={handleGitPullRequestsChange}
-            onPullRequestDiffsChange={handleGitPullRequestDiffsChange}
-            onPullRequestCommentsChange={handleGitPullRequestCommentsChange}
-          />
-        </Suspense>
-      ) : null}
       <AppLayout
         isPhone={isPhone}
         isTablet={isTablet}
@@ -2590,7 +2395,7 @@ function MainApp() {
         activeTab={activeTab}
         tabletTab={tabletTab}
         centerMode={centerMode}
-        preloadGitDiffs={appSettings.preloadGitDiffs}
+        preloadGitDiffs={false}
         hasActivePlan={hasActivePlan}
         activeWorkspace={Boolean(activeWorkspace)}
         sidebarNode={sidebarNode}
@@ -2629,15 +2434,8 @@ function MainApp() {
         onWorktreeSetupScriptChange={updateWorktreeSetupScript}
         onWorktreePromptCancel={cancelWorktreePrompt}
         onWorktreePromptConfirm={confirmWorktreePrompt}
-        branchSwitcher={branchSwitcher}
-        branches={branches}
-        workspaces={workspaces}
-        activeWorkspace={activeWorkspace}
-        currentBranch={currentBranch}
-        onBranchSwitcherSelect={handleBranchSelect}
-        onBranchSwitcherCancel={closeBranchSwitcher}
         settingsOpen={settingsOpen}
-        settingsSection={settingsSection ?? undefined}
+        settingsSection={settingsSection === "git" ? "projects" : settingsSection ?? undefined}
         onCloseSettings={closeSettings}
         SettingsViewComponent={SettingsView}
         settingsProps={{

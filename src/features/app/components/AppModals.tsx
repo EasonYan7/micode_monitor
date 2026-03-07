@@ -1,10 +1,8 @@
 import { lazy, memo, Suspense } from "react";
 import type { ComponentType } from "react";
-import type { BranchInfo, WorkspaceInfo } from "../../../types";
 import type { SettingsViewProps } from "../../settings/components/SettingsView";
 import { useRenameThreadPrompt } from "../../threads/hooks/useRenameThreadPrompt";
 import { useWorktreePrompt } from "../../workspaces/hooks/useWorktreePrompt";
-import type { BranchSwitcherState } from "../../git/hooks/useBranchSwitcher";
 import { useGitBranches } from "../../git/hooks/useGitBranches";
 
 const RenameThreadPrompt = lazy(() =>
@@ -17,12 +15,6 @@ const WorktreePrompt = lazy(() =>
     default: module.WorktreePrompt,
   })),
 );
-const BranchSwitcherPrompt = lazy(() =>
-  import("../../git/components/BranchSwitcherPrompt").then((module) => ({
-    default: module.BranchSwitcherPrompt,
-  })),
-);
-
 type RenamePromptState = ReturnType<typeof useRenameThreadPrompt>["renamePrompt"];
 
 type WorktreePromptState = ReturnType<typeof useWorktreePrompt>["worktreePrompt"];
@@ -39,13 +31,6 @@ type AppModalsProps = {
   onWorktreeSetupScriptChange: (value: string) => void;
   onWorktreePromptCancel: () => void;
   onWorktreePromptConfirm: () => void;
-  branchSwitcher: BranchSwitcherState;
-  branches: BranchInfo[];
-  workspaces: WorkspaceInfo[];
-  activeWorkspace: WorkspaceInfo | null;
-  currentBranch: string | null;
-  onBranchSwitcherSelect: (branch: string, worktree: WorkspaceInfo | null) => void;
-  onBranchSwitcherCancel: () => void;
   settingsOpen: boolean;
   settingsSection: SettingsViewProps["initialSection"] | null;
   onCloseSettings: () => void;
@@ -65,13 +50,6 @@ export const AppModals = memo(function AppModals({
   onWorktreeSetupScriptChange,
   onWorktreePromptCancel,
   onWorktreePromptConfirm,
-  branchSwitcher,
-  branches,
-  workspaces,
-  activeWorkspace,
-  currentBranch,
-  onBranchSwitcherSelect,
-  onBranchSwitcherCancel,
   settingsOpen,
   settingsSection,
   onCloseSettings,
@@ -115,18 +93,6 @@ export const AppModals = memo(function AppModals({
             onSetupScriptChange={onWorktreeSetupScriptChange}
             onCancel={onWorktreePromptCancel}
             onConfirm={onWorktreePromptConfirm}
-          />
-        </Suspense>
-      )}
-      {branchSwitcher && (
-        <Suspense fallback={null}>
-          <BranchSwitcherPrompt
-            branches={branches}
-            workspaces={workspaces}
-            activeWorkspace={activeWorkspace}
-            currentBranch={currentBranch}
-            onSelect={onBranchSwitcherSelect}
-            onCancel={onBranchSwitcherCancel}
           />
         </Suspense>
       )}

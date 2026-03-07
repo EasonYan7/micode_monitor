@@ -78,6 +78,7 @@
 - [x] Update README install section with official MiCode one-click install commands (macOS/Linux and Windows)
 - [x] Sync EN/CN README sections describing feature removals and behavior changes from original CodexMonitor
 - [x] Update About panel branding/links (remove Twitter, point GitHub to EasonYan7/micode_monitor, update footer credit)
+- [x] Remove user-facing Git UI and disable corresponding Tauri Git commands while keeping worktree internals available
 - [x] Point updater endpoint to fork release feed (`EasonYan7/micode_monitor`)
 - [x] Fix release workflow updater artifacts/URLs to fork naming (`MiCodeMonitor*` + `latest.json`) and document release steps in EN/CN README
 - [x] Rebrand frontend experience to 璐㈠澶?/ Rich and redesign the post-login home, sidebar, header, startup gate, and about panel
@@ -112,12 +113,15 @@
 - [x] Harden teammate onboarding run/build path: ignore `src-tauri/target`, add smart `npm run tauri dev|build` routing, and document cache-based bundle output locations
 - [x] Fix startup first-paint layout issue where window content fully renders only after dragging (startup viewport sync + `100dvh` fallback)
 - [x] Aggregate assistant streaming debug logs into a single rolling entry (replace per-delta spam with stream/final snapshots)
+- [x] Split Debug panel into Detailed local-log view and Compact readable timeline view (user message / AI start / tool call / output)
+- [x] Filter noisy MiCode IDEClient stderr probe logs (`Temp\\gemini\\ide` ENOENT) from Debug timeline so unrelated IDE detection does not confuse app testing
 - [x] Make CI/release builds resilient without MiCode CLI preinstall (allow doctor skip via `MICODE_DOCTOR_SKIP_MICODE=1` in GitHub Actions)
 - [x] Fix Windows build/runtime portability: move `sha2` to cross-platform dependency and make MiCode PATH discovery Windows-aware (`;` PATH, win shim dirs, `.exe/.cmd`)
 - [x] Fix Windows model discovery fallback: resolve `micode` command-name via PATH and parse npm/winget shim wrappers (`%~dp0 ... @mi/mi-code-cli/dist/cli.js`)
 - [x] Disable composer image uploads in chat/workspace dialogs (remove button and block drag/drop/paste attach paths)
 - [x] Fix Chinese UI leakage and mojibake in header/file panel/composer, and enlarge About page card by 50%
 - [x] Enlarge About window itself and make it resizable so enlarged content is fully visible
+- [x] Disable voice input entry points in Settings and composer UI with a clear "coming later" tooltip
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

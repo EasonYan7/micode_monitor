@@ -1462,7 +1462,7 @@ pub(crate) async fn get_commit_message_prompt(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     // Get the diff from git
-    let diff = crate::git::get_workspace_diff(&workspace_id, &state).await?;
+    let diff = crate::workspaces::get_workspace_diff(&workspace_id, &state).await?;
 
     if diff.trim().is_empty() {
         return Err("No changes to generate commit message for".to_string());
@@ -1559,7 +1559,7 @@ pub(crate) async fn generate_commit_message(
     app: AppHandle,
 ) -> Result<String, String> {
     // Get the diff from git
-    let diff = crate::git::get_workspace_diff(&workspace_id, &state).await?;
+    let diff = crate::workspaces::get_workspace_diff(&workspace_id, &state).await?;
 
     if diff.trim().is_empty() {
         return Err("No changes to generate commit message for".to_string());

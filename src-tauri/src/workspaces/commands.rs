@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
 
+use git2::{BranchType, Repository};
 use serde_json::json;
 use tauri::{AppHandle, Manager, State};
 use tokio::io::AsyncWriteExt;
@@ -32,9 +33,90 @@ use crate::shared::workspaces_core;
 use crate::state::AppState;
 use crate::storage::write_workspaces;
 use crate::types::{
-    WorkspaceEntry, WorkspaceInfo, WorkspaceKind, WorkspaceSettings, WorktreeSetupStatus,
+    BranchInfo, WorkspaceEntry, WorkspaceInfo, WorkspaceKind, WorkspaceSettings,
+    WorktreeSetupStatus,
 };
 use crate::utils::{git_env_path, resolve_git_binary};
+
+fn build_combined_diff(diff: &git2::Diff) -> String {
+    let mut combined_diff = String::new();
+    for (index, delta) in diff.deltas().enumerate() {
+        let path = delta.new_file().path().or_else(|| delta.old_file().path());
+        let Some(path) = path else {
+            continue;
+        };
+        let patch = match git2::Patch::from_diff(diff, index) {
+            Ok(patch) => patch,
+            Err(_) => continue,
+        };
+        let Some(mut patch) = patch else {
+            continue;
+        };
+        let content = match crate::git_utils::diff_patch_to_string(&mut patch) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        if content.trim().is_empty() {
+            continue;
+        }
+        if !combined_diff.is_empty() {
+            combined_diff.push_str("\n\n");
+        }
+        combined_diff.push_str(&format!("=== {} ===\n", path.display()));
+        combined_diff.push_str(&content);
+    }
+    combined_diff
+}
+
+fn collect_workspace_diff(repo_root: &std::path::Path) -> Result<String, String> {
+    let repo = Repository::open(repo_root).map_err(|e| e.to_string())?;
+    let head_tree = repo.head().ok().and_then(|head| head.peel_to_tree().ok());
+
+    let mut options = git2::DiffOptions::new();
+    let index = repo.index().map_err(|e| e.to_string())?;
+    let diff = match head_tree.as_ref() {
+        Some(tree) => repo
+            .diff_tree_to_index(Some(tree), Some(&index), Some(&mut options))
+            .map_err(|e| e.to_string())?,
+        None => repo
+            .diff_tree_to_index(None, Some(&index), Some(&mut options))
+            .map_err(|e| e.to_string())?,
+    };
+    let combined_diff = build_combined_diff(&diff);
+    if !combined_diff.trim().is_empty() {
+        return Ok(combined_diff);
+    }
+
+    let mut options = git2::DiffOptions::new();
+    options
+        .include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .show_untracked_content(true);
+    let diff = match head_tree.as_ref() {
+        Some(tree) => repo
+            .diff_tree_to_workdir_with_index(Some(tree), Some(&mut options))
+            .map_err(|e| e.to_string())?,
+        None => repo
+            .diff_tree_to_workdir_with_index(None, Some(&mut options))
+            .map_err(|e| e.to_string())?,
+    };
+    Ok(build_combined_diff(&diff))
+}
+
+pub(crate) async fn get_workspace_diff(
+    workspace_id: &str,
+    state: &State<'_, AppState>,
+) -> Result<String, String> {
+    let workspaces = state.workspaces.lock().await;
+    let entry = workspaces
+        .get(workspace_id)
+        .ok_or("workspace not found")?
+        .clone();
+    drop(workspaces);
+
+    let repo_root = resolve_git_root(&entry)?;
+    collect_workspace_diff(&repo_root)
+}
 
 fn spawn_with_app(
     app: &AppHandle,
@@ -875,6 +957,40 @@ pub(crate) async fn list_workspace_files(
         list_workspace_files_inner(root, usize::MAX)
     })
     .await
+}
+
+#[tauri::command]
+pub(crate) async fn list_git_branches(
+    workspace_id: String,
+    state: State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let workspaces = state.workspaces.lock().await;
+    let entry = workspaces
+        .get(&workspace_id)
+        .ok_or("workspace not found")?
+        .clone();
+    let repo_root = resolve_git_root(&entry)?;
+    let repo = Repository::open(&repo_root).map_err(|e| e.to_string())?;
+    let mut branches = Vec::new();
+    let refs = repo
+        .branches(Some(BranchType::Local))
+        .map_err(|e| e.to_string())?;
+    for branch_result in refs {
+        let (branch, _) = branch_result.map_err(|e| e.to_string())?;
+        let name = branch.name().ok().flatten().unwrap_or("").to_string();
+        if name.is_empty() {
+            continue;
+        }
+        let last_commit = branch
+            .get()
+            .target()
+            .and_then(|oid| repo.find_commit(oid).ok())
+            .map(|commit| commit.time().seconds())
+            .unwrap_or(0);
+        branches.push(BranchInfo { name, last_commit });
+    }
+    branches.sort_by(|a, b| b.last_commit.cmp(&a.last_commit));
+    Ok(json!({ "branches": branches }))
 }
 
 #[tauri::command]

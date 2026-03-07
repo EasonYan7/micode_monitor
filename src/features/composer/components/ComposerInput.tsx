@@ -29,6 +29,7 @@ import type { ReviewPromptState, ReviewPromptStep } from "../../threads/hooks/us
 import { getFileTypeIconUrl } from "../../../utils/fileTypeIcons";
 import { IMAGE_UPLOADS_ENABLED } from "../constants";
 import type { UiLanguage } from "../../../types";
+import { DICTATION_UNAVAILABLE_TOOLTIP } from "../../dictation/constants";
 
 type ComposerInputProps = {
   text: string;
@@ -144,9 +145,9 @@ export function ComposerInput({
   onSend,
   dictationState = "idle",
   dictationLevel = 0,
-  dictationEnabled = false,
-  onToggleDictation,
-  onOpenDictationSettings,
+  dictationEnabled: _dictationEnabled = false,
+  onToggleDictation: _onToggleDictation,
+  onOpenDictationSettings: _onOpenDictationSettings,
   dictationError = null,
   onDismissDictationError,
   dictationHint = null,
@@ -255,40 +256,12 @@ export function ComposerInput({
   }, [canStop, onSend, onStop]);
   const isDictating = dictationState === "listening";
   const isDictationBusy = dictationState !== "idle";
-  const allowOpenDictationSettings = Boolean(
-    onOpenDictationSettings && !dictationEnabled && !disabled,
+  const micDisabled = true;
+  const micTitle = t(
+    "Voice input is not available yet. It will be added in a future update.",
+    DICTATION_UNAVAILABLE_TOOLTIP,
   );
-  const micDisabled =
-    disabled || dictationState === "processing" || !dictationEnabled || !onToggleDictation;
-  const micAriaLabel = allowOpenDictationSettings
-    ? t("Open dictation settings", "打开语音输入设置")
-    : dictationState === "processing"
-      ? t("Dictation processing", "语音处理中")
-      : isDictating
-        ? t("Stop dictation", "停止语音输入")
-        : t("Start dictation", "开始语音输入");
-  const micTitle = allowOpenDictationSettings
-    ? t("Dictation disabled. Open settings", "语音输入已关闭，点击打开设置")
-    : dictationState === "processing"
-      ? t("Processing dictation", "正在处理语音")
-      : isDictating
-        ? t("Stop dictation", "停止语音输入")
-        : t("Start dictation", "开始语音输入");
-  const handleMicClick = useCallback(() => {
-    if (allowOpenDictationSettings) {
-      onOpenDictationSettings?.();
-      return;
-    }
-    if (!onToggleDictation || micDisabled) {
-      return;
-    }
-    onToggleDictation();
-  }, [
-    allowOpenDictationSettings,
-    micDisabled,
-    onOpenDictationSettings,
-    onToggleDictation,
-  ]);
+  const micAriaLabel = micTitle;
 
   const handleTextareaChange = useCallback(
     (event: ChangeEvent<HTMLTextAreaElement>) => {
@@ -533,23 +506,20 @@ export function ComposerInput({
           {isExpanded ? <ChevronDown aria-hidden /> : <ChevronUp aria-hidden />}
         </button>
       )}
-      <button
-        className={`composer-action composer-action--mic${
-          isDictationBusy ? " is-active" : ""
-        }${dictationState === "processing" ? " is-processing" : ""}${
-          micDisabled ? " is-disabled" : ""
-        }`}
-        onClick={handleMicClick}
-        disabled={
-          disabled ||
-          dictationState === "processing" ||
-          (!onToggleDictation && !allowOpenDictationSettings)
-        }
-        aria-label={micAriaLabel}
-        title={micTitle}
-      >
-        {isDictating ? <Square aria-hidden /> : <Mic aria-hidden />}
-      </button>
+      <span className="composer-action-tooltip" data-tooltip={micTitle}>
+        <button
+          className={`composer-action composer-action--mic${
+            isDictationBusy ? " is-active" : ""
+          }${dictationState === "processing" ? " is-processing" : ""}${
+            micDisabled ? " is-disabled" : ""
+          }`}
+          disabled
+          aria-label={micAriaLabel}
+          title={micTitle}
+        >
+          {isDictating ? <Square aria-hidden /> : <Mic aria-hidden />}
+        </button>
+      </span>
       <button
         className={`composer-action${canStop ? " is-stop" : " is-send"}${
           canStop && isProcessing ? " is-loading" : ""

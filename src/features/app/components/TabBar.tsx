@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import FolderKanban from "lucide-react/dist/esm/icons/folder-kanban";
-import GitBranch from "lucide-react/dist/esm/icons/git-branch";
+import Folder from "lucide-react/dist/esm/icons/folder";
 import MessagesSquare from "lucide-react/dist/esm/icons/messages-square";
 import TerminalSquare from "lucide-react/dist/esm/icons/terminal-square";
 
-type TabKey = "projects" | "micode" | "git" | "log";
+type TabKey = "projects" | "micode" | "files" | "log";
 
 type TabBarProps = {
   activeTab: TabKey;
@@ -14,7 +14,7 @@ type TabBarProps = {
 const tabs: { id: TabKey; label: string; icon: ReactNode }[] = [
   { id: "projects", label: "Projects", icon: <FolderKanban className="tabbar-icon" /> },
   { id: "micode", label: "Agent", icon: <MessagesSquare className="tabbar-icon" /> },
-  { id: "git", label: "Git", icon: <GitBranch className="tabbar-icon" /> },
+  { id: "files", label: "Files", icon: <Folder className="tabbar-icon" /> },
   { id: "log", label: "Log", icon: <TerminalSquare className="tabbar-icon" /> },
 ];
 

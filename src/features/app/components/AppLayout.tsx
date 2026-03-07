@@ -8,8 +8,8 @@ type AppLayoutProps = {
   isTablet: boolean;
   showHome: boolean;
   showGitDetail: boolean;
-  activeTab: "projects" | "micode" | "git" | "log";
-  tabletTab: "micode" | "git" | "log";
+  activeTab: "projects" | "micode" | "files" | "log";
+  tabletTab: "micode" | "files" | "log";
   centerMode: "chat" | "diff";
   preloadGitDiffs: boolean;
   hasActivePlan: boolean;
@@ -43,7 +43,7 @@ export const AppLayout = memo(function AppLayout({
   isPhone,
   isTablet,
   showHome,
-  showGitDetail,
+  showGitDetail: _showGitDetail,
   activeTab,
   tabletTab,
   centerMode,
@@ -69,7 +69,7 @@ export const AppLayout = memo(function AppLayout({
   terminalDockNode,
   compactEmptyMiCodeNode,
   compactEmptyGitNode,
-  compactGitBackNode,
+  compactGitBackNode: _compactGitBackNode,
   onSidebarResizeStart,
   onRightPanelResizeStart,
   onPlanPanelResizeStart,
@@ -84,15 +84,12 @@ export const AppLayout = memo(function AppLayout({
         sidebarNode={sidebarNode}
         activeTab={activeTab}
         activeWorkspace={activeWorkspace}
-        showGitDetail={showGitDetail}
         compactEmptyMiCodeNode={compactEmptyMiCodeNode}
         compactEmptyGitNode={compactEmptyGitNode}
-        compactGitBackNode={compactGitBackNode}
         topbarLeftNode={mainHeaderNode}
         messagesNode={messagesNode}
         composerNode={composerNode}
         gitDiffPanelNode={gitDiffPanelNode}
-        gitDiffViewerNode={gitDiffViewerNode}
         debugPanelNode={debugPanelFullNode}
       />
     );

@@ -50,7 +50,7 @@ const logEntries: GitLogEntry[] = [];
 const baseProps = {
   mode: "diff" as const,
   onModeChange: vi.fn(),
-  filePanelMode: "git" as const,
+  filePanelMode: "files" as const,
   onFilePanelModeChange: vi.fn(),
   branchName: "main",
   totalAdditions: 0,
