@@ -27,6 +27,7 @@ import { DictationWaveform } from "../../dictation/components/DictationWaveform"
 import { ReviewInlinePrompt } from "./ReviewInlinePrompt";
 import type { ReviewPromptState, ReviewPromptStep } from "../../threads/hooks/useReviewPrompt";
 import { getFileTypeIconUrl } from "../../../utils/fileTypeIcons";
+import { IMAGE_UPLOADS_ENABLED } from "../constants";
 
 type ComposerInputProps = {
   text: string;
@@ -189,6 +190,7 @@ export function ComposerInput({
   const minTextareaHeight = isExpanded ? 180 : 60;
   const maxTextareaHeight = isExpanded ? 320 : 120;
   const reviewPromptOpen = Boolean(reviewPrompt);
+  const imageUploadsEnabled = IMAGE_UPLOADS_ENABLED;
   const {
     dropTargetRef,
     isDragOver,
@@ -198,8 +200,8 @@ export function ComposerInput({
     handleDrop,
     handlePaste,
   } = useComposerImageDrop({
-    disabled,
-    onAttachImages,
+    disabled: disabled || !imageUploadsEnabled,
+    onAttachImages: imageUploadsEnabled ? onAttachImages : undefined,
   });
 
   useEffect(() => {
@@ -323,16 +325,18 @@ export function ComposerInput({
           onRemoveAttachment={onRemoveAttachment}
         />
         <div className="composer-input-row">
-          <button
-            type="button"
-            className="composer-attach"
-            onClick={onAddAttachment}
-            disabled={disabled || !onAddAttachment}
-            aria-label="Add image"
-            title="Add image"
-          >
-            <ImagePlus size={14} aria-hidden />
-          </button>
+          {imageUploadsEnabled && (
+            <button
+              type="button"
+              className="composer-attach"
+              onClick={onAddAttachment}
+              disabled={disabled || !onAddAttachment}
+              aria-label="Add image"
+              title="Add image"
+            >
+              <ImagePlus size={14} aria-hidden />
+            </button>
+          )}
           <textarea
             ref={textareaRef}
             placeholder={

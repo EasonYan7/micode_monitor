@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   environmentCheckStartup,
@@ -30,21 +30,37 @@ const DEFAULT_LANGUAGE: UiLanguage = "zh";
 const AUTO_START_DELAY_MS = 200;
 const SETTINGS_BOOT_TIMEOUT_MS = 1500;
 const FINISH_DELAY_MS = 900;
+const STARTUP_GATE_COMPLETED_KEY = "caiduoduo.startupGateCompleted.v1";
 const REQUIRED_CHECKS = [
   { id: "node", label: "Node.js" },
   { id: "micode", label: "MiCode CLI" },
   { id: "appServer", label: "ACP app-server" },
   { id: "python", label: "Python" },
 ] as const;
+const REQUIRED_CHECK_IDS = new Set<string>(REQUIRED_CHECKS.map((check) => check.id));
+
+function hasCompletedStartupGate() {
+  try {
+    return window.localStorage.getItem(STARTUP_GATE_COMPLETED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markStartupGateCompleted() {
+  try {
+    window.localStorage.setItem(STARTUP_GATE_COMPLETED_KEY, "1");
+  } catch {
+    // Ignore storage failures and continue unlocking the app.
+  }
+}
 
 function isCheckReady(check: StartupEnvironmentCheck) {
   return check.status === "ready";
 }
 
 function firstBlockingCheck(status: StartupEnvironmentStatus | null) {
-  return (
-    status?.checks.find((check) => check.required && !isCheckReady(check)) ?? null
-  );
+  return status?.checks.find((check) => check.required && !isCheckReady(check)) ?? null;
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
@@ -87,7 +103,7 @@ export function StartupEnvironmentGate({
   const [busyDependencyId, setBusyDependencyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState("");
-  const attemptedRef = useRef<Set<string>>(new Set());
+  const attemptedRef = useRef(new Set<string>());
   const activeRunRef = useRef(0);
   const loadingStartedRef = useRef(false);
   const autoCheckStartedRef = useRef(false);
@@ -130,10 +146,12 @@ export function StartupEnvironmentGate({
       if (activeRunRef.current !== runId) {
         return;
       }
+
       setStatus(nextStatus);
       setActionError(null);
 
       if (nextStatus.canProceed) {
+        markStartupGateCompleted();
         setBusyDependencyId(null);
         setPhase("finishing");
         markStatusNote(
@@ -175,11 +193,11 @@ export function StartupEnvironmentGate({
             return;
           }
           setActionError(error instanceof Error ? error.message : String(error));
+          setPhase("manual_action_required");
           markStatusNote(
             `${nextCheck.label} still needs manual action.`,
-            `${nextCheck.label} 仍需手动处理。`,
+            `${nextCheck.label} 仍需要手动处理。`,
           );
-          setPhase("manual_action_required");
           return;
         }
       }
@@ -209,8 +227,9 @@ export function StartupEnvironmentGate({
       setPhase("checking");
       markStatusNote(
         "Starting dependency checks automatically.",
-        "已自动开始依赖检查。",
+        "正在自动开始依赖检查。",
       );
+
       try {
         const nextStatus =
           mode === "manual"
@@ -222,11 +241,11 @@ export function StartupEnvironmentGate({
           return;
         }
         setActionError(error instanceof Error ? error.message : String(error));
+        setPhase("manual_action_required");
         markStatusNote(
           "Dependency check failed before completion.",
           "依赖检查在完成前失败了。",
         );
-        setPhase("manual_action_required");
       }
     },
     [driveFlow, markStatusNote, micodeArgs, micodeBin],
@@ -249,6 +268,7 @@ export function StartupEnvironmentGate({
         `Installing ${dependencyId} from the action button.`,
         `正在通过操作按钮安装 ${dependencyId}。`,
       );
+
       try {
         const nextStatus = await environmentInstallDependency(
           dependencyId,
@@ -262,11 +282,8 @@ export function StartupEnvironmentGate({
           return;
         }
         setActionError(error instanceof Error ? error.message : String(error));
-        markStatusNote(
-          "Install action failed.",
-          "安装动作失败了。",
-        );
         setPhase("manual_action_required");
+        markStatusNote("Install action failed.", "安装动作失败了。");
       }
     },
     [driveFlow, markStatusNote, micodeArgs, micodeBin],
@@ -307,11 +324,20 @@ export function StartupEnvironmentGate({
         agentArgs: appSettings?.agentArgs ?? appSettings?.micodeArgs ?? null,
         micodeArgs: appSettings?.micodeArgs ?? appSettings?.agentArgs ?? null,
       };
+
       if (cachedStatus) {
         setStatus(cachedStatus);
       }
 
-      if (!canceled && !autoCheckStartedRef.current) {
+      if (hasCompletedStartupGate() || cachedStatus?.canProceed) {
+        if (cachedStatus?.canProceed) {
+          markStartupGateCompleted();
+        }
+        setPhase("ready");
+        return;
+      }
+
+      if (!autoCheckStartedRef.current) {
         void runStartupCheck("auto");
       }
     })();
@@ -326,7 +352,7 @@ export function StartupEnvironmentGate({
   const blockingCheck = useMemo(() => firstBlockingCheck(status), [status]);
   const displayChecks = useMemo(() => {
     const checkMap = new Map((status?.checks ?? []).map((check) => [check.id, check]));
-    return REQUIRED_CHECKS.map(({ id, label }) => {
+    const requiredChecks = REQUIRED_CHECKS.map(({ id, label }) => {
       const existing = checkMap.get(id);
       if (existing) {
         return existing;
@@ -347,12 +373,16 @@ export function StartupEnvironmentGate({
         summary:
           phase === "loading"
             ? t("Waiting to start checks.", "等待开始检查。")
-            : t("Waiting for this step.", "等待执行到这个节点。"),
+            : t("Waiting for this step.", "等待执行到这一步。"),
         technicalDetails: null,
         recommendedAction: null,
         canAutoInstall: false,
       } satisfies StartupEnvironmentCheck;
     });
+    const additionalChecks = (status?.checks ?? []).filter(
+      (check) => !REQUIRED_CHECK_IDS.has(check.id),
+    );
+    return [...requiredChecks, ...additionalChecks];
   }, [busyDependencyId, phase, status?.checks, t]);
 
   const completedChecks = displayChecks.filter((check) => isCheckReady(check)).length;
@@ -435,182 +465,198 @@ export function StartupEnvironmentGate({
     },
   ];
 
-  if (phase === "ready") {
-    return <>{children}</>;
-  }
+  const isBlocked = phase !== "ready";
 
   return (
-    <div className="startup-gate-shell">
-      <div className="startup-gate-backdrop" />
-      <div className="startup-gate-panel" role="dialog" aria-modal="true">
-        <div className="startup-gate-eyebrow">
-          {t("Startup Environment Check", "启动环境检查")}
-        </div>
-        <h1 className="startup-gate-title">
-          {t(
-            "Rich is preparing the workspace runtime for 财多多.",
-            "财多多正在准备运行环境。",
-          )}
-        </h1>
-        <p className="startup-gate-copy">
-          {t(
-            "We check Node.js, MiCode CLI, ACP app-server, and Python up front so the product does not fail later in the middle of your work.",
-            "在 Node.js、MiCode CLI、ACP app-server 和 Python 可用前，应用会保持锁定，避免你进入后才遇到卡住或失败。",
-          )}
-        </p>
-
-        <div className="startup-gate-progress-block">
-          <div className="startup-gate-progress-head">
-            <div>
-              <div className="startup-gate-progress-label">
-                {t("Current stage", "当前阶段")}
-              </div>
-              <div className="startup-gate-progress-stage">{currentStageLabel}</div>
-            </div>
-            <div className="startup-gate-progress-metric">
-              {completedChecks}/{REQUIRED_CHECKS.length}
-              <span>{t(" completed", " 个节点完成")}</span>
-            </div>
-          </div>
-          <div className="startup-gate-progress-track" aria-hidden>
-            <div
-              className="startup-gate-progress-fill"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-          <div className="startup-gate-progress-subcopy">
-            {t(`Progress ${progressPercent}%`, `总进度 ${progressPercent}%`)}
-          </div>
-          {statusNote ? <div className="startup-gate-live-note">{statusNote}</div> : null}
-          <div className="startup-gate-stage-steps">
-            {stageSteps.map((step) => (
-              <div
-                key={step.id}
-                className={`startup-gate-stage-step ${
-                  step.done ? "done" : step.active ? "active" : ""
-                }`}
-              >
-                <span className="startup-gate-stage-dot" />
-                <span>{step.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="startup-gate-status">
-          <div className={`startup-gate-badge startup-gate-badge-${phase}`}>
-            {phase === "loading" && t("Loading settings", "读取设置中")}
-            {phase === "checking" && t("Checking environment", "检查环境中")}
-            {phase === "installing" &&
-              (busyDependencyId
-                ? t(`Installing ${busyDependencyId}`, `正在安装 ${busyDependencyId}`)
-                : t("Installing dependency", "正在安装依赖"))}
-            {phase === "manual_action_required" &&
-              t("Manual action required", "需要手动处理")}
-            {phase === "finishing" &&
-              t("Checks complete", "检查完成")}
-          </div>
-          {blockingCheck ? (
-            <div className="startup-gate-focus">
-              <strong>{blockingCheck.label}</strong>
-              <span>{blockingCheck.summary}</span>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="startup-gate-checks">
-          {displayChecks.map((check, index) => {
-            const failed = !isCheckReady(check);
-            const isInstalling = phase === "installing" && busyDependencyId === check.id;
-            const isChecking =
-              phase === "checking" &&
-              !isCheckReady(check) &&
-              (blockingCheck?.id === check.id ||
-                (!blockingCheck && index === completedChecks));
-            const stateLabel = isCheckReady(check)
-              ? t("Ready", "正常")
-              : isInstalling
-                ? t("Installing", "安装中")
-                : isChecking
-                  ? t("Checking", "检查中")
-                  : failed
-                    ? t("Blocked", "未就绪")
-                    : t("Pending", "等待中");
-            return (
-              <div
-                key={check.id}
-                className={`startup-gate-check ${
-                  isCheckReady(check)
-                    ? "ready"
-                    : isInstalling
-                      ? "installing"
-                      : isChecking
-                        ? "checking"
-                        : failed
-                          ? "failed"
-                          : ""
-                }`}
-              >
-                <div className="startup-gate-check-head">
-                  <span className="startup-gate-check-label">{check.label}</span>
-                  <span className="startup-gate-check-state">{stateLabel}</span>
-                </div>
-                <div className="startup-gate-check-summary">{check.summary}</div>
-                {check.detectedVersion ? (
-                  <div className="startup-gate-check-version">
-                    {t("Version", "版本")} {check.detectedVersion}
-                  </div>
-                ) : null}
-                {check.recommendedAction && failed ? (
-                  <div className="startup-gate-check-action">
-                    {check.recommendedAction}
-                  </div>
-                ) : null}
-                {check.technicalDetails && failed ? (
-                  <details className="startup-gate-details">
-                    <summary>{t("Technical details", "技术详情")}</summary>
-                    <pre>{check.technicalDetails}</pre>
-                  </details>
-                ) : null}
-                {phase === "manual_action_required" &&
-                failed &&
-                check.canAutoInstall ? (
-                  <button
-                    type="button"
-                    className="startup-gate-button secondary"
-                    onClick={() => {
-                      void handleInstall(check.id);
-                    }}
-                  >
-                    {t("Install now", "立即安装")}
-                  </button>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-
-        {actionError ? <div className="startup-gate-error">{actionError}</div> : null}
-
-        <div className="startup-gate-actions">
-          <button
-            type="button"
-            className="startup-gate-button"
-            onClick={handleRetry}
-            disabled={phase === "checking" || phase === "installing" || phase === "finishing"}
-          >
-            {phase === "loading"
-              ? t("Start check", "开始检测")
-              : phase === "checking"
-              ? t("Checking...", "检查中...")
-              : phase === "installing"
-                ? t("Installing...", "安装中...")
-                : phase === "finishing"
-                  ? t("Entering app...", "正在进入应用...")
-                  : t("Retry check", "重新检查")}
-          </button>
-        </div>
+    <>
+      <div
+        className={
+          isBlocked
+            ? "startup-gate-app startup-gate-app-blocked"
+            : "startup-gate-app startup-gate-app-ready"
+        }
+        aria-hidden={isBlocked}
+      >
+        {children}
       </div>
-    </div>
+      {isBlocked ? (
+        <div className="startup-gate-shell">
+          <div className="startup-gate-backdrop" />
+          <div className="startup-gate-panel" role="dialog" aria-modal="true">
+            <div className="startup-gate-eyebrow">
+              {t("Startup Environment Check", "启动环境检查")}
+            </div>
+            <h1 className="startup-gate-title">
+              {t(
+                "Rich is preparing the runtime for 财多多.",
+                "财多多正在准备运行环境。",
+              )}
+            </h1>
+            <p className="startup-gate-copy">
+              {t(
+                "The app checks Node.js, MiCode CLI, ACP app-server, and Python up front so your workspace can start in a ready state.",
+                "应用会先检查 Node.js、MiCode CLI、ACP app-server 和 Python，这样工作区在进入页面时就能尽量处于可用状态。",
+              )}
+            </p>
+
+            <div className="startup-gate-progress-block">
+              <div className="startup-gate-progress-head">
+                <div>
+                  <div className="startup-gate-progress-label">
+                    {t("Current stage", "当前阶段")}
+                  </div>
+                  <div className="startup-gate-progress-stage">{currentStageLabel}</div>
+                </div>
+                <div className="startup-gate-progress-metric">
+                  {completedChecks}/{REQUIRED_CHECKS.length}
+                  <span>{t(" completed", " 项已完成")}</span>
+                </div>
+              </div>
+              <div className="startup-gate-progress-track" aria-hidden>
+                <div
+                  className="startup-gate-progress-fill"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+              <div className="startup-gate-progress-subcopy">
+                {t(`Progress ${progressPercent}%`, `总进度 ${progressPercent}%`)}
+              </div>
+              {statusNote ? <div className="startup-gate-live-note">{statusNote}</div> : null}
+              <div className="startup-gate-stage-steps">
+                {stageSteps.map((step) => (
+                  <div
+                    key={step.id}
+                    className={`startup-gate-stage-step ${
+                      step.done ? "done" : step.active ? "active" : ""
+                    }`}
+                  >
+                    <span className="startup-gate-stage-dot" />
+                    <span>{step.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="startup-gate-status">
+              <div className={`startup-gate-badge startup-gate-badge-${phase}`}>
+                {phase === "loading" && t("Loading settings", "读取设置中")}
+                {phase === "checking" && t("Checking environment", "检查环境中")}
+                {phase === "installing" &&
+                  (busyDependencyId
+                    ? t(`Installing ${busyDependencyId}`, `正在安装 ${busyDependencyId}`)
+                    : t("Installing dependency", "正在安装依赖"))}
+                {phase === "manual_action_required" &&
+                  t("Manual action required", "需要手动处理")}
+                {phase === "finishing" && t("Checks complete", "检查完成")}
+              </div>
+              {blockingCheck ? (
+                <div className="startup-gate-focus">
+                  <strong>{blockingCheck.label}</strong>
+                  <span>{blockingCheck.summary}</span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="startup-gate-checks">
+              {displayChecks.map((check, index) => {
+                const failed = !isCheckReady(check);
+                const isInstalling = phase === "installing" && busyDependencyId === check.id;
+                const isChecking =
+                  phase === "checking" &&
+                  !isCheckReady(check) &&
+                  (blockingCheck?.id === check.id ||
+                    (!blockingCheck && index === completedChecks));
+                const stateLabel = isCheckReady(check)
+                  ? t("Ready", "正常")
+                  : isInstalling
+                    ? t("Installing", "安装中")
+                    : isChecking
+                      ? t("Checking", "检查中")
+                      : failed
+                        ? t("Blocked", "未就绪")
+                        : t("Pending", "等待中");
+                return (
+                  <div
+                    key={check.id}
+                    className={`startup-gate-check ${
+                      isCheckReady(check)
+                        ? "ready"
+                        : isInstalling
+                          ? "installing"
+                          : isChecking
+                            ? "checking"
+                            : failed
+                              ? "failed"
+                              : ""
+                    }`}
+                  >
+                    <div className="startup-gate-check-head">
+                      <div className="startup-gate-check-title">
+                        <span className="startup-gate-check-label">{check.label}</span>
+                        {!check.required ? (
+                          <span className="startup-gate-check-kind">
+                            {t("Optional", "开发提示")}
+                          </span>
+                        ) : null}
+                      </div>
+                      <span className="startup-gate-check-state">{stateLabel}</span>
+                    </div>
+                    <div className="startup-gate-check-summary">{check.summary}</div>
+                    {check.detectedVersion ? (
+                      <div className="startup-gate-check-version">
+                        {t("Version", "版本")} {check.detectedVersion}
+                      </div>
+                    ) : null}
+                    {check.recommendedAction && failed ? (
+                      <div className="startup-gate-check-action">
+                        {check.recommendedAction}
+                      </div>
+                    ) : null}
+                    {check.technicalDetails && failed ? (
+                      <details className="startup-gate-details">
+                        <summary>{t("Technical details", "技术详情")}</summary>
+                        <pre>{check.technicalDetails}</pre>
+                      </details>
+                    ) : null}
+                    {phase === "manual_action_required" && failed && check.canAutoInstall ? (
+                      <button
+                        type="button"
+                        className="startup-gate-button secondary"
+                        onClick={() => {
+                          void handleInstall(check.id);
+                        }}
+                      >
+                        {t("Install now", "立即安装")}
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+
+            {actionError ? <div className="startup-gate-error">{actionError}</div> : null}
+
+            <div className="startup-gate-actions">
+              <button
+                type="button"
+                className="startup-gate-button"
+                onClick={handleRetry}
+                disabled={phase === "checking" || phase === "installing" || phase === "finishing"}
+              >
+                {phase === "loading"
+                  ? t("Start check", "开始检查")
+                  : phase === "checking"
+                    ? t("Checking...", "检查中...")
+                    : phase === "installing"
+                      ? t("Installing...", "安装中...")
+                      : phase === "finishing"
+                        ? t("Entering app...", "正在进入应用...")
+                        : t("Retry check", "重新检查")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }

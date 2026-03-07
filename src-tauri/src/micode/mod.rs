@@ -166,6 +166,25 @@ fn ready_check(
     }
 }
 
+fn ready_optional_check(
+    id: &str,
+    label: &str,
+    version: Option<String>,
+    summary: String,
+) -> StartupEnvironmentCheck {
+    StartupEnvironmentCheck {
+        id: id.to_string(),
+        label: label.to_string(),
+        required: false,
+        status: "ready".to_string(),
+        detected_version: version,
+        summary,
+        technical_details: None,
+        recommended_action: None,
+        can_auto_install: false,
+    }
+}
+
 fn failed_check(
     id: &str,
     label: &str,
@@ -178,6 +197,27 @@ fn failed_check(
         id: id.to_string(),
         label: label.to_string(),
         required: true,
+        status: "failed".to_string(),
+        detected_version: None,
+        summary,
+        technical_details,
+        recommended_action,
+        can_auto_install,
+    }
+}
+
+fn failed_optional_check(
+    id: &str,
+    label: &str,
+    summary: String,
+    technical_details: Option<String>,
+    recommended_action: Option<String>,
+    can_auto_install: bool,
+) -> StartupEnvironmentCheck {
+    StartupEnvironmentCheck {
+        id: id.to_string(),
+        label: label.to_string(),
+        required: false,
         status: "failed".to_string(),
         detected_version: None,
         summary,
@@ -449,6 +489,34 @@ async fn check_python_dependency(path_env: Option<String>) -> StartupEnvironment
     )
 }
 
+async fn check_msvc_linker_dependency() -> Option<StartupEnvironmentCheck> {
+    #[cfg(not(target_os = "windows"))]
+    {
+        None
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if command_exists("link") {
+            Some(ready_optional_check(
+                "msvcLinker",
+                "MSVC linker",
+                None,
+                "Windows C++ linker (link.exe) is available for local Rust/Tauri builds.".to_string(),
+            ))
+        } else {
+            Some(failed_optional_check(
+                "msvcLinker",
+                "MSVC linker",
+                "Windows build tools are incomplete in this shell. Local `cargo` / `tauri dev` builds may fail because `link.exe` is missing.".to_string(),
+                Some("Run `where link` in PowerShell. If nothing is returned, install Visual Studio Build Tools 2022 with the Desktop development with C++ workload, then reopen PowerShell.".to_string()),
+                Some("Install Visual Studio Build Tools 2022 and include Desktop development with C++. VS Code alone is not enough for Rust MSVC builds.".to_string()),
+                false,
+            ))
+        }
+    }
+}
+
 async fn environment_check_startup_inner(
     micode_bin: Option<String>,
     micode_args: Option<String>,
@@ -464,12 +532,12 @@ async fn environment_check_startup_inner(
         check_app_server_dependency(resolved_bin.clone(), resolved_args.clone(), is_ready(&micode))
             .await;
     let python = check_python_dependency(path_env).await;
+    let mut checks = vec![node, micode, app_server, python];
+    if let Some(msvc_linker) = check_msvc_linker_dependency().await {
+        checks.push(msvc_linker);
+    }
 
-    build_startup_environment_status(
-        vec![node, micode, app_server, python],
-        resolved_bin,
-        resolved_args,
-    )
+    build_startup_environment_status(checks, resolved_bin, resolved_args)
 }
 
 fn install_error(message: &str) -> String {
