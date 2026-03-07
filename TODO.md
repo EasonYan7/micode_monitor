@@ -123,6 +123,7 @@
 - [x] Enlarge About window itself and make it resizable so enlarged content is fully visible
 - [x] Disable voice input entry points in Settings and composer UI with a clear "coming later" tooltip
 - [x] Fix thread hook test fixtures for active-turn tracking so CI `npm run build` typecheck passes again
+- [x] Pause auto Windows build workflow on `windows-main` and align Windows release build to VS-aware wrapper for safer future releases
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

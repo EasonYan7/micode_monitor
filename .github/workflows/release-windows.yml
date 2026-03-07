@@ -89,9 +89,10 @@ jobs:
       - name: Build Windows release bundles
         env:
           MICODE_DOCTOR_SKIP_MICODE: "1"
+        shell: pwsh
         run: |
           npm run doctor:win
-          npx tauri build --config src-tauri/tauri.windows.release.conf.json
+          powershell -ExecutionPolicy Bypass -File scripts/with-vs-dev-env.ps1 tauri.cmd build --config src-tauri/tauri.windows.release.conf.json
 
       - name: Build latest.json
         shell: pwsh
