@@ -851,6 +851,9 @@ pub(crate) async fn open_workspace_in(
         {
             // On Windows app display names like "Visual Studio Code" are not executable names.
             // Prefer known CLI launchers when available.
+            // Note: many editors install .cmd wrappers (e.g. code.cmd, cursor.cmd) rather than
+            // plain .exe files, so we must invoke them via `cmd /C` to let the Windows shell
+            // resolve .cmd/.bat extensions from PATH.
             let normalized_app = app.trim().to_ascii_lowercase();
             let executable = match normalized_app.as_str() {
                 "visual studio code" | "vscode" | "vs code" => "code".to_string(),
@@ -858,8 +861,8 @@ pub(crate) async fn open_workspace_in(
                 "zed" => "zed".to_string(),
                 _ => app,
             };
-            let mut cmd = std::process::Command::new(executable);
-            cmd.args(args).arg(path);
+            let mut cmd = std::process::Command::new("cmd");
+            cmd.arg("/C").arg(executable).args(args).arg(path);
             cmd.status()
                 .map_err(|error| format!("Failed to open app ({target_label}): {error}"))?
         }
@@ -880,8 +883,11 @@ pub(crate) async fn open_workspace_in(
         }
         #[cfg(target_os = "windows")]
         {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
             let mut cmd = std::process::Command::new("cmd");
             cmd.args(["/C", "start", "", &path]);
+            cmd.creation_flags(CREATE_NO_WINDOW);
             cmd.status()
                 .map_err(|error| format!("Failed to open file with default app: {error}"))?
         }
