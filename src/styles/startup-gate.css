@@ -1,0 +1,335 @@
+.startup-gate-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.startup-gate-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top, rgba(46, 91, 255, 0.18), transparent 42%),
+    linear-gradient(180deg, rgba(7, 10, 20, 0.92), rgba(11, 15, 26, 0.98));
+  backdrop-filter: blur(24px);
+}
+
+.startup-gate-panel {
+  position: relative;
+  width: min(920px, 100%);
+  max-height: min(90vh, 920px);
+  overflow: auto;
+  padding: 28px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(12, 18, 31, 0.95);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+  color: #f4f6fb;
+}
+
+.startup-gate-eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(196, 206, 255, 0.72);
+}
+
+.startup-gate-title {
+  margin: 10px 0 8px;
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1.06;
+}
+
+.startup-gate-copy {
+  margin: 0;
+  max-width: 760px;
+  color: rgba(230, 235, 250, 0.8);
+  line-height: 1.6;
+}
+
+.startup-gate-progress-block {
+  margin-top: 24px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.startup-gate-progress-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.startup-gate-progress-label,
+.startup-gate-progress-subcopy {
+  font-size: 13px;
+  color: rgba(220, 229, 255, 0.72);
+}
+
+.startup-gate-live-note {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(234, 240, 255, 0.86);
+  font-size: 13px;
+}
+
+.startup-gate-progress-stage {
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #f4f6fb;
+}
+
+.startup-gate-progress-metric {
+  font-size: 22px;
+  font-weight: 800;
+  color: #dfe8ff;
+  white-space: nowrap;
+}
+
+.startup-gate-progress-metric span {
+  margin-left: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(220, 229, 255, 0.72);
+}
+
+.startup-gate-progress-track {
+  margin-top: 14px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.startup-gate-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7ba8ff, #6be0ff);
+  transition: width 220ms ease;
+}
+
+.startup-gate-stage-steps {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.startup-gate-stage-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(220, 229, 255, 0.72);
+  font-size: 13px;
+}
+
+.startup-gate-stage-step.active {
+  color: #f4f6fb;
+  background: rgba(106, 163, 255, 0.12);
+}
+
+.startup-gate-stage-step.done {
+  color: #dff5e6;
+  background: rgba(60, 200, 120, 0.12);
+}
+
+.startup-gate-stage-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.08);
+}
+
+.startup-gate-status {
+  margin-top: 22px;
+  display: grid;
+  gap: 12px;
+}
+
+.startup-gate-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.startup-gate-badge-loading,
+.startup-gate-badge-checking {
+  background: rgba(106, 163, 255, 0.18);
+  color: #9ec9ff;
+}
+
+.startup-gate-badge-installing {
+  background: rgba(255, 183, 77, 0.18);
+  color: #ffd37d;
+}
+
+.startup-gate-badge-manual_action_required {
+  background: rgba(255, 99, 99, 0.18);
+  color: #ffb3b3;
+}
+
+.startup-gate-focus {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.startup-gate-focus span {
+  color: rgba(230, 235, 250, 0.82);
+}
+
+.startup-gate-checks {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.startup-gate-check {
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.startup-gate-check.ready {
+  border-color: rgba(60, 200, 120, 0.36);
+  background: rgba(60, 200, 120, 0.1);
+}
+
+.startup-gate-check.failed {
+  border-color: rgba(255, 99, 99, 0.28);
+  background: rgba(255, 99, 99, 0.08);
+}
+
+.startup-gate-check.installing {
+  border-color: rgba(255, 183, 77, 0.32);
+  background: rgba(255, 183, 77, 0.08);
+}
+
+.startup-gate-check.checking {
+  border-color: rgba(106, 163, 255, 0.32);
+  background: rgba(106, 163, 255, 0.1);
+}
+
+.startup-gate-check-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.startup-gate-check-label {
+  font-weight: 700;
+}
+
+.startup-gate-check-state,
+.startup-gate-check-version,
+.startup-gate-check-action {
+  color: rgba(230, 235, 250, 0.78);
+  font-size: 13px;
+}
+
+.startup-gate-check-summary {
+  margin-top: 8px;
+  line-height: 1.55;
+}
+
+.startup-gate-details {
+  margin-top: 12px;
+}
+
+.startup-gate-details summary {
+  cursor: pointer;
+  color: #d5defe;
+}
+
+.startup-gate-details pre {
+  margin: 10px 0 0;
+  padding: 12px;
+  overflow: auto;
+  border-radius: 12px;
+  background: rgba(3, 6, 16, 0.8);
+  color: #dbe6ff;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.startup-gate-error {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 92, 92, 0.14);
+  color: #ffbaba;
+}
+
+.startup-gate-actions {
+  margin-top: 20px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.startup-gate-button {
+  appearance: none;
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #7ba8ff, #4d7dff);
+  color: #081120;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.startup-gate-button.secondary {
+  margin-top: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f4f6fb;
+}
+
+.startup-gate-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (max-width: 720px) {
+  .startup-gate-shell {
+    padding: 14px;
+  }
+
+  .startup-gate-panel {
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  .startup-gate-checks {
+    grid-template-columns: 1fr;
+  }
+
+  .startup-gate-progress-head {
+    flex-direction: column;
+  }
+
+  .startup-gate-progress-metric {
+    font-size: 18px;
+  }
+}

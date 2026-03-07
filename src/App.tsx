@@ -25,6 +25,7 @@ import "./styles/tabbar.css";
 import "./styles/worktree-modal.css";
 import "./styles/branch-switcher-modal.css";
 import "./styles/settings.css";
+import "./styles/startup-gate.css";
 import "./styles/compact-base.css";
 import "./styles/compact-phone.css";
 import "./styles/compact-tablet.css";
@@ -33,6 +34,7 @@ import errorSoundUrl from "./assets/error-notification.mp3";
 import { AppLayout } from "./features/app/components/AppLayout";
 import { AppModals } from "./features/app/components/AppModals";
 import { MainHeaderActions } from "./features/app/components/MainHeaderActions";
+import { StartupEnvironmentGate } from "./features/app/components/StartupEnvironmentGate";
 import { useLayoutNodes } from "./features/layout/hooks/useLayoutNodes";
 import { useWorkspaceDropZone } from "./features/workspaces/hooks/useWorkspaceDropZone";
 import { useThreads } from "./features/threads/hooks/useThreads";
@@ -2657,7 +2659,11 @@ function App() {
       </Suspense>
     );
   }
-  return <MainApp />;
+  return (
+    <StartupEnvironmentGate>
+      <MainApp />
+    </StartupEnvironmentGate>
+  );
 }
 
 export default App;
