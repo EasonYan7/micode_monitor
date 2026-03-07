@@ -217,41 +217,6 @@ export type MiCodeDoctorResult = {
   nodeOk: boolean;
   nodeVersion: string | null;
   nodeDetails: string | null;
-  overallStatus?: string;
-  canProceed?: boolean;
-  blocking?: boolean;
-  checks?: StartupEnvironmentCheck[];
-  lastCheckedAt?: number;
-};
-
-export type StartupEnvironmentCheck = {
-  id: "node" | "micode" | "appServer" | "python" | string;
-  label: string;
-  required: boolean;
-  status:
-    | "pending"
-    | "checking"
-    | "installing"
-    | "verifying"
-    | "ready"
-    | "failed"
-    | "manual_action_required"
-    | string;
-  detectedVersion?: string | null;
-  summary: string;
-  technicalDetails?: string | null;
-  recommendedAction?: string | null;
-  canAutoInstall: boolean;
-};
-
-export type StartupEnvironmentStatus = {
-  overallStatus: string;
-  canProceed: boolean;
-  blocking: boolean;
-  checks: StartupEnvironmentCheck[];
-  lastCheckedAt: number;
-  micodeBin?: string | null;
-  micodeArgs?: string | null;
 };
 
 export type ApprovalRequest = {

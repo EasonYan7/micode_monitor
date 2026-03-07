@@ -76,7 +76,6 @@
 - [x] Fallback MCP status source: when ACP returns empty/error, read configured servers from `settings.json` for `/mcp` display
 - [x] Resolve MiCode home with global default (`~/.micode|~/.codex`) for all workspaces; only use workspace `.micodemonitor` as legacy fallback
 - [x] Add startup doctor hint for missing MiCode CLI (show localized toast instead of silent failure)
-- [x] Add blocking startup environment gate with structured checks/install-retry flow for Node/MiCode ACP/Python (exclude VS Code from startup gating)
 - [x] Enforce slash command-only send path: slash-prefixed input is never forwarded to AI text prompt; `/mcp *` always runs local MCP handler
 - [x] Keep Token terminology untranslated in Chinese UI (replace “代币” labels with “Token”)
 - [x] Hide composer "Default" controls: remove collaboration selector when only default mode exists and hide thinking selector when no reasoning options
@@ -92,7 +91,6 @@
 - [x] Update About panel branding/links (remove Twitter, point GitHub to EasonYan7/micode_monitor, update footer credit)
 - [x] Point updater endpoint to fork release feed (`EasonYan7/micode_monitor`)
 - [x] Fix release workflow updater artifacts/URLs to fork naming (`MiCodeMonitor*` + `latest.json`) and document release steps in EN/CN README
-- [x] Rebrand frontend experience to 财多多 / Rich and redesign the post-login home, sidebar, header, startup gate, and about panel
 - [x] Disable in-app updater entry/flow (remove menu check-updates item and force updater controller idle/no-op)
 - [x] Disable updater at build/runtime config level (remove updater plugin/permission and turn off updater artifacts in `tauri.conf.json`)
 - [x] Add GitHub Actions Windows build workflow (`build-windows.yml`) for `windows-main` branch + manual dispatch + artifact upload

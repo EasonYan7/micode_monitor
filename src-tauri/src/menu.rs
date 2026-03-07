@@ -387,7 +387,7 @@ pub(crate) fn handle_menu_event<R: Runtime>(app: &tauri::AppHandle<R>, event: ta
             }
             let window =
                 WebviewWindowBuilder::new(app, "about", WebviewUrl::App("index.html".into()))
-                    .title("About 财多多")
+                    .title("About MiCode Monitor")
                     .resizable(false)
                     .maximizable(false)
                     .minimizable(false)

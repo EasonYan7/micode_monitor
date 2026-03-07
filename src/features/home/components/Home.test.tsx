@@ -6,9 +6,6 @@ import { Home } from "./Home";
 const baseProps = {
   onOpenProject: vi.fn(),
   onAddWorkspace: vi.fn(),
-  workspaces: [],
-  threadsByWorkspace: {},
-  threadStatusById: {},
   latestAgentRuns: [],
   isLoadingLatestAgents: false,
   localUsageSnapshot: null,
@@ -20,12 +17,11 @@ const baseProps = {
   usageWorkspaceId: null,
   usageWorkspaceOptions: [],
   onUsageWorkspaceChange: vi.fn(),
-  onOpenWorkspace: vi.fn(),
   onSelectThread: vi.fn(),
 };
 
 describe("Home", () => {
-  it("renders latest activity and lets you open a thread", () => {
+  it("renders latest agent runs and lets you open a thread", () => {
     const onSelectThread = vi.fn();
     render(
       <Home
@@ -34,7 +30,7 @@ describe("Home", () => {
           {
             message: "Ship the dashboard refresh",
             timestamp: Date.now(),
-            projectName: "Revenue Hub",
+            projectName: "Agent Monitor",
             groupName: "Frontend",
             workspaceId: "workspace-1",
             threadId: "thread-1",
@@ -45,51 +41,27 @@ describe("Home", () => {
       />,
     );
 
-    expect(screen.getByText("Recent activity")).toBeTruthy();
-    expect(screen.getByText("Rich", { selector: ".home-title" })).toBeTruthy();
+    expect(screen.getByText("Latest agents")).toBeTruthy();
+    expect(screen.getByText("Agent Monitor", { selector: ".home-title" })).toBeTruthy();
     expect(screen.getByText("Frontend")).toBeTruthy();
-    const card = screen.getByRole("button", { name: /ship the dashboard refresh/i });
+    const message = screen.getByText("Ship the dashboard refresh");
+    const card = message.closest("button");
+    expect(card).toBeTruthy();
+    if (!card) {
+      throw new Error("Expected latest agent card button");
+    }
     fireEvent.click(card);
     expect(onSelectThread).toHaveBeenCalledWith("workspace-1", "thread-1");
     expect(screen.getByText("Running")).toBeTruthy();
   });
 
-  it("shows the empty state when there is no recent activity", () => {
+  it("shows the empty state when there are no latest runs", () => {
     render(<Home {...baseProps} />);
 
-    expect(screen.getByText("No recent activity yet")).toBeTruthy();
+    expect(screen.getByText("No agent activity yet")).toBeTruthy();
     expect(
-      screen.getByText(
-        "Start a conversation and this space will surface the latest results and resumable work.",
-      ),
+      screen.getByText("Start a thread to see the latest responses here."),
     ).toBeTruthy();
-  });
-
-  it("renders workspace overview cards and opens a workspace", () => {
-    const onOpenWorkspace = vi.fn();
-    render(
-      <Home
-        {...baseProps}
-        onOpenWorkspace={onOpenWorkspace}
-        workspaces={[
-          {
-            id: "ws-1",
-            name: "Revenue Hub",
-            path: "/tmp/revenue",
-            connected: true,
-            settings: { sidebarCollapsed: false },
-          },
-        ]}
-        threadsByWorkspace={{
-          "ws-1": [{ id: "thread-1", name: "Q1 review", updatedAt: Date.now() }],
-        }}
-      />,
-    );
-
-    expect(screen.getAllByText("Workspace overview").length).toBeGreaterThan(0);
-    const overviewButtons = screen.getAllByRole("button", { name: /revenue hub/i });
-    fireEvent.click(overviewButtons[overviewButtons.length - 1] as HTMLButtonElement);
-    expect(onOpenWorkspace).toHaveBeenCalledWith("ws-1");
   });
 
   it("renders usage cards in time mode", () => {

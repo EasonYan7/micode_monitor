@@ -43,14 +43,11 @@ check_cmd rustc
 check_cmd cargo
 check_cmd cmake
 check_cmd git
-if ! command -v python >/dev/null 2>&1 && ! command -v py >/dev/null 2>&1; then
-  add_missing "python"
-fi
 if [ "$SKIP_MICODE" -eq 0 ]; then
   check_cmd micode
 fi
 
-REQUIRED_TOOLS="node npm rustc cargo cmake git python"
+REQUIRED_TOOLS="node npm rustc cargo cmake git"
 if [ "$SKIP_MICODE" -eq 0 ]; then
   REQUIRED_TOOLS="$REQUIRED_TOOLS micode"
 fi
@@ -113,9 +110,6 @@ if [ "$INSTALL" -eq 1 ]; then
       if ! command -v git >/dev/null 2>&1; then
         base_pkgs="$base_pkgs git"
       fi
-      if ! command -v python >/dev/null 2>&1; then
-        base_pkgs="$base_pkgs python"
-      fi
       if [ -n "$base_pkgs" ]; then
         # shellcheck disable=SC2086
         brew install $base_pkgs
@@ -127,11 +121,11 @@ if [ "$INSTALL" -eq 1 ]; then
     Linux)
       if command -v apt-get >/dev/null 2>&1; then
         sudo apt-get update
-        sudo apt-get install -y nodejs npm rustc cargo cmake git python3
+        sudo apt-get install -y nodejs npm rustc cargo cmake git
       elif command -v dnf >/dev/null 2>&1; then
-        sudo dnf install -y nodejs npm rust cargo cmake git python3
+        sudo dnf install -y nodejs npm rust cargo cmake git
       elif command -v pacman >/dev/null 2>&1; then
-        sudo pacman -Sy --noconfirm nodejs npm rust cmake git python
+        sudo pacman -Sy --noconfirm nodejs npm rust cmake git
       else
         echo "Auto-install failed: unsupported Linux package manager."
         exit 1
@@ -158,16 +152,16 @@ fi
 case "$(uname -s)" in
   Darwin)
     echo "macOS install hints:"
-    echo "  brew install node rust cmake git python"
+    echo "  brew install node rust cmake git"
     if [ "$SKIP_MICODE" -eq 0 ]; then
       echo "  MiCode: bash -c \"\$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)\""
     fi
     ;;
   Linux)
     echo "Linux install hints:"
-    echo "  Ubuntu/Debian: sudo apt-get install -y nodejs npm rustc cargo cmake git python3"
-    echo "  Fedora: sudo dnf install -y nodejs npm rust cargo cmake git python3"
-    echo "  Arch: sudo pacman -S nodejs npm rust cmake git python"
+    echo "  Ubuntu/Debian: sudo apt-get install -y nodejs npm rustc cargo cmake git"
+    echo "  Fedora: sudo dnf install -y nodejs npm rust cargo cmake git"
+    echo "  Arch: sudo pacman -S nodejs npm rust cmake git"
     if [ "$SKIP_MICODE" -eq 0 ]; then
       echo "  MiCode: bash -c \"\$(curl -fsSL https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.sh)\""
     fi

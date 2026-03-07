@@ -25,10 +25,9 @@ if (!hasCommand("rustc")) missing.push("rustc");
 if (!hasCommand("cargo")) missing.push("cargo");
 if (!hasCommand("cmake")) missing.push("cmake");
 if (!hasCommand("git")) missing.push("git");
-if (!hasCommand("python") && !(process.platform === "win32" && hasCommand("py"))) missing.push("python");
 if (!skipMicode && !hasCommand("micode")) missing.push("micode");
 
-const requiredTools = ["node", "npm", "rustc", "cargo", "cmake", "git", "python"];
+const requiredTools = ["node", "npm", "rustc", "cargo", "cmake", "git"];
 if (!skipMicode) {
   requiredTools.push("micode");
 }
@@ -60,7 +59,6 @@ if (install) {
       ["cargo", installer === "winget" ? ["winget", ["install", "--id", "Rustlang.Rustup", "-e"]] : ["choco", ["install", "-y", "rustup.install"]]],
       ["cmake", installer === "winget" ? ["winget", ["install", "--id", "Kitware.CMake", "-e"]] : ["choco", ["install", "-y", "cmake"]]],
       ["git", installer === "winget" ? ["winget", ["install", "--id", "Git.Git", "-e"]] : ["choco", ["install", "-y", "git"]]],
-      ["python", installer === "winget" ? ["winget", ["install", "--id", "Python.Python.3.12", "-e"]] : ["choco", ["install", "-y", "python"]]],
     ];
     const planned = new Set();
     for (const [cmd, [installer, args]] of installMap) {
@@ -120,9 +118,8 @@ switch (process.platform) {
     console.log("  winget install Rustlang.Rustup");
     console.log("  winget install Kitware.CMake");
     console.log("  winget install Git.Git");
-    console.log("  winget install Python.Python.3.12");
     console.log("Or with choco:");
-    console.log("  choco install -y nodejs rustup.install cmake git python");
+    console.log("  choco install -y nodejs rustup.install cmake git");
     if (!skipMicode) {
       console.log("MiCode (PowerShell):");
       console.log('  powershell -ExecutionPolicy Bypass -Command "iwr -useb https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.ps1 | iex"');

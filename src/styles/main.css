@@ -59,10 +59,6 @@
   flex-shrink: 0;
 }
 
-.main-header-brand-chip {
-  display: none;
-}
-
 .diff-view-toggle {
   display: inline-flex;
   align-items: center;
@@ -451,22 +447,9 @@
   flex: 1;
 }
 
-.workspace-context-badge {
-  display: none;
-  align-items: center;
-  border-radius: 999px;
-  padding: 4px 8px;
-  color: var(--text-subtle);
-  background: var(--surface-card);
-  border: 1px solid var(--border-subtle);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
 .workspace-title {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 600;
   letter-spacing: 0.2px;
   max-width: min(32vw, 420px);
   overflow: hidden;
