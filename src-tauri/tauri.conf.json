@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "MiCode Monitor",
+  "productName": "财多多",
   "version": "0.7.52",
   "identifier": "com.dimillian.micodemonitor",
   "build": {
@@ -13,7 +13,7 @@
     "macOSPrivateApi": true,
     "windows": [
       {
-        "title": "MiCode Monitor",
+        "title": "财多多",
         "width": 1200,
         "height": 700,
         "minWidth": 360,

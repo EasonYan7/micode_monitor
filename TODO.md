@@ -78,6 +78,7 @@
 - [x] Update About panel branding/links (remove Twitter, point GitHub to EasonYan7/micode_monitor, update footer credit)
 - [x] Point updater endpoint to fork release feed (`EasonYan7/micode_monitor`)
 - [x] Fix release workflow updater artifacts/URLs to fork naming (`MiCodeMonitor*` + `latest.json`) and document release steps in EN/CN README
+- [x] Rebrand frontend experience to 财多多 / Rich and redesign the post-login home, sidebar, header, startup gate, and about panel
 - [x] Disable in-app updater entry/flow (remove menu check-updates item and force updater controller idle/no-op)
 - [x] Disable updater at build/runtime config level (remove updater plugin/permission and turn off updater artifacts in `tauri.conf.json`)
 - [x] Add GitHub Actions Windows build workflow (`build-windows.yml`) for `windows-main` branch + manual dispatch + artifact upload

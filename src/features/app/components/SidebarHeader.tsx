@@ -18,36 +18,40 @@ export function SidebarHeader({
   language = "en",
 }: SidebarHeaderProps) {
   const isZh = language === "zh";
+
   return (
     <div className="sidebar-header">
       <div className="sidebar-header-title">
-        <div className="sidebar-title-group">
-          <button
-            className="sidebar-title-add"
-            onClick={onAddWorkspace}
-            data-tauri-drag-region="false"
-            aria-label={isZh ? "添加工作区" : "Add workspace"}
-            type="button"
-          >
-            <FolderPlus aria-hidden />
-          </button>
-          <button
-            className="subtitle subtitle-button sidebar-title-button"
-            onClick={onSelectHome}
-            data-tauri-drag-region="false"
-            aria-label={isZh ? "打开首页" : "Open home"}
-          >
-            {isZh ? "项目" : "Projects"}
-          </button>
-        </div>
+        <button
+          className="sidebar-brand"
+          onClick={onSelectHome}
+          data-tauri-drag-region="false"
+          aria-label={isZh ? "打开财多多首页" : "Open Rich home"}
+          title={isZh ? "财多多" : "Rich"}
+          type="button"
+        >
+          <span className="sidebar-brand-mark">{isZh ? "财" : "R"}</span>
+          <span className="sidebar-brand-name">{isZh ? "财多多" : "Rich"}</span>
+        </button>
       </div>
       <div className="sidebar-header-actions">
+        <button
+          className="sidebar-header-add"
+          onClick={onAddWorkspace}
+          data-tauri-drag-region="false"
+          aria-label={isZh ? "添加工作区" : "Add workspace"}
+          title={isZh ? "添加工作区" : "Add workspace"}
+          type="button"
+        >
+          <FolderPlus aria-hidden />
+        </button>
         <button
           className={`ghost sidebar-search-toggle${isSearchOpen ? " is-active" : ""}`}
           onClick={onToggleSearch}
           data-tauri-drag-region="false"
           aria-label={isZh ? "切换搜索" : "Toggle search"}
           aria-pressed={isSearchOpen}
+          title={isZh ? "搜索" : "Search"}
           type="button"
         >
           <Search aria-hidden />

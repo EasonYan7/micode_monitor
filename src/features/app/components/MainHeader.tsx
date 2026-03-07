@@ -197,11 +197,11 @@ export function MainHeader({
     <header className="main-header" data-tauri-drag-region>
       <div className="workspace-header">
         <div className="workspace-title-line">
+          <span className="workspace-context-badge">
+            {workspace.connected ? "Live workspace" : "Setup workspace"}
+          </span>
           <span className="workspace-title">
             {parentName ? parentName : workspace.name}
-          </span>
-          <span className="workspace-separator" aria-hidden>
-            ›
           </span>
           {disableBranchMenu ? (
             <div className="workspace-branch-static-row" ref={infoRef}>
@@ -486,6 +486,7 @@ export function MainHeader({
         </div>
       </div>
       <div className="main-header-actions">
+        <div className="main-header-brand-chip">财多多 / Rich</div>
         {onRunLaunchScript &&
           onOpenLaunchScriptEditor &&
           onCloseLaunchScriptEditor &&

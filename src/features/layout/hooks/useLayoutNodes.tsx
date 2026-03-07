@@ -663,6 +663,9 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
     <Home
       onOpenProject={options.onAddWorkspace}
       onAddWorkspace={options.onAddWorkspace}
+      workspaces={options.workspaces}
+      threadsByWorkspace={options.threadsByWorkspace}
+      threadStatusById={options.threadStatusById}
       latestAgentRuns={options.latestAgentRuns}
       isLoadingLatestAgents={options.isLoadingLatestAgents}
       localUsageSnapshot={options.localUsageSnapshot}
@@ -674,6 +677,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       usageWorkspaceId={options.usageWorkspaceId}
       usageWorkspaceOptions={options.usageWorkspaceOptions}
       onUsageWorkspaceChange={options.onUsageWorkspaceChange}
+      onOpenWorkspace={options.onSelectWorkspace}
       onSelectThread={options.onSelectHomeThread}
       language={options.language}
     />

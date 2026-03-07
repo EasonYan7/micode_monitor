@@ -448,13 +448,13 @@ export function StartupEnvironmentGate({
         </div>
         <h1 className="startup-gate-title">
           {t(
-            "MiCodeMonitor is preparing the required runtime.",
-            "MiCodeMonitor 正在准备运行环境。",
+            "Rich is preparing the workspace runtime for 财多多.",
+            "财多多正在准备运行环境。",
           )}
         </h1>
         <p className="startup-gate-copy">
           {t(
-            "The app stays locked until Node.js, MiCode CLI, ACP app-server, and Python are ready. This prevents confusing failures later.",
+            "We check Node.js, MiCode CLI, ACP app-server, and Python up front so the product does not fail later in the middle of your work.",
             "在 Node.js、MiCode CLI、ACP app-server 和 Python 可用前，应用会保持锁定，避免你进入后才遇到卡住或失败。",
           )}
         </p>
