@@ -44,6 +44,7 @@ const baseProps = {
   unpinThread: vi.fn(),
   isThreadPinned: vi.fn(() => false),
   getPinTimestamp: vi.fn(() => null),
+  pinnedThreadsVersion: 0,
   onRenameThread: vi.fn(),
   onDeleteWorkspace: vi.fn(),
   onClearWorkspaceHistory: vi.fn(),
@@ -195,5 +196,32 @@ describe("Sidebar", () => {
     });
 
     expect(screen.getByText("Main Repo")).toBeTruthy();
+  });
+
+  it("recomputes pinned rows when pinnedThreadsVersion changes", () => {
+    let isPinned = false;
+    const thread = { id: "thread-1", name: "Pinned Thread", updatedAt: Date.now() };
+    const workspace = {
+      id: "ws-1",
+      name: "Workspace",
+      path: "/tmp/workspace",
+      connected: true,
+      settings: { sidebarCollapsed: false },
+    };
+    const props = {
+      ...baseProps,
+      workspaces: [workspace],
+      groupedWorkspaces: [{ id: null, name: "Workspaces", workspaces: [workspace] }],
+      threadsByWorkspace: { "ws-1": [thread] },
+      getPinTimestamp: vi.fn(() => (isPinned ? 123 : null)),
+      pinnedThreadsVersion: 0,
+    };
+
+    const { rerender } = render(<Sidebar {...props} />);
+    expect(screen.queryByText("Pinned")).toBeNull();
+
+    isPinned = true;
+    rerender(<Sidebar {...props} pinnedThreadsVersion={1} />);
+    expect(screen.getByText("Pinned")).toBeTruthy();
   });
 });

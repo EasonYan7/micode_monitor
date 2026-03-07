@@ -76,6 +76,7 @@ type SidebarProps = {
   unpinThread: (workspaceId: string, threadId: string) => void;
   isThreadPinned: (workspaceId: string, threadId: string) => boolean;
   getPinTimestamp: (workspaceId: string, threadId: string) => number | null;
+  pinnedThreadsVersion: number;
   onRenameThread: (workspaceId: string, threadId: string) => void;
   onDeleteWorkspace: (workspaceId: string) => void;
   onClearWorkspaceHistory: (workspaceId: string) => void;
@@ -127,6 +128,7 @@ export function Sidebar({
   unpinThread,
   isThreadPinned,
   getPinTimestamp,
+  pinnedThreadsVersion,
   onRenameThread,
   onDeleteWorkspace,
   onClearWorkspaceHistory,
@@ -274,6 +276,7 @@ export function Sidebar({
   );
 
   const pinnedThreadRows = useMemo(() => {
+    void pinnedThreadsVersion;
     type ThreadRow = { thread: ThreadSummary; depth: number };
     const groups: Array<{
       pinTime: number;
@@ -340,6 +343,7 @@ export function Sidebar({
     getThreadRows,
     getPinTimestamp,
     isWorkspaceMatch,
+    pinnedThreadsVersion,
   ]);
 
   const scrollFadeDeps = useMemo(

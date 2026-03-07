@@ -43,7 +43,7 @@ vi.mock("../../../services/toasts", () => ({
 }));
 
 describe("useSidebarMenus", () => {
-  it("localizes thread menu in zh and omits sync from server", async () => {
+  it("localizes thread menu in zh and omits archive/sync entries", async () => {
     const { result } = renderHook(() =>
       useSidebarMenus({
         onDeleteThread: vi.fn(),
@@ -75,8 +75,8 @@ describe("useSidebarMenus", () => {
     expect(labels).toContain("重命名");
     expect(labels).toContain("置顶");
     expect(labels).toContain("复制 ID");
-    expect(labels).toContain("归档");
     expect(labels).toContain("删除会话");
+    expect(labels).not.toContain("归档");
     expect(labels).not.toContain("Sync from server");
   });
 

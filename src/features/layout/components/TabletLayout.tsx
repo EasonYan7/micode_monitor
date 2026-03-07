@@ -53,7 +53,12 @@ export function TabletLayout({
         {approvalToastsNode}
         {updateToastNode}
         {errorToastsNode}
-        {showHome && homeNode}
+        {showHome && (
+          <div className="home-shell home-shell-tablet">
+            <MainTopbar leftNode={null} className="tablet-topbar home-topbar-spacer" />
+            <div className="home-shell-content">{homeNode}</div>
+          </div>
+        )}
         {showWorkspace && (
           <>
             <MainTopbar leftNode={topbarLeftNode} className="tablet-topbar" />

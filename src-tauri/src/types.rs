@@ -1,5 +1,38 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StartupEnvironmentCheck {
+    pub(crate) id: String,
+    pub(crate) label: String,
+    pub(crate) required: bool,
+    pub(crate) status: String,
+    #[serde(default)]
+    pub(crate) detected_version: Option<String>,
+    pub(crate) summary: String,
+    #[serde(default)]
+    pub(crate) technical_details: Option<String>,
+    #[serde(default)]
+    pub(crate) recommended_action: Option<String>,
+    #[serde(default)]
+    pub(crate) can_auto_install: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StartupEnvironmentStatus {
+    pub(crate) overall_status: String,
+    pub(crate) can_proceed: bool,
+    pub(crate) blocking: bool,
+    #[serde(default)]
+    pub(crate) checks: Vec<StartupEnvironmentCheck>,
+    pub(crate) last_checked_at: i64,
+    #[serde(default, rename = "micodeBin")]
+    pub(crate) micode_bin: Option<String>,
+    #[serde(default, rename = "micodeArgs")]
+    pub(crate) micode_args: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct GitFileStatus {
     pub(crate) path: String,
@@ -368,11 +401,6 @@ pub(crate) struct AppSettings {
     )]
     pub(crate) new_worktree_agent_shortcut: Option<String>,
     #[serde(
-        default = "default_archive_thread_shortcut",
-        rename = "archiveThreadShortcut"
-    )]
-    pub(crate) archive_thread_shortcut: Option<String>,
-    #[serde(
         default = "default_toggle_projects_sidebar_shortcut",
         rename = "toggleProjectsSidebarShortcut"
     )]
@@ -630,10 +658,6 @@ fn default_new_worktree_agent_shortcut() -> Option<String> {
     Some("cmd+shift+n".to_string())
 }
 
-fn default_archive_thread_shortcut() -> Option<String> {
-    Some("cmd+ctrl+a".to_string())
-}
-
 fn default_toggle_projects_sidebar_shortcut() -> Option<String> {
     Some("cmd+shift+p".to_string())
 }
@@ -809,7 +833,6 @@ impl Default for AppSettings {
             composer_collaboration_shortcut: default_composer_collaboration_shortcut(),
             new_agent_shortcut: default_new_agent_shortcut(),
             new_worktree_agent_shortcut: default_new_worktree_agent_shortcut(),
-            archive_thread_shortcut: default_archive_thread_shortcut(),
             toggle_projects_sidebar_shortcut: default_toggle_projects_sidebar_shortcut(),
             toggle_git_sidebar_shortcut: default_toggle_git_sidebar_shortcut(),
             toggle_debug_panel_shortcut: default_toggle_debug_panel_shortcut(),
@@ -898,10 +921,6 @@ mod tests {
         assert_eq!(
             settings.interrupt_shortcut.as_deref(),
             Some(expected_interrupt)
-        );
-        assert_eq!(
-            settings.archive_thread_shortcut.as_deref(),
-            Some("cmd+ctrl+a")
         );
         assert_eq!(
             settings.toggle_debug_panel_shortcut.as_deref(),

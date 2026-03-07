@@ -99,6 +99,11 @@
   color: var(--text-strong);
 }
 
+.settings-nav-advanced-toggle {
+  margin-top: auto;
+  color: var(--text-faint);
+}
+
 .settings-content {
   padding: 20px 24px;
   overflow-y: auto;

@@ -58,7 +58,7 @@ function renderComposerImages(
 }
 
 describe("useComposerImages", () => {
-  it("attaches images and deduplicates paths", () => {
+  it("keeps image attachments disabled", async () => {
     const hook = renderComposerImages({
       activeThreadId: "thread-1",
       activeWorkspaceId: "ws-1",
@@ -68,22 +68,18 @@ describe("useComposerImages", () => {
       hook.result.attachImages(["/tmp/a.png", "/tmp/b.png"]);
     });
 
-    expect(hook.result.activeImages).toEqual(["/tmp/a.png", "/tmp/b.png"]);
+    expect(hook.result.activeImages).toEqual([]);
 
-    act(() => {
-      hook.result.attachImages(["/tmp/b.png", "/tmp/c.png"]);
+    await act(async () => {
+      await hook.result.pickImages();
     });
 
-    expect(hook.result.activeImages).toEqual([
-      "/tmp/a.png",
-      "/tmp/b.png",
-      "/tmp/c.png",
-    ]);
+    expect(hook.result.activeImages).toEqual([]);
 
     hook.unmount();
   });
 
-  it("removes images and clears empty drafts", () => {
+  it("ignores remove and clear operations when uploads are disabled", () => {
     const hook = renderComposerImages({
       activeThreadId: "thread-2",
       activeWorkspaceId: "ws-1",
@@ -97,10 +93,8 @@ describe("useComposerImages", () => {
       hook.result.removeImage("/tmp/a.png");
     });
 
-    expect(hook.result.activeImages).toEqual(["/tmp/b.png"]);
-
     act(() => {
-      hook.result.removeImage("/tmp/b.png");
+      hook.result.clearActiveImages();
     });
 
     expect(hook.result.activeImages).toEqual([]);
@@ -108,27 +102,27 @@ describe("useComposerImages", () => {
     hook.unmount();
   });
 
-  it("switches drafts between thread and workspace", () => {
+  it("does not restore thread or workspace image drafts while disabled", () => {
     const hook = renderComposerImages({
       activeThreadId: "thread-1",
       activeWorkspaceId: "ws-1",
     });
 
     act(() => {
-      hook.result.attachImages(["/tmp/a.png"]);
+      hook.result.setImagesForThread("thread-1", ["/tmp/a.png"]);
     });
-    expect(hook.result.activeImages).toEqual(["/tmp/a.png"]);
+    expect(hook.result.activeImages).toEqual([]);
 
     hook.rerender({ activeThreadId: null, activeWorkspaceId: "ws-1" });
     expect(hook.result.activeImages).toEqual([]);
 
     act(() => {
-      hook.result.attachImages(["/tmp/b.png"]);
+      hook.result.setImagesForThread("draft-ws-1", ["/tmp/b.png"]);
     });
-    expect(hook.result.activeImages).toEqual(["/tmp/b.png"]);
+    expect(hook.result.activeImages).toEqual([]);
 
     hook.rerender({ activeThreadId: "thread-1", activeWorkspaceId: "ws-1" });
-    expect(hook.result.activeImages).toEqual(["/tmp/a.png"]);
+    expect(hook.result.activeImages).toEqual([]);
 
     hook.unmount();
   });

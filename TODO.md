@@ -1,4 +1,4 @@
-# MiCode ACP Migration TODO
+﻿# MiCode ACP Migration TODO
 
 - [x] Fork/clone MiCodeMonitor codebase into current workspace
 - [x] Create migration branch `micode/micode-acp-migration`
@@ -43,14 +43,14 @@
 - [x] Add frontend fallback split when backend reuses same assistant `itemId` across tool boundary
 - [x] Add thread context menu action: Delete Conversation (keep usage)
 - [x] Fix local usage session-root resolution (`.micodemonitor` fallback to global `~/.micode|~/.codex`) so homepage usage/TOP models can refresh
-- [x] Add Display language setting (`English` / `中文`) and wire core home-page copy switch
-- [x] Remove sidebar bottom-left Account button; localize sidebar usage labels (`Session/Weekly/Resets/Credits/Tokens`) for `中文`
+- [x] Add Display language setting (`English` / `涓枃`) and wire core home-page copy switch
+- [x] Remove sidebar bottom-left Account button; localize sidebar usage labels (`Session/Weekly/Resets/Credits/Tokens`) for `涓枃`
 - [x] Make settings updates optimistic (including language switch) with save-failure rollback
 - [x] Prevent settings UI flashback on save errors (keep optimistic state; log save failure to Debug panel)
 - [x] Remove Features experimental toggles (Multi-agent/Apps) from Settings UI
 - [x] Remove MiCode remote backend host/token inputs from Settings UI
 - [x] Expand Chinese UI localization: SettingsView major sections/controls + sidebar core labels/search/thread list actions
-- [x] Rename creation entry to New Conversation / 新建对话
+- [x] Rename creation entry to New Conversation / 鏂板缓瀵硅瘽
 - [x] Remove New Clone Agent feature path (sidebar entry, menu event, accelerators, modal/hook/files, shortcuts UI)
 - [x] Restore app-level slash routing for built-in commands and add `/skills` list command (plus fallback slash autocomplete entries)
 - [x] Fix App MCP/skills visibility parity: pass configured `mcpServers` on ACP `session/new` and stop hardcoding empty `skills/list` response
@@ -62,8 +62,9 @@
 - [x] Fallback MCP status source: when ACP returns empty/error, read configured servers from `settings.json` for `/mcp` display
 - [x] Resolve MiCode home with global default (`~/.micode|~/.codex`) for all workspaces; only use workspace `.micodemonitor` as legacy fallback
 - [x] Add startup doctor hint for missing MiCode CLI (show localized toast instead of silent failure)
+- [x] Add blocking startup environment gate with structured checks/install-retry flow for Node/MiCode ACP/Python (exclude VS Code from startup gating)
 - [x] Enforce slash command-only send path: slash-prefixed input is never forwarded to AI text prompt; `/mcp *` always runs local MCP handler
-- [x] Keep Token terminology untranslated in Chinese UI (replace “代币” labels with “Token”)
+- [x] Keep Token terminology untranslated in Chinese UI (replace 鈥滀唬甯佲€?labels with 鈥淭oken鈥?
 - [x] Hide composer "Default" controls: remove collaboration selector when only default mode exists and hide thinking selector when no reasoning options
 - [x] Restore Home top-model stats by parsing new MiCode `tmp/*/chats/session-*.json` usage source (not only legacy jsonl)
 - [x] Fix usage root resolution: scan MiCode `tmp/<hash>/chats` directories (keep legacy `sessions` fallback) so Home model usage refreshes correctly
@@ -77,6 +78,9 @@
 - [x] Update About panel branding/links (remove Twitter, point GitHub to EasonYan7/micode_monitor, update footer credit)
 - [x] Point updater endpoint to fork release feed (`EasonYan7/micode_monitor`)
 - [x] Fix release workflow updater artifacts/URLs to fork naming (`MiCodeMonitor*` + `latest.json`) and document release steps in EN/CN README
+- [x] Rebrand frontend experience to 璐㈠澶?/ Rich and redesign the post-login home, sidebar, header, startup gate, and about panel
+- [x] Split Home into a dedicated shell with stable chart and panel heights so async file/usage loads no longer push the page upward after render
+- [x] Mount the app behind the startup gate so workspace restore/connect begins during checks instead of only after the gate unlocks
 - [x] Disable in-app updater entry/flow (remove menu check-updates item and force updater controller idle/no-op)
 - [x] Disable updater at build/runtime config level (remove updater plugin/permission and turn off updater artifacts in `tauri.conf.json`)
 - [x] Add GitHub Actions Windows build workflow (`build-windows.yml`) for `windows-main` branch + manual dispatch + artifact upload
@@ -92,6 +96,7 @@
 - [x] Expand doctor checks (`node/npm/rustc/cargo/cmake/git/micode`) and update install hints for macOS/Windows/Linux
 - [x] Update README EN/CN to explicitly state source-first distribution and local build flow
 - [x] Add optional doctor auto-install mode (`npm run doctor:install`, `npm run doctor:win:install`) to reduce teammate setup friction
+- [x] Make Windows local-build checks/tooling VS-aware: detect installed MSVC `link.exe` outside PATH and auto-activate Visual Studio build environment for `tauri:dev:win` / `tauri:build:win`
 - [x] Ignore and untrack local runtime workspace data (`.micodemonitor/`) to avoid leaking local sessions/rules into repository history
 - [x] Remove duplicate shadow files (`* 2.*` / `* 3.*`) that are not part of active compile chain
 - [x] Add bootstrap scripts for beginners (`bootstrap:mac`, `bootstrap:win`) and package-manager fallback guidance (`brew`/`winget`/`choco`)
@@ -105,6 +110,7 @@
 - [x] Make CI/release builds resilient without MiCode CLI preinstall (allow doctor skip via `MICODE_DOCTOR_SKIP_MICODE=1` in GitHub Actions)
 - [x] Fix Windows build/runtime portability: move `sha2` to cross-platform dependency and make MiCode PATH discovery Windows-aware (`;` PATH, win shim dirs, `.exe/.cmd`)
 - [x] Fix Windows model discovery fallback: resolve `micode` command-name via PATH and parse npm/winget shim wrappers (`%~dp0 ... @mi/mi-code-cli/dist/cli.js`)
+- [x] Disable composer image uploads in chat/workspace dialogs (remove button and block drag/drop/paste attach paths)
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 

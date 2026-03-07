@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { Dispatch, MutableRefObject } from "react";
-import type { TurnPlan } from "../../../types";
+import type { TurnPlan, TurnPlanStep } from "../../../types";
 import { interruptTurn as interruptTurnService } from "../../../services/tauri";
 import { getThreadTimestamp } from "../../../utils/threadItems";
 import {
@@ -48,7 +48,7 @@ export function useThreadTurnEvents({
     if (turnId && plan.turnId !== turnId) {
       return false;
     }
-    return plan.steps.every((step) => step.status === "completed");
+    return plan.steps.every((step: TurnPlanStep) => step.status === "completed");
   }, [planByThreadRef]);
 
   const onThreadStarted = useCallback(

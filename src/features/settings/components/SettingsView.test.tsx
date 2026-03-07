@@ -8,14 +8,28 @@ import {
   within,
 } from "@testing-library/react";
 import type { ComponentProps } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppSettings, WorkspaceInfo } from "../../../types";
 import { SettingsView } from "./SettingsView";
+
+const getMiCodeConfigPathMock = vi.hoisted(() => vi.fn());
+const listApprovalRulesMock = vi.hoisted(() => vi.fn());
+const removeApprovalRuleMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   ask: vi.fn(),
   open: vi.fn(),
 }));
+
+vi.mock("../../../services/tauri", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../services/tauri")>();
+  return {
+    ...actual,
+    getMiCodeConfigPath: (...args: unknown[]) => getMiCodeConfigPathMock(...args),
+    listApprovalRules: (...args: unknown[]) => listApprovalRulesMock(...args),
+    removeApprovalRule: (...args: unknown[]) => removeApprovalRuleMock(...args),
+  };
+});
 
 const baseSettings: AppSettings = {
   agentProvider: "micode-acp",
@@ -35,7 +49,6 @@ const baseSettings: AppSettings = {
   interruptShortcut: null,
   newAgentShortcut: null,
   newWorktreeAgentShortcut: null,
-  archiveThreadShortcut: null,
   toggleProjectsSidebarShortcut: null,
   toggleGitSidebarShortcut: null,
   branchSwitcherShortcut: null,
@@ -102,6 +115,12 @@ const createDoctorResult = () => ({
   nodeOk: true,
   nodeVersion: null,
   nodeDetails: null,
+});
+
+beforeEach(() => {
+  getMiCodeConfigPathMock.mockResolvedValue("/tmp/.micode/config.toml");
+  listApprovalRulesMock.mockResolvedValue({ rules: [], rulesPath: null });
+  removeApprovalRuleMock.mockResolvedValue({ ok: true, removed: true });
 });
 
 const renderDisplaySection = (
@@ -775,5 +794,120 @@ describe("SettingsView Shortcuts", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("does not render archive shortcut settings", () => {
+    render(
+      <SettingsView
+        workspaceGroups={[]}
+        groupedWorkspaces={[]}
+        ungroupedLabel="Ungrouped"
+        onClose={vi.fn()}
+        onMoveWorkspace={vi.fn()}
+        onDeleteWorkspace={vi.fn()}
+        onCreateWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+        onRenameWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+        onMoveWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+        onDeleteWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+        onAssignWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+        reduceTransparency={false}
+        onToggleTransparency={vi.fn()}
+        appSettings={baseSettings}
+        openAppIconById={{}}
+        onUpdateAppSettings={vi.fn().mockResolvedValue(undefined)}
+        onRunDoctor={vi.fn().mockResolvedValue(createDoctorResult())}
+        onUpdateWorkspaceMiCodeBin={vi.fn().mockResolvedValue(undefined)}
+        onUpdateWorkspaceSettings={vi.fn().mockResolvedValue(undefined)}
+        scaleShortcutTitle="Scale shortcut"
+        scaleShortcutText="Use Command +/-"
+        onTestNotificationSound={vi.fn()}
+        onTestSystemNotification={vi.fn()}
+        dictationModelStatus={null}
+        onDownloadDictationModel={vi.fn()}
+        onCancelDictationDownload={vi.fn()}
+        onRemoveDictationModel={vi.fn()}
+        initialSection="shortcuts"
+      />,
+    );
+
+    expect(screen.queryByText("Archive active thread")).toBeNull();
+    expect(screen.queryByText("归档当前会话")).toBeNull();
+  });
+});
+
+describe("SettingsView Approval Rules", () => {
+  it("renders approval rules item-by-item and removes a single rule", async () => {
+    listApprovalRulesMock
+      .mockResolvedValueOnce({
+        rules: [
+          { command: ["fetch", "https://example.com/a"] },
+          { command: ["execute", "npm", "run", "build"] },
+        ],
+        rulesPath: "/tmp/.micode/rules/default.rules",
+      })
+      .mockResolvedValueOnce({
+        rules: [{ command: ["execute", "npm", "run", "build"] }],
+        rulesPath: "/tmp/.micode/rules/default.rules",
+      });
+
+    render(
+      <SettingsView
+        workspaceGroups={[]}
+        groupedWorkspaces={[
+          {
+            id: null,
+            name: "Ungrouped",
+            workspaces: [workspace({ id: "ws-1", name: "Demo Workspace" })],
+          },
+        ]}
+        ungroupedLabel="Ungrouped"
+        onClose={vi.fn()}
+        onMoveWorkspace={vi.fn()}
+        onDeleteWorkspace={vi.fn()}
+        onCreateWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+        onRenameWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+        onMoveWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+        onDeleteWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+        onAssignWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+        reduceTransparency={false}
+        onToggleTransparency={vi.fn()}
+        appSettings={baseSettings}
+        openAppIconById={{}}
+        onUpdateAppSettings={vi.fn().mockResolvedValue(undefined)}
+        onRunDoctor={vi.fn().mockResolvedValue(createDoctorResult())}
+        onUpdateWorkspaceMiCodeBin={vi.fn().mockResolvedValue(undefined)}
+        onUpdateWorkspaceSettings={vi.fn().mockResolvedValue(undefined)}
+        scaleShortcutTitle="Scale shortcut"
+        scaleShortcutText="Use Command +/-"
+        onTestNotificationSound={vi.fn()}
+        onTestSystemNotification={vi.fn()}
+        dictationModelStatus={null}
+        onDownloadDictationModel={vi.fn()}
+        onCancelDictationDownload={vi.fn()}
+        onRemoveDictationModel={vi.fn()}
+        initialSection="micode"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("fetch https://example.com/a")).toBeTruthy();
+      expect(screen.getByText("execute npm run build")).toBeTruthy();
+    });
+
+    const removeButtons = screen.getAllByRole("button", { name: "Remove" });
+    expect(removeButtons).toHaveLength(2);
+    fireEvent.click(removeButtons[0]);
+
+    await waitFor(() => {
+      expect(removeApprovalRuleMock).toHaveBeenCalledWith("ws-1", [
+        "fetch",
+        "https://example.com/a",
+      ]);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("fetch https://example.com/a")).toBeNull();
+      expect(screen.getByText("execute npm run build")).toBeTruthy();
+    });
   });
 });

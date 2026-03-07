@@ -20,6 +20,9 @@ import { getDefaultInterruptShortcut } from "../../../utils/shortcuts";
 const allowedThemes = new Set(["system", "light", "dark", "dim"]);
 const allowedPersonality = new Set(["friendly", "pragmatic"]);
 const allowedLanguages = new Set(["en", "zh"]);
+const DISPLAY_SETTINGS_FALLBACK_KEY = "micodemonitor.displaySettingsFallback.v1";
+
+type DisplaySettingsFallback = Pick<AppSettings, "theme" | "language" | "uiScale">;
 
 const defaultSettings: AppSettings = {
   agentProvider: "micode-acp",
@@ -39,7 +42,6 @@ const defaultSettings: AppSettings = {
   interruptShortcut: getDefaultInterruptShortcut(),
   newAgentShortcut: "cmd+n",
   newWorktreeAgentShortcut: "cmd+shift+n",
-  archiveThreadShortcut: "cmd+ctrl+a",
   toggleProjectsSidebarShortcut: "cmd+shift+p",
   toggleGitSidebarShortcut: "cmd+shift+g",
   branchSwitcherShortcut: "cmd+b",
@@ -85,6 +87,55 @@ const defaultSettings: AppSettings = {
   openAppTargets: DEFAULT_OPEN_APP_TARGETS,
   selectedOpenAppId: DEFAULT_OPEN_APP_ID,
 };
+
+function readDisplaySettingsFallback(): Partial<DisplaySettingsFallback> {
+  if (typeof window === "undefined") {
+    return {};
+  }
+  try {
+    const raw = window.localStorage.getItem(DISPLAY_SETTINGS_FALLBACK_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const next: Partial<DisplaySettingsFallback> = {};
+    if (typeof parsed.theme === "string" && allowedThemes.has(parsed.theme)) {
+      next.theme = parsed.theme as AppSettings["theme"];
+    }
+    if (typeof parsed.language === "string" && allowedLanguages.has(parsed.language)) {
+      next.language = parsed.language as AppSettings["language"];
+    }
+    if (typeof parsed.uiScale === "number" && Number.isFinite(parsed.uiScale)) {
+      next.uiScale = clampUiScale(parsed.uiScale);
+    }
+    return next;
+  } catch {
+    return {};
+  }
+}
+
+function writeDisplaySettingsFallback(
+  theme: AppSettings["theme"],
+  language: AppSettings["language"],
+  uiScale: number,
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    const fallback: DisplaySettingsFallback = {
+      theme,
+      language,
+      uiScale: clampUiScale(uiScale),
+    };
+    window.localStorage.setItem(
+      DISPLAY_SETTINGS_FALLBACK_KEY,
+      JSON.stringify(fallback),
+    );
+  } catch {
+    // Ignore localStorage failures.
+  }
+}
 
 function normalizeAppSettings(settings: AppSettings): AppSettings {
   const normalizedTargets =
@@ -152,19 +203,26 @@ export function useAppSettings() {
 
   useEffect(() => {
     let active = true;
+    const fallbackSettings = readDisplaySettingsFallback();
+    const settingsWithFallback = {
+      ...defaultSettings,
+      ...fallbackSettings,
+    };
     void (async () => {
       try {
         const response = await getAppSettings();
         if (active) {
           setSettings(
             normalizeAppSettings({
-              ...defaultSettings,
+              ...settingsWithFallback,
               ...response,
             }),
           );
         }
       } catch {
-        // Defaults stay in place if loading settings fails.
+        if (active) {
+          setSettings(normalizeAppSettings(settingsWithFallback));
+        }
       } finally {
         if (active) {
           setIsLoading(false);
@@ -175,6 +233,14 @@ export function useAppSettings() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    writeDisplaySettingsFallback(
+      settings.theme,
+      settings.language,
+      settings.uiScale,
+    );
+  }, [settings.language, settings.theme, settings.uiScale]);
 
   const saveSettings = useCallback(async (next: AppSettings) => {
     const normalized = normalizeAppSettings(next);

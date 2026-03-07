@@ -672,4 +672,20 @@ describe("threadItems", () => {
     expect(timestamp).toBe(0);
   });
 
+  it("safely stringifies numeric/object tool payloads", () => {
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    const item = buildConversationItem({
+      type: "plan",
+      id: "plan-safe-1",
+      status: 200,
+      text: cyclic,
+    });
+    expect(item).not.toBeNull();
+    if (item && item.kind === "tool") {
+      expect(item.status).toBe("200");
+      expect((item.output ?? "").length).toBeGreaterThan(0);
+    }
+  });
+
 });

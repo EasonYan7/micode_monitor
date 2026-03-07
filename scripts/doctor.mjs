@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import path from "node:path";
 
 const strict = process.argv.includes("--strict");
 const install = process.argv.includes("--install");
@@ -13,6 +15,50 @@ function hasCommand(command) {
   return result.status === 0;
 }
 
+function findWindowsLinker() {
+  if (process.platform !== "win32") {
+    return null;
+  }
+  if (hasCommand("link")) {
+    return "PATH";
+  }
+
+  const roots = [
+    "C:\\Program Files\\Microsoft Visual Studio\\2022",
+    "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022",
+  ];
+  const editions = ["BuildTools", "Community", "Professional", "Enterprise"];
+
+  for (const root of roots) {
+    for (const edition of editions) {
+      const binRoot = path.join(root, edition, "VC", "Tools", "MSVC");
+      if (!existsSync(binRoot)) {
+        continue;
+      }
+      const entries = spawnSync("powershell", [
+        "-NoProfile",
+        "-Command",
+        `Get-ChildItem -Path '${binRoot.replace(/'/g, "''")}' -Directory | Sort-Object Name -Descending | Select-Object -ExpandProperty FullName`,
+      ], { encoding: "utf8" });
+      if (entries.status !== 0) {
+        continue;
+      }
+      const versions = entries.stdout
+        .split(/\r?\n/)
+        .map((value) => value.trim())
+        .filter(Boolean);
+      for (const versionDir of versions) {
+        const linkerPath = path.join(versionDir, "bin", "Hostx64", "x64", "link.exe");
+        if (existsSync(linkerPath)) {
+          return linkerPath;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { stdio: "inherit", shell: false, ...options });
   return result.status === 0;
@@ -25,15 +71,25 @@ if (!hasCommand("rustc")) missing.push("rustc");
 if (!hasCommand("cargo")) missing.push("cargo");
 if (!hasCommand("cmake")) missing.push("cmake");
 if (!hasCommand("git")) missing.push("git");
+if (!hasCommand("python") && !(process.platform === "win32" && hasCommand("py"))) missing.push("python");
 if (!skipMicode && !hasCommand("micode")) missing.push("micode");
+const windowsLinkerPath = findWindowsLinker();
+if (process.platform === "win32" && !windowsLinkerPath) missing.push("link");
 
-const requiredTools = ["node", "npm", "rustc", "cargo", "cmake", "git"];
+const requiredTools = ["node", "npm", "rustc", "cargo", "cmake", "git", "python"];
 if (!skipMicode) {
   requiredTools.push("micode");
+}
+if (process.platform === "win32") {
+  requiredTools.push("link");
 }
 
 if (missing.length === 0) {
   console.log("Doctor: OK");
+  if (process.platform === "win32" && windowsLinkerPath && windowsLinkerPath !== "PATH") {
+    console.log(`Doctor: found Visual Studio linker outside PATH: ${windowsLinkerPath}`);
+    console.log("Doctor: tauri:dev:win will activate the Visual Studio build environment automatically.");
+  }
   process.exit(0);
 }
 
@@ -59,6 +115,10 @@ if (install) {
       ["cargo", installer === "winget" ? ["winget", ["install", "--id", "Rustlang.Rustup", "-e"]] : ["choco", ["install", "-y", "rustup.install"]]],
       ["cmake", installer === "winget" ? ["winget", ["install", "--id", "Kitware.CMake", "-e"]] : ["choco", ["install", "-y", "cmake"]]],
       ["git", installer === "winget" ? ["winget", ["install", "--id", "Git.Git", "-e"]] : ["choco", ["install", "-y", "git"]]],
+      ["python", installer === "winget" ? ["winget", ["install", "--id", "Python.Python.3.12", "-e"]] : ["choco", ["install", "-y", "python"]]],
+      ["link", installer === "winget"
+        ? ["winget", ["install", "--id", "Microsoft.VisualStudio.2022.BuildTools", "-e", "--override", "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"]]
+        : ["choco", ["install", "-y", "visualstudio2022buildtools", "--package-parameters", "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive --norestart"]]],
     ];
     const planned = new Set();
     for (const [cmd, [installer, args]] of installMap) {
@@ -118,8 +178,13 @@ switch (process.platform) {
     console.log("  winget install Rustlang.Rustup");
     console.log("  winget install Kitware.CMake");
     console.log("  winget install Git.Git");
+    console.log("  winget install Python.Python.3.12");
+    console.log("  winget install Microsoft.VisualStudio.2022.BuildTools --override \"--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended\"");
     console.log("Or with choco:");
-    console.log("  choco install -y nodejs rustup.install cmake git");
+    console.log("  choco install -y nodejs rustup.install cmake git python");
+    console.log("  choco install -y visualstudio2022buildtools --package-parameters \"--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive --norestart\"");
+    console.log("Why link.exe matters:");
+    console.log("  Tauri/Rust on Windows uses the MSVC linker. If `where link` returns nothing, install Visual Studio Build Tools 2022 with Desktop development with C++.");
     if (!skipMicode) {
       console.log("MiCode (PowerShell):");
       console.log('  powershell -ExecutionPolicy Bypass -Command "iwr -useb https://cnbj1-fds.api.xiaomi.net/mi-code-public/install.ps1 | iex"');

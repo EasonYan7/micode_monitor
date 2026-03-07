@@ -192,7 +192,7 @@ jobs:
 
           "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Create or update GitHub Release
+      - name: Create draft GitHub Release (immutable-safe)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
@@ -202,9 +202,14 @@ jobs:
             throw "Missing RELEASE_TAG from previous step."
           }
 
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --title $tag --notes "Windows release $tag" --target $env:GITHUB_SHA
+          gh release view $tag --json isDraft *> $null
+          if ($LASTEXITCODE -eq 0) {
+            $isDraft = gh release view $tag --json isDraft -q .isDraft
+            if ($isDraft -ne "true") {
+              throw "Release $tag already exists and is immutable. Use a new version/tag."
+            }
+          } else {
+            gh release create $tag --draft --title $tag --notes "Windows release $tag" --target $env:GITHUB_SHA
           }
 
           $uploadItems = Get-Content "release-artifacts/upload-manifest.json" -Raw | ConvertFrom-Json
@@ -212,3 +217,14 @@ jobs:
             $sourceWithLabel = "$($item.path)#$($item.label)"
             gh release upload $tag $sourceWithLabel --clobber
           }
+
+      - name: Publish GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = $env:RELEASE_TAG
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            throw "Missing RELEASE_TAG from previous step."
+          }
+          gh release edit $tag --draft=false

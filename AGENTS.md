@@ -313,3 +313,123 @@ At the end of a task:
   - Hook: `src/features/notifications/hooks/useErrorToasts.ts`
   - UI: `src/features/notifications/components/ErrorToasts.tsx`
   - Styles: `src/styles/error-toasts.css`
+
+## AI Development Agent Guide
+
+This document defines how the AI assistant should behave when helping contributors work on this repository.
+
+The goal is to ensure safe collaboration, minimal code changes, and correct Git workflow.
+
+### 1. Repository Context
+
+This repository is a cross-platform application.
+
+Branch structure:
+
+`main`
+- Mac stable version (DO NOT modify)
+
+`windows-main`
+- Windows shared integration branch (team target branch)
+- Sen may push to this branch after the AI asks for confirmation and Sen explicitly approves the push
+
+`windows-sen`
+- Sen's development branch
+
+`windows-hongyi`
+- Hongyi's development branch
+
+`windows-ruiyu`
+- Ruiyu's development branch
+
+All Windows fixes must eventually merge into:
+
+`windows-main`
+
+Never merge directly into:
+
+`main`
+
+### 2. First Step: Identify the User
+
+Before performing any coding task, the AI must ask:
+
+`Who are you working as in this repository?`
+
+Valid answers:
+
+- `Sen`
+- `Hongyi`
+- `Ruiyu`
+
+If the user does not answer clearly, ask again.
+
+### 3. Map User -> Branch
+
+After identity is confirmed, the AI must enforce the correct branch.
+
+User -> Branch:
+
+- `Sen` -> `windows-sen`
+- `Hongyi` -> `windows-hongyi`
+- `Ruiyu` -> `windows-ruiyu`
+
+The AI must warn the user if they attempt to modify the wrong branch.
+
+Exception:
+
+- If the confirmed user is `Sen`, the AI may push to `windows-main` after asking for confirmation and receiving an explicit approval from Sen.
+
+Example warning:
+
+`You are Hongyi. You should only work on branch windows-hongyi.`
+
+### 4. Development Workflow
+
+The AI must guide the user through the following workflow.
+
+Step 1:
+Understand the bug.
+
+Ask for:
+
+- bug description
+- error message
+- affected file
+- expected behavior
+
+Step 2:
+Locate relevant code.
+
+Only inspect files related to the bug.
+
+Do NOT scan the entire repository unless necessary.
+
+Step 3:
+Propose minimal change.
+
+Rules:
+
+- Only fix the bug
+- Avoid refactoring unrelated code
+- Avoid rewriting entire files
+- Preserve cross-platform compatibility
+
+Step 4:
+Show patch before modification.
+
+AI must explain:
+
+- which lines change
+- why the change fixes the issue
+
+Step 5:
+Apply the fix.
+
+### 5. Strict Code Modification Rules
+
+The AI must follow these constraints.
+
+1. Do NOT perform large refactors.
+2. Do NOT change unrelated modules.
+3. Do NOT modify Mac-specific logic unless the bug requires it.
