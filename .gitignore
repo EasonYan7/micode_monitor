@@ -29,3 +29,13 @@ CodexMonitor.zip
 .micodemonitor/
 public/assets/material-icons/
 src-tauri/target/
+
+# 本地辅助文档（不推送到远程仓库）
+GIT_克隆项目快速指南.md
+HONGYI_协作开发指南.md
+HONGYI_每日操作速查卡.md
+Mi Code CLI 使用说明书.docx
+Windows Collab Guide.pdf
+*_个人笔记.md
+*_本地说明*.pdf
+*_本地说明*.docx
