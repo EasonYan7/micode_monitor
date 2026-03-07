@@ -232,6 +232,7 @@ export function useThreads({
     onReviewExited: handleReviewExited,
     approvalAllowlistRef,
     pendingInterruptsRef,
+    activeTurnIdByThread: state.activeTurnIdByThread,
   });
 
   const handleAccountLoginCompleted = useCallback(
