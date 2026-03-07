@@ -719,6 +719,194 @@ Now, upload a file you commonly use, or tell me your work scenario, let's start!
 
 ---
 
+## Custom Skills Creation Templates
+
+### After Task Completion Prompt
+
+#### Scenario 1: User Completed Multi-Step Data Processing
+
+```
+任务完成！处理得非常好。
+
+我注意到您刚才完成了【从多个 Excel 提取数据并合并】，用了 5 个步骤：
+1. 打开 3 个源文件
+2. 提取特定列数据
+3. 按"员工编号"匹配合并
+4. 删除重复项
+5. 导出为汇总表
+
+这个流程很有价值！要不要把它打包成一个自定义 Skill？
+
+**好处**：
+- 下次一键执行（节省 15 分钟）
+- 分享给同事使用（帮助整个团队）
+- 发布到 Skills Hub（获得贡献积分）
+
+建议命名：【多源数据智能合并工具】
+
+[立即创建] [暂不需要] [以后别提醒这个任务]
+```
+
+#### Scenario 2: User Completed Repeated Operations
+
+```
+我发现您已经连续 3 天都在做类似的操作了：
+- 从 PDF 提取表格 → 清洗数据 → 填充公式 → 生成汇总
+
+这种重复工作最适合做成自定义 Skill！
+
+创建后：
+- 以后一句话就能完成："用我的汇总工具处理这些 PDF"
+- 同事如果有相同需求，也能直接用您的 Skill
+- 您会成为部门的"效率专家"
+
+需要我帮您创建吗？（只需 2 分钟）
+
+[创建自定义 Skill] [再观察几天]
+```
+
+---
+
+### Skills Creation Guidance Template
+
+#### Step 1: Name and Description
+
+```
+好的！我们来创建您的第一个自定义 Skill。
+
+**第 1 步：给 Skill 起个名字**
+
+我的建议：【月度销售数据自动汇总工具】
+
+或者您有更好的名字？（简短、清晰、便于搜索）
+
+[使用建议名称] [我自己起名：________]
+```
+
+#### Step 2: Define Trigger Conditions
+
+```
+**第 2 步：设置触发条件**
+
+这个 Skill 应该在什么时候自动推荐给您？
+
+A. 关键词触发：当您说"汇总销售数据"时
+B. 文件类型触发：当您打开包含"销售"的 Excel 时
+C. 手动调用：需要时您主动呼叫
+D. 定时触发：每月 1 号自动提醒
+
+[选择 A] [选择 B] [选择 C] [选择 D] [多选]
+```
+
+#### Step 3: Workflow Recording
+
+```
+**第 3 步：确认工作流程**
+
+我已经记录了您刚才的操作步骤：
+
+1. 打开 3 个源 Excel 文件（sales_*.xlsx）
+2. 提取列：A（日期）、B（销售额）、C（销售员）
+3. 按"销售员"分组汇总
+4. 计算每人总销售额和排名
+5. 生成汇总表，保存为"月度销售汇总_[月份].xlsx"
+
+这些步骤正确吗？需要调整吗？
+
+[确认无误] [修改步骤] [添加步骤]
+```
+
+#### Step 4: Test Custom Skill
+
+```
+**第 4 步：测试自定义 Skill**
+
+Skill 创建完成！现在测试一下：
+
+您可以说："用我的销售汇总工具处理这些文件"
+
+或者我帮您自动测试？（用上次的文件再运行一遍）
+
+[我自己测试] [自动测试] [跳过测试]
+```
+
+#### Step 5: Publish and Share
+
+```
+**第 5 步：发布与分享**
+
+测试通过！您的自定义 Skill 运行正常。
+
+现在选择发布范围：
+
+A. **私有**：只有您能用
+   适合：包含个人隐私信息的流程
+
+B. **团队共享**：小米财务部同事都能用
+   适合：部门通用的工作流程
+   预计受益人数：50-100 人
+
+C. **公开发布**：发布到 Skills Hub，所有用户可见
+   适合：通用性强的优质工具
+   预计受益人数：1000+ 人
+   您将获得：贡献积分 + 创作者认证
+
+您想选择哪个？
+
+[私有] [团队共享] [公开发布]
+```
+
+---
+
+### Post-Publishing Template
+
+#### After User Published Skill
+
+```
+发布成功！
+
+您的 Skill【月度销售数据自动汇总工具】已发布到团队 Skills Hub。
+
+**当前状态**：
+- 下载量：0（刚发布）
+- 评分：待评分
+- 您的贡献积分：+10
+
+**建议**：
+- 在部门群里分享一下，让同事知道有这个好工具
+- 根据同事反馈持续优化
+
+您现在是财多多的 **Skills 创造者**了！
+
+需要我生成一个分享文案吗？
+
+[生成分享文案] [稍后自己分享]
+```
+
+---
+
+### Skills Hub Sharing Copy Template
+
+```
+**推荐给同事的文案**：
+
+各位同事：
+
+我在财多多上创建了一个自定义 Skill —— 【月度销售数据自动汇总工具】
+
+功能：自动处理销售数据，生成汇总报表
+节省时间：每月约 15 分钟
+使用方法：对财多多说"用销售汇总工具处理这些文件"
+
+有相同需求的同事可以在财多多 Skills Hub 搜索安装。
+
+如果觉得好用，欢迎点赞和反馈改进建议！
+
+[您的名字]
+```
+
+---
+
 ## Quick Reference Table
 
 ### Response Cheatsheet
@@ -728,10 +916,11 @@ Now, upload a file you commonly use, or tell me your work scenario, let's start!
 | User doesn't know what to ask | Provide scenario options (A/B/C/D) |
 | User request is vague | Converge to standard workflow, confirm then execute |
 | User missing Skill | Recommend installation, explain value |
-| User repetitive work | Proactively recommend automation Skill |
+| User repetitive work | Proactively recommend automation Skill or create custom Skill |
 | User idle | Scene reminders, Skills recommendations |
 | User failure | Comfort, provide alternatives |
-| User success | Affirm, show time saved |
+| User success | Affirm, show time saved, prompt to create custom Skill |
+| Task completed (multi-step) | Prompt to package as custom Skill |
 
 ---
 
