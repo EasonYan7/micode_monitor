@@ -2,6 +2,7 @@ import Layers from "lucide-react/dist/esm/icons/layers";
 import type { MouseEvent } from "react";
 
 import type { ThreadSummary, UiLanguage, WorkspaceInfo } from "../../../types";
+import type { WorkspaceRestoreStatus } from "../../workspaces/hooks/useWorkspaceRestore";
 import { ThreadList } from "./ThreadList";
 import { ThreadLoading } from "./ThreadLoading";
 import { WorktreeCard } from "./WorktreeCard";
@@ -26,6 +27,7 @@ type WorktreeSectionProps = {
   threadListLoadingByWorkspace: Record<string, boolean>;
   threadListPagingByWorkspace: Record<string, boolean>;
   threadListCursorByWorkspace: Record<string, string | null>;
+  workspaceRestoreStatusById?: Record<string, WorkspaceRestoreStatus | null>;
   expandedWorkspaces: Set<string>;
   activeWorkspaceId: string | null;
   activeThreadId: string | null;
@@ -62,6 +64,7 @@ export function WorktreeSection({
   threadListLoadingByWorkspace,
   threadListPagingByWorkspace,
   threadListCursorByWorkspace,
+  workspaceRestoreStatusById = {},
   expandedWorkspaces,
   activeWorkspaceId,
   activeThreadId,
@@ -119,10 +122,12 @@ export function WorktreeSection({
               worktree={worktree}
               isActive={worktree.id === activeWorkspaceId}
               isDeleting={deletingWorktreeIds.has(worktree.id)}
+              restoreStatus={workspaceRestoreStatusById[worktree.id] ?? null}
               onSelectWorkspace={onSelectWorkspace}
               onShowWorktreeMenu={onShowWorktreeMenu}
               onToggleWorkspaceCollapse={onToggleWorkspaceCollapse}
               onConnectWorkspace={onConnectWorkspace}
+              language={language}
             >
               {showWorktreeThreadList && (
                 <ThreadList

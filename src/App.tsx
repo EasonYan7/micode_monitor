@@ -35,6 +35,7 @@ import { AppLayout } from "./features/app/components/AppLayout";
 import { AppModals } from "./features/app/components/AppModals";
 import { MainHeaderActions } from "./features/app/components/MainHeaderActions";
 import { StartupEnvironmentGate } from "./features/app/components/StartupEnvironmentGate";
+import { WorkspaceOpeningToast } from "./features/app/components/WorkspaceOpeningToast";
 import { useLayoutNodes } from "./features/layout/hooks/useLayoutNodes";
 import { useWorkspaceDropZone } from "./features/workspaces/hooks/useWorkspaceDropZone";
 import { useThreads } from "./features/threads/hooks/useThreads";
@@ -1301,6 +1302,10 @@ function MainApp() {
     : null;
   const activeTokenUsage = useMemo(() => {
     if (!activeWorkspaceId) {
+      const allWorkspaceUsage = mergeTokenUsage(Object.values(tokenUsageByThread));
+      if (allWorkspaceUsage) {
+        return allWorkspaceUsage;
+      }
       return activeThreadId ? tokenUsageByThread[activeThreadId] ?? null : null;
     }
     const workspaceThreads = threadsByWorkspace[activeWorkspaceId] ?? [];
@@ -1338,6 +1343,10 @@ function MainApp() {
     });
   const [usageMetric, setUsageMetric] = useState<"tokens" | "time">("tokens");
   const [usageWorkspaceId, setUsageWorkspaceId] = useState<string | null>(null);
+  const [isWorkspaceOpening, setIsWorkspaceOpening] = useState(false);
+  const [workspaceRestoreStatusById, setWorkspaceRestoreStatusById] = useState<
+    Record<string, "connecting" | "syncing" | null>
+  >({});
   const usageWorkspaceOptions = useMemo(
     () =>
       workspaces.map((workspace) => {
@@ -1737,8 +1746,19 @@ function MainApp() {
     workspaces,
     hasLoaded,
     connectWorkspace,
-    listThreadsForWorkspace
-  });
+    listThreadsForWorkspace,
+    onStatusChange: (workspaceId, status) => {
+      setWorkspaceRestoreStatusById((current) => {
+        if ((current[workspaceId] ?? null) === status) {
+          return current;
+        }
+        return {
+          ...current,
+          [workspaceId]: status,
+        };
+      });
+    },
+    });
   useWorkspaceRefreshOnFocus({
     workspaces,
     refreshWorkspaces,
@@ -1755,6 +1775,8 @@ function MainApp() {
     isCompact,
     addWorkspace,
     addWorkspaceFromPath,
+    onWorkspaceOpenStart: () => setIsWorkspaceOpening(true),
+    onWorkspaceOpenEnd: () => setIsWorkspaceOpening(false),
     setActiveThreadId,
     setActiveTab,
     exitDiffView,
@@ -2017,8 +2039,9 @@ function MainApp() {
     threadResumeLoadingById,
     threadListLoadingByWorkspace,
     threadListPagingByWorkspace,
-    threadListCursorByWorkspace,
-    activeWorkspaceId,
+      threadListCursorByWorkspace,
+      workspaceRestoreStatusById,
+      activeWorkspaceId,
     activeThreadId,
     activeItems,
     activeRateLimits,
@@ -2144,9 +2167,15 @@ function MainApp() {
         return;
       }
       void listThreadsForWorkspace(workspace);
-    },
-    updaterState,
-    onUpdate: startUpdate,
+      },
+      updaterState,
+      workspaceOpeningToastNode: (
+        <WorkspaceOpeningToast
+          visible={isWorkspaceOpening}
+          language={(appSettings.language ?? "en") as "en" | "zh"}
+        />
+      ),
+      onUpdate: startUpdate,
     onDismissUpdate: dismissUpdate,
     errorToasts,
     onDismissErrorToast: dismissErrorToast,
@@ -2667,4 +2696,5 @@ function App() {
 }
 
 export default App;
+
 

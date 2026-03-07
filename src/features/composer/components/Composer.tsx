@@ -14,6 +14,7 @@ import type {
   DictationTranscript,
   QueuedMessage,
   ThreadTokenUsage,
+  UiLanguage,
 } from "../../../types";
 import type {
   ReviewPromptState,
@@ -119,6 +120,7 @@ type ComposerProps = {
   onReviewPromptUpdateCustomInstructions?: (value: string) => void;
   onReviewPromptConfirmCustom?: () => Promise<void>;
   onFileAutocompleteActiveChange?: (active: boolean) => void;
+  language?: UiLanguage;
 };
 
 const DEFAULT_EDITOR_SETTINGS: ComposerEditorSettings = {
@@ -210,6 +212,7 @@ export function Composer({
   onReviewPromptUpdateCustomInstructions,
   onReviewPromptConfirmCustom,
   onFileAutocompleteActiveChange,
+  language = "en",
 }: ComposerProps) {
   const [text, setText] = useState(draftText);
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
@@ -709,6 +712,7 @@ export function Composer({
         onReviewPromptConfirmCommit={onReviewPromptConfirmCommit}
         onReviewPromptUpdateCustomInstructions={onReviewPromptUpdateCustomInstructions}
         onReviewPromptConfirmCustom={onReviewPromptConfirmCustom}
+        language={language}
       />
       <ComposerMetaBar
         disabled={disabled}
@@ -729,3 +733,4 @@ export function Composer({
     </footer>
   );
 }
+

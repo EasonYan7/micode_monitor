@@ -91,7 +91,9 @@ export function getUsageLabels(
   const sessionTokens = tokenUsage?.last?.totalTokens ?? null;
   const totalTokens = tokenUsage?.total?.totalTokens ?? null;
   const sessionValueLabel =
-    sessionPercent === null ? formatTokenCount(sessionTokens) : null;
+    sessionPercent === null
+      ? formatTokenCount(totalTokens ?? sessionTokens)
+      : null;
   const weeklyValueLabel = weeklyPercent === null ? null : null;
   const creditsLabel = formatCreditsLabel(accountRateLimits, language);
   const fallbackCredits =

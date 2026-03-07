@@ -184,6 +184,8 @@ export function WorkspaceHome({
   onAgentMdSave,
   language = "en",
 }: WorkspaceHomeProps) {
+  const isZh = language === "zh";
+  const t = (en: string, zh: string) => (isZh ? zh : en);
   const [showIcon, setShowIcon] = useState(true);
   const [runModeOpen, setRunModeOpen] = useState(false);
   const [modelsOpen, setModelsOpen] = useState(false);
@@ -504,7 +506,7 @@ export function WorkspaceHome({
           <ComposerInput
             text={prompt}
             disabled={isSubmitting}
-            sendLabel="Send"
+            sendLabel={t("Send", "发送")}
             canStop={false}
             canSend={prompt.trim().length > 0 || activeImages.length > 0}
             isProcessing={isSubmitting}
@@ -539,6 +541,7 @@ export function WorkspaceHome({
             onHighlightIndex={setHighlightIndex}
             onSelectSuggestion={applyAutocomplete}
             suggestionsStyle={suggestionsStyle}
+            language={language}
           />
         </div>
         {error && <div className="workspace-home-error">{error}</div>}

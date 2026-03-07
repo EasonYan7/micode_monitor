@@ -1,11 +1,14 @@
 import type { MouseEvent } from "react";
 
 import type { WorkspaceInfo } from "../../../types";
+import type { WorkspaceRestoreStatus } from "../../workspaces/hooks/useWorkspaceRestore";
 
 type WorktreeCardProps = {
   worktree: WorkspaceInfo;
   isActive: boolean;
   isDeleting?: boolean;
+  restoreStatus?: WorkspaceRestoreStatus | null;
+  language?: "en" | "zh";
   onSelectWorkspace: (id: string) => void;
   onShowWorktreeMenu: (event: MouseEvent, worktree: WorkspaceInfo) => void;
   onToggleWorkspaceCollapse: (workspaceId: string, collapsed: boolean) => void;
@@ -17,6 +20,8 @@ export function WorktreeCard({
   worktree,
   isActive,
   isDeleting = false,
+  restoreStatus = null,
+  language = "en",
   onSelectWorkspace,
   onShowWorktreeMenu,
   onToggleWorkspaceCollapse,
@@ -27,6 +32,16 @@ export function WorktreeCard({
   const worktreeBranch = worktree.worktree?.branch ?? "";
   const worktreeLabel = worktree.name?.trim() || worktreeBranch;
   const contentCollapsedClass = worktreeCollapsed ? " collapsed" : "";
+  const restoreHint =
+    restoreStatus === "connecting"
+      ? language === "zh"
+        ? "正在努力打开工作区..."
+        : "Opening workspace..."
+      : restoreStatus === "syncing"
+        ? language === "zh"
+          ? "正在同步历史记录..."
+          : "Syncing history..."
+        : null;
 
   return (
     <div className={`worktree-card${isDeleting ? " deleting" : ""}`}>
@@ -64,6 +79,11 @@ export function WorktreeCard({
             </div>
           ) : (
             <>
+              {restoreHint ? (
+                <div className="workspace-restore-hint" role="status" aria-live="polite">
+                  {restoreHint}
+                </div>
+              ) : null}
               <button
                 className={`worktree-toggle ${worktreeCollapsed ? "" : "expanded"}`}
                 onClick={(event) => {
@@ -76,7 +96,7 @@ export function WorktreeCard({
               >
                 <span className="worktree-toggle-icon">›</span>
               </button>
-              {!worktree.connected && (
+              {!worktree.connected && !restoreHint && (
                 <span
                   className="connect"
                   onClick={(event) => {
