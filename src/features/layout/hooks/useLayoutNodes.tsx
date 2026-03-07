@@ -8,8 +8,6 @@ import { ApprovalToasts } from "../../app/components/ApprovalToasts";
 import { UpdateToast } from "../../update/components/UpdateToast";
 import { ErrorToasts } from "../../notifications/components/ErrorToasts";
 import { Composer } from "../../composer/components/Composer";
-import { GitDiffPanel } from "../../git/components/GitDiffPanel";
-import { GitDiffViewer } from "../../git/components/GitDiffViewer";
 import { FileTreePanel } from "../../files/components/FileTreePanel";
 import { PromptPanel } from "../../prompts/components/PromptPanel";
 import { DebugPanel } from "../../debug/components/DebugPanel";
@@ -58,6 +56,7 @@ import type { UpdateState } from "../../update/hooks/useUpdater";
 import type { TerminalSessionState } from "../../terminal/hooks/useTerminalSession";
 import type { TerminalTab } from "../../terminal/hooks/useTerminalTabs";
 import type { ErrorToast } from "../../../services/toasts";
+import type { DebugViewMode } from "../../../utils/debugEntries";
 
 type ThreadActivityStatus = {
   isProcessing: boolean;
@@ -231,9 +230,9 @@ type LayoutNodesOptions = {
   mainHeaderActionsNode?: ReactNode;
   centerMode: "chat" | "diff";
   onExitDiff: () => void;
-  activeTab: "projects" | "micode" | "git" | "log";
-  onSelectTab: (tab: "projects" | "micode" | "git" | "log") => void;
-  tabletNavTab: "micode" | "git" | "log";
+  activeTab: "projects" | "micode" | "files" | "log";
+  onSelectTab: (tab: "projects" | "micode" | "files" | "log") => void;
+  tabletNavTab: "micode" | "files" | "log";
   gitPanelMode: "diff" | "log" | "issues" | "prs";
   onGitPanelModeChange: (mode: "diff" | "log" | "issues" | "prs") => void;
   gitDiffViewStyle: "split" | "unified";
@@ -244,8 +243,8 @@ type LayoutNodesOptions = {
   worktreeApplyError: string | null;
   worktreeApplySuccess: boolean;
   onApplyWorktreeChanges?: () => void | Promise<void>;
-  filePanelMode: "git" | "files" | "prompts";
-  onFilePanelModeChange: (mode: "git" | "files" | "prompts") => void;
+  filePanelMode: "files" | "prompts";
+  onFilePanelModeChange: (mode: "files" | "prompts") => void;
   fileTreeLoading: boolean;
   gitStatus: {
     branchName: string;
@@ -435,6 +434,7 @@ type LayoutNodesOptions = {
   composerSendLabel?: string;
   plan: TurnPlan | null;
   debugEntries: DebugEntry[];
+  debugViewMode: DebugViewMode;
   debugOpen: boolean;
   terminalOpen: boolean;
   terminalTabs: TerminalTab[];
@@ -445,6 +445,7 @@ type LayoutNodesOptions = {
   terminalState: TerminalSessionState | null;
   onClearDebug: () => void;
   onCopyDebug: () => void;
+  onDebugViewModeChange: (mode: DebugViewMode) => void;
   onResizeDebug: (event: MouseEvent<Element>) => void;
   onResizeTerminal: (event: MouseEvent<Element>) => void;
   onBackFromDiff: () => void;
@@ -705,9 +706,6 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       selectedOpenAppId={options.selectedOpenAppId}
       onSelectOpenAppId={options.onSelectOpenAppId}
       branchName={options.branchName}
-      branches={options.branches}
-      onCheckoutBranch={options.onCheckoutBranch}
-      onCreateBranch={options.onCreateBranch}
       canCopyThread={options.activeItems.length > 0}
       onCopyThread={options.onCopyThread}
       onToggleTerminal={options.onToggleTerminal}
@@ -751,9 +749,6 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
   const tabBarNode = (
     <TabBar activeTab={options.activeTab} onSelect={options.onSelectTab} />
   );
-
-  const sidebarSelectedDiffPath =
-    options.centerMode === "diff" ? options.selectedDiffPath : null;
 
   let gitDiffPanelNode: ReactNode;
   if (options.filePanelMode === "files" && options.activeWorkspace) {
@@ -799,112 +794,10 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       />
     );
   } else {
-    gitDiffPanelNode = (
-      <GitDiffPanel
-        workspaceId={options.activeWorkspace?.id ?? null}
-        workspacePath={options.activeWorkspace?.path ?? null}
-        mode={options.gitPanelMode}
-        onModeChange={options.onGitPanelModeChange}
-        filePanelMode={options.filePanelMode}
-        onFilePanelModeChange={options.onFilePanelModeChange}
-        worktreeApplyLabel={options.worktreeApplyLabel}
-        worktreeApplyTitle={options.worktreeApplyTitle}
-        worktreeApplyLoading={options.worktreeApplyLoading}
-        worktreeApplyError={options.worktreeApplyError}
-        worktreeApplySuccess={options.worktreeApplySuccess}
-        onApplyWorktreeChanges={options.onApplyWorktreeChanges}
-        branchName={options.gitStatus.branchName || "unknown"}
-        totalAdditions={options.gitStatus.totalAdditions}
-        totalDeletions={options.gitStatus.totalDeletions}
-        fileStatus={options.fileStatus}
-        error={options.gitStatus.error}
-        logError={options.gitLogError}
-        logLoading={options.gitLogLoading}
-        stagedFiles={options.gitStatus.stagedFiles}
-        unstagedFiles={options.gitStatus.unstagedFiles}
-        onSelectFile={options.onSelectDiff}
-        selectedPath={sidebarSelectedDiffPath}
-        logEntries={options.gitLogEntries}
-        logTotal={options.gitLogTotal}
-        logAhead={options.gitLogAhead}
-        logBehind={options.gitLogBehind}
-        logAheadEntries={options.gitLogAheadEntries}
-        logBehindEntries={options.gitLogBehindEntries}
-        logUpstream={options.gitLogUpstream}
-        selectedCommitSha={options.selectedCommitSha}
-        onSelectCommit={options.onSelectCommit}
-        issues={options.gitIssues}
-        issuesTotal={options.gitIssuesTotal}
-        issuesLoading={options.gitIssuesLoading}
-        issuesError={options.gitIssuesError}
-        pullRequests={options.gitPullRequests}
-        pullRequestsTotal={options.gitPullRequestsTotal}
-        pullRequestsLoading={options.gitPullRequestsLoading}
-        pullRequestsError={options.gitPullRequestsError}
-        selectedPullRequest={options.selectedPullRequestNumber}
-        onSelectPullRequest={options.onSelectPullRequest}
-        gitRemoteUrl={options.gitRemoteUrl}
-        gitRoot={options.gitRoot}
-        gitRootCandidates={options.gitRootCandidates}
-        gitRootScanDepth={options.gitRootScanDepth}
-        gitRootScanLoading={options.gitRootScanLoading}
-        gitRootScanError={options.gitRootScanError}
-        gitRootScanHasScanned={options.gitRootScanHasScanned}
-        onGitRootScanDepthChange={options.onGitRootScanDepthChange}
-        onScanGitRoots={options.onScanGitRoots}
-        onSelectGitRoot={options.onSelectGitRoot}
-        onClearGitRoot={options.onClearGitRoot}
-        onPickGitRoot={options.onPickGitRoot}
-        onStageAllChanges={options.onStageGitAll}
-        onStageFile={options.onStageGitFile}
-        onUnstageFile={options.onUnstageGitFile}
-        onRevertFile={options.onRevertGitFile}
-        onRevertAllChanges={options.onRevertAllGitChanges}
-        commitMessage={options.commitMessage}
-        commitMessageLoading={options.commitMessageLoading}
-        commitMessageError={options.commitMessageError}
-        onCommitMessageChange={options.onCommitMessageChange}
-        onGenerateCommitMessage={options.onGenerateCommitMessage}
-        onCommit={options.onCommit}
-        onCommitAndPush={options.onCommitAndPush}
-        onCommitAndSync={options.onCommitAndSync}
-        onPull={options.onPull}
-        onFetch={options.onFetch}
-        onPush={options.onPush}
-        onSync={options.onSync}
-        commitLoading={options.commitLoading}
-        pullLoading={options.pullLoading}
-        fetchLoading={options.fetchLoading}
-        pushLoading={options.pushLoading}
-        syncLoading={options.syncLoading}
-        commitError={options.commitError}
-        pullError={options.pullError}
-        fetchError={options.fetchError}
-        pushError={options.pushError}
-        syncError={options.syncError}
-        commitsAhead={options.commitsAhead}
-      />
-    );
+    gitDiffPanelNode = null;
   }
 
-  const gitDiffViewerNode = (
-    <GitDiffViewer
-      diffs={options.gitDiffs}
-      selectedPath={options.selectedDiffPath}
-      scrollRequestId={options.diffScrollRequestId}
-      isLoading={options.gitDiffLoading}
-      error={options.gitDiffError}
-      diffStyle={options.gitDiffViewStyle}
-      ignoreWhitespaceChanges={options.gitDiffIgnoreWhitespaceChanges}
-      pullRequest={options.selectedPullRequest}
-      pullRequestComments={options.selectedPullRequestComments}
-      pullRequestCommentsLoading={options.selectedPullRequestCommentsLoading}
-      pullRequestCommentsError={options.selectedPullRequestCommentsError}
-      canRevert={options.diffSource === "local"}
-      onRevertFile={options.onRevertGitFile}
-      onActivePathChange={options.onDiffActivePathChange}
-    />
-  );
+  const gitDiffViewerNode = null;
 
   const planPanelNode = <PlanPanel plan={options.plan} isProcessing={options.isProcessing} />;
 
@@ -935,6 +828,9 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       isOpen={options.debugOpen}
       onClear={options.onClearDebug}
       onCopy={options.onCopyDebug}
+      viewMode={options.debugViewMode}
+      onViewModeChange={options.onDebugViewModeChange}
+      language={options.language}
       onResizeStart={options.onResizeDebug}
     />
   );
@@ -945,6 +841,9 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       isOpen
       onClear={options.onClearDebug}
       onCopy={options.onCopyDebug}
+      viewMode={options.debugViewMode}
+      onViewModeChange={options.onDebugViewModeChange}
+      language={options.language}
       variant="full"
     />
   );
@@ -962,7 +861,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
   const compactEmptyGitNode = (
     <div className="compact-empty">
       <h3>No workspace selected</h3>
-      <p>Select a project to inspect diffs.</p>
+      <p>Select a project to browse files.</p>
       <button className="ghost" onClick={options.onGoProjects}>
         Go to Projects
       </button>
@@ -975,7 +874,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
         {options.language === "zh" ? "返回" : "Back"}
       </button>
       <span className="workspace-title">
-        {options.language === "zh" ? "差异" : "Diff"}
+        {options.language === "zh" ? "文件" : "Files"}
       </span>
     </div>
   );

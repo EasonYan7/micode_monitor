@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DebugEntry } from "../../../types";
+import type { DebugEntry, UiLanguage } from "../../../types";
 import { appendDebugLogs, type PersistedDebugEntry } from "../../../services/tauri";
+import { formatDebugEntriesForCopy, type DebugViewMode } from "../../../utils/debugEntries";
 
 const MAX_DEBUG_ENTRIES = 200;
 const MAX_PENDING_PERSIST_ENTRIES = 5000;
@@ -23,11 +24,12 @@ function tryExtractWorkspaceId(payload: unknown): string | null {
   return null;
 }
 
-export function useDebugLog() {
+export function useDebugLog(language?: UiLanguage) {
   const [debugOpen, setDebugOpenState] = useState(false);
   const [debugEntries, setDebugEntries] = useState<DebugEntry[]>([]);
   const [hasDebugAlerts, setHasDebugAlerts] = useState(false);
   const [debugPinned, setDebugPinned] = useState(false);
+  const [debugViewMode, setDebugViewMode] = useState<DebugViewMode>("compact");
   const pendingPersistRef = useRef<PersistedDebugEntry[]>([]);
   const persistingRef = useRef(false);
 
@@ -126,24 +128,11 @@ export function useDebugLog() {
   );
 
   const handleCopyDebug = useCallback(async () => {
-    const text = debugEntries
-      .map((entry) => {
-        const timestamp = new Date(entry.timestamp).toLocaleTimeString();
-        const payload =
-          entry.payload !== undefined
-            ? typeof entry.payload === "string"
-              ? entry.payload
-              : JSON.stringify(entry.payload, null, 2)
-            : "";
-        return [entry.source.toUpperCase(), timestamp, entry.label, payload]
-          .filter(Boolean)
-          .join("\n");
-      })
-      .join("\n\n");
+    const text = formatDebugEntriesForCopy(debugEntries, debugViewMode, language);
     if (text) {
       await navigator.clipboard.writeText(text);
     }
-  }, [debugEntries]);
+  }, [debugEntries, debugViewMode, language]);
 
   const clearDebugEntries = useCallback(() => {
     setDebugEntries([]);
@@ -169,6 +158,8 @@ export function useDebugLog() {
     debugOpen,
     setDebugOpen,
     debugEntries,
+    debugViewMode,
+    setDebugViewMode,
     hasDebugAlerts,
     showDebugButton,
     addDebugEntry,

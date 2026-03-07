@@ -1,12 +1,21 @@
 import { useMemo, useRef } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import type { DebugEntry } from "../../../types";
+import type { DebugEntry, UiLanguage } from "../../../types";
+import {
+  buildCompactDebugEntries,
+  getDebugPanelLabels,
+  type CompactDebugEntry,
+  type DebugViewMode,
+} from "../../../utils/debugEntries";
 
 type DebugPanelProps = {
   entries: DebugEntry[];
   isOpen: boolean;
   onClear: () => void;
   onCopy: () => void;
+  viewMode: DebugViewMode;
+  onViewModeChange: (mode: DebugViewMode) => void;
+  language?: UiLanguage;
   onResizeStart?: (event: ReactMouseEvent) => void;
   variant?: "dock" | "full";
 };
@@ -30,10 +39,14 @@ export function DebugPanel({
   isOpen,
   onClear,
   onCopy,
+  viewMode,
+  onViewModeChange,
+  language,
   onResizeStart,
   variant = "dock",
 }: DebugPanelProps) {
   const isVisible = variant === "full" || isOpen;
+  const labels = getDebugPanelLabels(language);
 
   type FormattedDebugEntry = DebugEntry & {
     timeLabel: string;
@@ -83,6 +96,13 @@ export function DebugPanel({
     return nextFormatted;
   }, [entries, isVisible]);
 
+  const compactEntries = useMemo<CompactDebugEntry[]>(() => {
+    if (!isVisible) {
+      return [];
+    }
+    return buildCompactDebugEntries(entries, language);
+  }, [entries, isVisible, language]);
+
   if (!isVisible) {
     return null;
   }
@@ -101,7 +121,27 @@ export function DebugPanel({
         />
       ) : null}
       <div className="debug-header">
-        <div className="debug-title">Debug</div>
+        <div className="debug-heading">
+          <div className="debug-title">Debug</div>
+          <div className="debug-mode-tabs" role="tablist" aria-label="Debug view mode">
+            <button
+              className={`debug-mode-tab ${viewMode === "compact" ? "active" : ""}`}
+              onClick={() => onViewModeChange("compact")}
+              role="tab"
+              aria-selected={viewMode === "compact"}
+            >
+              {labels.compactTab}
+            </button>
+            <button
+              className={`debug-mode-tab ${viewMode === "detail" ? "active" : ""}`}
+              onClick={() => onViewModeChange("detail")}
+              role="tab"
+              aria-selected={viewMode === "detail"}
+            >
+              {labels.detailTab}
+            </button>
+          </div>
+        </div>
         <div className="debug-actions">
           <button className="ghost" onClick={onCopy}>
             Copy
@@ -113,23 +153,56 @@ export function DebugPanel({
       </div>
       {isOpen ? (
         <div className="debug-list">
-          {formattedEntries.length === 0 ? (
-            <div className="debug-empty">No debug events yet.</div>
-          ) : null}
-          {formattedEntries.map((entry) => (
-            <div key={entry.id} className="debug-row">
-              <div className="debug-meta">
-                <span className={`debug-source ${entry.source}`}>
-                  {entry.source}
-                </span>
-                <span className="debug-time">{entry.timeLabel}</span>
-                <span className="debug-label">{entry.label}</span>
-              </div>
-              {entry.payloadText !== undefined ? (
-                <pre className="debug-payload">{entry.payloadText}</pre>
-              ) : null}
+          {viewMode === "detail" ? (
+            <div className="debug-note">
+              {labels.detailNote}
             </div>
-          ))}
+          ) : (
+            <div className="debug-note">
+              {labels.compactNote}
+            </div>
+          )}
+          {viewMode === "detail" && formattedEntries.length === 0 ? (
+            <div className="debug-empty">{labels.noDetail}</div>
+          ) : null}
+          {viewMode === "compact" && compactEntries.length === 0 ? (
+            <div className="debug-empty">{labels.noCompact}</div>
+          ) : null}
+          {viewMode === "detail"
+            ? formattedEntries.map((entry) => (
+                <div key={entry.id} className="debug-row">
+                  <div className="debug-meta">
+                    <span className={`debug-source ${entry.source}`}>
+                      {entry.source}
+                    </span>
+                    <span className="debug-time">{entry.timeLabel}</span>
+                    <span className="debug-label">{entry.label}</span>
+                  </div>
+                  {entry.payloadText !== undefined ? (
+                    <pre className="debug-payload">{entry.payloadText}</pre>
+                  ) : null}
+                </div>
+              ))
+            : compactEntries.map((entry) => (
+                <div
+                  key={entry.id}
+                  className={`debug-row debug-row-compact ${entry.category}`}
+                >
+                  <div className="debug-meta">
+                    <span className={`debug-source ${entry.source}`}>
+                      {entry.category}
+                    </span>
+                    <span className="debug-time">
+                      {new Date(entry.timestamp).toLocaleTimeString()}
+                    </span>
+                    <span className="debug-label">{entry.title}</span>
+                  </div>
+                  <div className="debug-compact-summary">{entry.summary}</div>
+                  {entry.detail ? (
+                    <pre className="debug-payload">{entry.detail}</pre>
+                  ) : null}
+                </div>
+              ))}
         </div>
       ) : null}
     </section>

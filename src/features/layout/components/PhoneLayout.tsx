@@ -7,17 +7,14 @@ type PhoneLayoutProps = {
   errorToastsNode: ReactNode;
   tabBarNode: ReactNode;
   sidebarNode: ReactNode;
-  activeTab: "projects" | "micode" | "git" | "log";
+  activeTab: "projects" | "micode" | "files" | "log";
   activeWorkspace: boolean;
-  showGitDetail: boolean;
   compactEmptyMiCodeNode: ReactNode;
   compactEmptyGitNode: ReactNode;
-  compactGitBackNode: ReactNode;
   topbarLeftNode: ReactNode;
   messagesNode: ReactNode;
   composerNode: ReactNode;
   gitDiffPanelNode: ReactNode;
-  gitDiffViewerNode: ReactNode;
   debugPanelNode: ReactNode;
 };
 
@@ -29,15 +26,12 @@ export function PhoneLayout({
   sidebarNode,
   activeTab,
   activeWorkspace,
-  showGitDetail,
   compactEmptyMiCodeNode,
   compactEmptyGitNode,
-  compactGitBackNode,
   topbarLeftNode,
   messagesNode,
   composerNode,
   gitDiffPanelNode,
-  gitDiffViewerNode,
   debugPanelNode,
 }: PhoneLayoutProps) {
   return (
@@ -59,16 +53,10 @@ export function PhoneLayout({
           )}
         </div>
       )}
-      {activeTab === "git" && (
+      {activeTab === "files" && (
         <div className="compact-panel">
           {!activeWorkspace && compactEmptyGitNode}
-          {activeWorkspace && showGitDetail && (
-            <>
-              {compactGitBackNode}
-              <div className="compact-git-viewer">{gitDiffViewerNode}</div>
-            </>
-          )}
-          {activeWorkspace && !showGitDetail && (
+          {activeWorkspace && (
             <>
               <MainTopbar leftNode={topbarLeftNode} className="compact-topbar" />
               <div className="compact-git">

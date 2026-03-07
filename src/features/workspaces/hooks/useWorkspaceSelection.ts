@@ -5,7 +5,7 @@ type UseWorkspaceSelectionOptions = {
   workspaces: WorkspaceInfo[];
   isCompact: boolean;
   activeWorkspaceId: string | null;
-  setActiveTab: (tab: "projects" | "micode" | "git" | "log") => void;
+  setActiveTab: (tab: "projects" | "micode" | "files" | "log") => void;
   setActiveWorkspaceId: (workspaceId: string | null) => void;
   updateWorkspaceSettings: (
     workspaceId: string,
