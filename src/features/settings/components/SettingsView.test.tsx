@@ -103,6 +103,7 @@ const baseSettings: AppSettings = {
     },
   ],
   selectedOpenAppId: "vscode",
+  startupEnvironmentGateCompleted: false,
 };
 
 const createDoctorResult = () => ({

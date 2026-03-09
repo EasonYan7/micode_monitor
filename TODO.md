@@ -68,6 +68,9 @@
 - [x] Compact startup environment gate for height-constrained screens and surface install-action errors near the progress summary
 - [x] Change startup gate behavior to first-pass blocking only, then default to direct app entry on later launches while keeping install-time recheck logic
 - [x] Refresh Windows dependency rechecks from the latest user/machine PATH so newly installed Python/Node can be detected without restarting the app
+- [x] Only show Python/Node auto-install actions when Windows actually has `winget` or `choco`, and switch missing-package-manager cases to explicit manual install guidance
+- [x] Hide optional developer-only checks like `MSVC linker` from the user-facing startup environment gate
+- [x] Stop spawning visible console windows during Windows startup checks by hiding `where`-based dependency probes and removing `MSVC linker` from startup-time diagnostics
 - [x] Enforce slash command-only send path: slash-prefixed input is never forwarded to AI text prompt; `/mcp *` always runs local MCP handler
 - [x] Keep Token terminology untranslated in Chinese UI (replace 鈥滀唬甯佲€?labels with 鈥淭oken鈥?
 - [x] Hide composer "Default" controls: remove collaboration selector when only default mode exists and hide thinking selector when no reasoning options
@@ -78,6 +81,7 @@
 - [x] Resolve frontend TypeScript baseline errors so `npm run typecheck` passes again
 - [x] Add sidebar workspace action: clear project conversation history with confirm dialog, and wipe local history cache (`.micodemonitor` + global `~/.micode|~/.codex/tmp`)
 - [x] Split README into standalone EN/CN versions (`README.md` + `README.zh-CN.md`) with language switch links and MiCode install guide
+- [x] Persist startup environment gate completion in `settings.json` so packaged app restarts do not reopen the detection gate after it already passed
 - [x] Update README install section with official MiCode one-click install commands (macOS/Linux and Windows)
 - [x] Sync EN/CN README sections describing feature removals and behavior changes from original CodexMonitor
 - [x] Update About panel branding/links (remove Twitter, point GitHub to EasonYan7/micode_monitor, update footer credit)

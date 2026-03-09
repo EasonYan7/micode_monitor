@@ -9,10 +9,12 @@ import {
   environmentInstallDependency,
   environmentRetryCheck,
   getAppSettings,
+  updateAppSettings,
 } from "../../../services/tauri";
 
 vi.mock("../../../services/tauri", () => ({
   getAppSettings: vi.fn(),
+  updateAppSettings: vi.fn(),
   environmentCheckStartup: vi.fn(),
   environmentGetCachedStatus: vi.fn(),
   environmentInstallDependency: vi.fn(),
@@ -20,6 +22,7 @@ vi.mock("../../../services/tauri", () => ({
 }));
 
 const getAppSettingsMock = vi.mocked(getAppSettings);
+const updateAppSettingsMock = vi.mocked(updateAppSettings);
 const environmentCheckStartupMock = vi.mocked(environmentCheckStartup);
 const environmentGetCachedStatusMock = vi.mocked(environmentGetCachedStatus);
 const environmentInstallDependencyMock = vi.mocked(environmentInstallDependency);
@@ -92,7 +95,9 @@ describe("StartupEnvironmentGate", () => {
       micodeBin: null,
       agentArgs: null,
       micodeArgs: null,
+      startupEnvironmentGateCompleted: false,
     } as AppSettings);
+    updateAppSettingsMock.mockImplementation(async (settings) => settings);
     environmentGetCachedStatusMock.mockResolvedValue(null);
     environmentRetryCheckMock.mockResolvedValue(buildStatus());
   });
@@ -118,6 +123,33 @@ describe("StartupEnvironmentGate", () => {
       { timeout: 3000 },
     );
     expect(environmentInstallDependencyMock).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(updateAppSettingsMock).toHaveBeenCalledWith(
+        expect.objectContaining({ startupEnvironmentGateCompleted: true }),
+      );
+    });
+  });
+
+  it("skips startup checks after the gate was already completed in app settings", async () => {
+    getAppSettingsMock.mockResolvedValue({
+      language: "zh",
+      agentBin: null,
+      micodeBin: null,
+      agentArgs: null,
+      micodeArgs: null,
+      startupEnvironmentGateCompleted: true,
+    } as AppSettings);
+
+    render(
+      <StartupEnvironmentGate>
+        <div>app ready</div>
+      </StartupEnvironmentGate>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("app ready")).toBeTruthy();
+    });
+    expect(environmentCheckStartupMock).not.toHaveBeenCalled();
   });
 
   it("auto-installs a missing dependency before rendering children", async () => {
@@ -159,7 +191,7 @@ describe("StartupEnvironmentGate", () => {
     );
   });
 
-  it("shows optional development hints without blocking the app", async () => {
+  it("keeps optional development hints out of the startup gate", async () => {
     environmentCheckStartupMock.mockResolvedValue(
       buildStatus({
         checks: [
@@ -191,6 +223,7 @@ describe("StartupEnvironmentGate", () => {
       },
       { timeout: 3000 },
     );
+    expect(screen.queryByText("MSVC linker")).toBeNull();
   });
 
   it("skips the gate after one successful completion was already recorded", async () => {

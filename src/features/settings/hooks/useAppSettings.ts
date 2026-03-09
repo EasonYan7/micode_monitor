@@ -86,6 +86,7 @@ const defaultSettings: AppSettings = {
   workspaceGroups: [],
   openAppTargets: DEFAULT_OPEN_APP_TARGETS,
   selectedOpenAppId: DEFAULT_OPEN_APP_ID,
+  startupEnvironmentGateCompleted: false,
 };
 
 function readDisplaySettingsFallback(): Partial<DisplaySettingsFallback> {

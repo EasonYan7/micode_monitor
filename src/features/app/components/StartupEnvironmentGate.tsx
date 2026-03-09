@@ -6,6 +6,7 @@ import {
   environmentInstallDependency,
   environmentRetryCheck,
   getAppSettings,
+  updateAppSettings,
 } from "../../../services/tauri";
 import type {
   AppSettings,
@@ -37,9 +38,8 @@ const REQUIRED_CHECKS = [
   { id: "appServer", label: "ACP app-server" },
   { id: "python", label: "Python" },
 ] as const;
-const REQUIRED_CHECK_IDS = new Set<string>(REQUIRED_CHECKS.map((check) => check.id));
 
-function hasCompletedStartupGate() {
+function hasCompletedStartupGateLocally() {
   try {
     return window.localStorage.getItem(STARTUP_GATE_COMPLETED_KEY) === "1";
   } catch {
@@ -107,6 +107,7 @@ export function StartupEnvironmentGate({
   const activeRunRef = useRef(0);
   const loadingStartedRef = useRef(false);
   const autoCheckStartedRef = useRef(false);
+  const appSettingsRef = useRef<AppSettings | null>(null);
   const settingsRef = useRef<
     Pick<AppSettings, "agentBin" | "micodeBin" | "agentArgs" | "micodeArgs">
   >({
@@ -137,6 +138,39 @@ export function StartupEnvironmentGate({
   const micodeBin = settingsRef.current.agentBin ?? settingsRef.current.micodeBin ?? null;
   const micodeArgs = settingsRef.current.agentArgs ?? settingsRef.current.micodeArgs ?? null;
 
+  const hasCompletedStartupGate = useCallback(() => {
+    return Boolean(appSettingsRef.current?.startupEnvironmentGateCompleted) ||
+      hasCompletedStartupGateLocally();
+  }, []);
+
+  const persistStartupGateCompleted = useCallback(async () => {
+    markStartupGateCompleted();
+
+    let currentSettings = appSettingsRef.current;
+    if (!currentSettings) {
+      try {
+        currentSettings = await getAppSettings();
+        appSettingsRef.current = currentSettings;
+      } catch {
+        return;
+      }
+    }
+
+    if (currentSettings.startupEnvironmentGateCompleted) {
+      return;
+    }
+
+    try {
+      const savedSettings = await updateAppSettings({
+        ...currentSettings,
+        startupEnvironmentGateCompleted: true,
+      });
+      appSettingsRef.current = savedSettings;
+    } catch {
+      // Best-effort persistence. localStorage still covers the current session if this save fails.
+    }
+  }, []);
+
   const driveFlow = useCallback(
     async (
       nextStatus: StartupEnvironmentStatus,
@@ -151,7 +185,7 @@ export function StartupEnvironmentGate({
       setActionError(null);
 
       if (nextStatus.canProceed) {
-        markStartupGateCompleted();
+        void persistStartupGateCompleted();
         setBusyDependencyId(null);
         setPhase("finishing");
         markStatusNote(
@@ -211,7 +245,7 @@ export function StartupEnvironmentGate({
       }
       setPhase("manual_action_required");
     },
-    [markStatusNote, micodeArgs, micodeBin],
+    [markStatusNote, micodeArgs, micodeBin, persistStartupGateCompleted],
   );
 
   const runStartupCheck = useCallback(
@@ -318,6 +352,7 @@ export function StartupEnvironmentGate({
           ? appSettings.language
           : DEFAULT_LANGUAGE;
       setLanguage(nextLanguage);
+      appSettingsRef.current = appSettings;
       settingsRef.current = {
         agentBin: appSettings?.agentBin ?? appSettings?.micodeBin ?? null,
         micodeBin: appSettings?.micodeBin ?? appSettings?.agentBin ?? null,
@@ -335,7 +370,7 @@ export function StartupEnvironmentGate({
       }
 
       if (cachedStatus?.canProceed) {
-        markStartupGateCompleted();
+        void persistStartupGateCompleted();
         setPhase("ready");
         return;
       }
@@ -350,7 +385,7 @@ export function StartupEnvironmentGate({
       window.clearTimeout(autoStartTimer);
       activeRunRef.current += 1;
     };
-  }, [runStartupCheck]);
+  }, [hasCompletedStartupGate, persistStartupGateCompleted, runStartupCheck]);
 
   const blockingCheck = useMemo(() => firstBlockingCheck(status), [status]);
   const displayChecks = useMemo(() => {
@@ -382,10 +417,7 @@ export function StartupEnvironmentGate({
         canAutoInstall: false,
       } satisfies StartupEnvironmentCheck;
     });
-    const additionalChecks = (status?.checks ?? []).filter(
-      (check) => !REQUIRED_CHECK_IDS.has(check.id),
-    );
-    return [...requiredChecks, ...additionalChecks];
+    return requiredChecks;
   }, [busyDependencyId, phase, status?.checks, t]);
 
   const completedChecks = displayChecks.filter((check) => isCheckReady(check)).length;

@@ -23,7 +23,7 @@ use crate::backend::events::AppServerEvent;
 use crate::event_sink::TauriEventSink;
 use crate::remote_backend;
 use crate::shared::{micode_core, workspaces_core};
-use crate::shared::process_core::tokio_command;
+use crate::shared::process_core::{std_command, tokio_command};
 use crate::state::AppState;
 use crate::types::{StartupEnvironmentCheck, StartupEnvironmentStatus, WorkspaceEntry};
 
@@ -166,25 +166,6 @@ fn ready_check(
     }
 }
 
-fn ready_optional_check(
-    id: &str,
-    label: &str,
-    version: Option<String>,
-    summary: String,
-) -> StartupEnvironmentCheck {
-    StartupEnvironmentCheck {
-        id: id.to_string(),
-        label: label.to_string(),
-        required: false,
-        status: "ready".to_string(),
-        detected_version: version,
-        summary,
-        technical_details: None,
-        recommended_action: None,
-        can_auto_install: false,
-    }
-}
-
 fn failed_check(
     id: &str,
     label: &str,
@@ -197,27 +178,6 @@ fn failed_check(
         id: id.to_string(),
         label: label.to_string(),
         required: true,
-        status: "failed".to_string(),
-        detected_version: None,
-        summary,
-        technical_details,
-        recommended_action,
-        can_auto_install,
-    }
-}
-
-fn failed_optional_check(
-    id: &str,
-    label: &str,
-    summary: String,
-    technical_details: Option<String>,
-    recommended_action: Option<String>,
-    can_auto_install: bool,
-) -> StartupEnvironmentCheck {
-    StartupEnvironmentCheck {
-        id: id.to_string(),
-        label: label.to_string(),
-        required: false,
         status: "failed".to_string(),
         detected_version: None,
         summary,
@@ -291,6 +251,7 @@ async fn run_version_probe(program: &str, args: &[&str], path_env: Option<&str>)
     }
 }
 
+#[allow(dead_code)]
 fn node_recommended_action() -> Option<String> {
     Some(if cfg!(windows) {
         "财多多需要先准备好 Node.js，才能启动 MiCode CLI。你可以使用自动安装按钮，或手动安装 Node.js 后再重试。".to_string()
@@ -307,12 +268,50 @@ fn micode_recommended_action() -> Option<String> {
     })
 }
 
+#[allow(dead_code)]
 fn python_recommended_action(store_alias: bool) -> Option<String> {
     Some(if cfg!(windows) {
         if store_alias {
             "Windows only found the Microsoft Store Python alias, which cannot run your tasks reliably. Use the automatic install button to install the real Python runtime, then retry.".to_string()
         } else {
             "Python is required before tasks that run Python scripts can start. Use the automatic install button, or install Python manually, then retry.".to_string()
+        }
+    } else {
+        "Install Python and make sure `python3 --version` works in Terminal, then retry.".to_string()
+    })
+}
+
+fn windows_package_manager_available() -> bool {
+    cfg!(windows) && (command_exists("winget") || command_exists("choco"))
+}
+
+fn node_recommended_action_for_availability(auto_install_available: bool) -> Option<String> {
+    Some(if cfg!(windows) {
+        if auto_install_available {
+            "Node.js is required before MiCode CLI can start. Use the automatic install button, or install Node.js manually, then retry.".to_string()
+        } else {
+            "Node.js is required before MiCode CLI can start. This PC does not have winget or choco, so install Node.js manually and make sure `node --version` works in PowerShell, then retry.".to_string()
+        }
+    } else {
+        "Install Node.js and make sure `node --version` works in Terminal, then retry.".to_string()
+    })
+}
+
+fn python_recommended_action_for_availability(
+    store_alias: bool,
+    auto_install_available: bool,
+) -> Option<String> {
+    Some(if cfg!(windows) {
+        if store_alias {
+            if auto_install_available {
+                "Windows only found the Microsoft Store Python alias, which cannot run your tasks reliably. Use the automatic install button to install the real Python runtime, then retry.".to_string()
+            } else {
+                "Windows only found the Microsoft Store Python alias, which cannot run your tasks reliably. This PC does not have winget or choco, so install the real Python runtime manually, enable Add Python to PATH, then retry.".to_string()
+            }
+        } else if auto_install_available {
+            "Python is required before tasks that run Python scripts can start. Use the automatic install button, or install Python manually, then retry.".to_string()
+        } else {
+            "Python is required before tasks that run Python scripts can start. This PC does not have winget or choco, so install Python manually, enable Add Python to PATH, then retry.".to_string()
         }
     } else {
         "Install Python and make sure `python3 --version` works in Terminal, then retry.".to_string()
@@ -358,6 +357,7 @@ fn is_windows_store_python_detail(detail: &str) -> bool {
 }
 
 async fn check_node_dependency(path_env: Option<String>) -> StartupEnvironmentCheck {
+    let auto_install_available = windows_package_manager_available();
     match run_version_probe("node", &["--version"], path_env.as_deref()).await {
         Ok(version) => ready_check(
             "node",
@@ -370,8 +370,8 @@ async fn check_node_dependency(path_env: Option<String>) -> StartupEnvironmentCh
             "Node.js",
             "Node.js 缺失或无法启动，因此财多多无法启动 MiCode CLI。".to_string(),
             Some(detail),
-            node_recommended_action(),
-            cfg!(windows),
+            node_recommended_action_for_availability(auto_install_available),
+            auto_install_available,
         ),
     }
 }
@@ -449,6 +449,7 @@ async fn check_app_server_dependency(
 }
 
 async fn check_python_dependency(path_env: Option<String>) -> StartupEnvironmentCheck {
+    let auto_install_available = windows_package_manager_available();
     let candidates: [(&str, [&str; 2]); 3] = [
         ("python", ["--version", ""]),
         ("py", ["-3", "--version"]),
@@ -497,37 +498,9 @@ async fn check_python_dependency(path_env: Option<String>) -> StartupEnvironment
             "Python is missing or cannot start, so Python-based tasks would fail.".to_string()
         },
         Some(detail),
-        python_recommended_action(store_alias),
-        cfg!(windows),
+        python_recommended_action_for_availability(store_alias, auto_install_available),
+        auto_install_available,
     )
-}
-
-async fn check_msvc_linker_dependency() -> Option<StartupEnvironmentCheck> {
-    #[cfg(not(target_os = "windows"))]
-    {
-        None
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        if command_exists("link") {
-            Some(ready_optional_check(
-                "msvcLinker",
-                "MSVC linker",
-                None,
-                "Windows C++ linker (link.exe) is available for local Rust/Tauri builds.".to_string(),
-            ))
-        } else {
-            Some(failed_optional_check(
-                "msvcLinker",
-                "MSVC linker",
-                "Windows build tools are incomplete in this shell. Local `cargo` / `tauri dev` builds may fail because `link.exe` is missing.".to_string(),
-                Some("Run `where link` in PowerShell. If nothing is returned, install Visual Studio Build Tools 2022 with the Desktop development with C++ workload, then reopen PowerShell.".to_string()),
-                Some("Install Visual Studio Build Tools 2022 and include Desktop development with C++. VS Code alone is not enough for Rust MSVC builds.".to_string()),
-                false,
-            ))
-        }
-    }
 }
 
 async fn environment_check_startup_inner(
@@ -545,11 +518,7 @@ async fn environment_check_startup_inner(
         check_app_server_dependency(resolved_bin.clone(), resolved_args.clone(), is_ready(&micode))
             .await;
     let python = check_python_dependency(path_env).await;
-    let mut checks = vec![node, micode, app_server, python];
-    if let Some(msvc_linker) = check_msvc_linker_dependency().await {
-        checks.push(msvc_linker);
-    }
-
+    let checks = vec![node, micode, app_server, python];
     build_startup_environment_status(checks, resolved_bin, resolved_args)
 }
 
@@ -559,7 +528,7 @@ fn install_error(message: &str) -> String {
 
 fn command_exists(program: &str) -> bool {
     let checker = if cfg!(windows) { "where" } else { "which" };
-    std::process::Command::new(checker)
+    std_command(checker)
         .arg(program)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -1950,6 +1919,7 @@ fn sanitize_run_worktree_name(value: &str) -> String {
 mod tests {
     use super::{
         build_startup_environment_status, failed_check, is_windows_store_python_detail,
+        node_recommended_action_for_availability, python_recommended_action_for_availability,
         ready_check, summarize_acp_error,
     };
 
@@ -1993,5 +1963,19 @@ mod tests {
             summarize_acp_error("PowerShell blocked execution because of ExecutionPolicy");
         assert!(summary.contains("PowerShell"));
         assert!(action.unwrap_or_default().contains("RemoteSigned"));
+    }
+
+    #[test]
+    fn python_manual_action_mentions_manual_install_when_auto_install_is_unavailable() {
+        let action = python_recommended_action_for_availability(true, false).unwrap_or_default();
+        assert!(action.contains("install the real Python runtime manually"));
+        assert!(action.contains("Add Python to PATH"));
+    }
+
+    #[test]
+    fn node_manual_action_mentions_manual_install_when_auto_install_is_unavailable() {
+        let action = node_recommended_action_for_availability(false).unwrap_or_default();
+        assert!(action.contains("install Node.js manually"));
+        assert!(action.contains("node --version"));
     }
 }
