@@ -148,6 +148,7 @@ fn managed_install_roots(
     let mut roots = Vec::new();
     if let Some(root) = local_app_data {
         roots.push(PathBuf::from(root).join("Programs"));
+        roots.push(PathBuf::from(root));
     }
     if let Some(root) = program_files {
         roots.push(PathBuf::from(root));
@@ -167,6 +168,21 @@ fn looks_like_same_executable(path: &Path, file_name: &str, current_path: &str) 
             .unwrap_or(false)
         && !normalize_windows_like_path(&path.to_string_lossy())
             .eq(&normalize_windows_like_path(current_path))
+}
+
+#[allow(dead_code)]
+fn has_windows_install_marker(executable_path: &Path) -> bool {
+    let Some(parent) = executable_path.parent() else {
+        return false;
+    };
+    [
+        "uninstall.exe",
+        "Uninstall.exe",
+        "unins000.exe",
+        "uninstall.dat",
+    ]
+    .iter()
+    .any(|name| parent.join(name).exists())
 }
 
 #[allow(dead_code)]
@@ -252,6 +268,14 @@ fn detect_windows_launch_mode(
         .any(|root| path_is_within_root(&normalized, root))
     {
         return LaunchMode::Installed;
+    }
+
+    if let Some(root) = local_app_data {
+        if path_is_within_root(&normalized, root)
+            && has_windows_install_marker(Path::new(executable_path))
+        {
+            return LaunchMode::Installed;
+        }
     }
 
     LaunchMode::Portable
@@ -378,6 +402,32 @@ mod tests {
     }
 
     #[test]
+    fn detect_windows_launch_mode_marks_local_appdata_install_root_as_installed() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("duration")
+            .as_nanos();
+        let root = env::temp_dir().join(format!("micode-updater-install-{unique}"));
+        let local_app_data = root.join("Local");
+        let installed_dir = local_app_data.join("财多多");
+        fs::create_dir_all(&installed_dir).expect("create installed dir");
+        let installed_exe = installed_dir.join("micode-monitor.exe");
+        fs::write(&installed_exe, b"stub").expect("write installed exe");
+        fs::write(installed_dir.join("uninstall.exe"), b"stub").expect("write uninstall exe");
+
+        let mode = detect_windows_launch_mode(
+            installed_exe.to_string_lossy().as_ref(),
+            Some(local_app_data.to_string_lossy().as_ref()),
+            Some(r"C:\Program Files"),
+            Some(r"C:\Program Files (x86)"),
+        );
+
+        assert_eq!(mode, LaunchMode::Installed);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
     fn find_installed_executable_prefers_managed_roots() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -386,6 +436,31 @@ mod tests {
         let root = env::temp_dir().join(format!("micode-updater-test-{unique}"));
         let local_app_data = root.join("Local");
         let installed_dir = local_app_data.join("Programs").join("Rich");
+        fs::create_dir_all(&installed_dir).expect("create installed dir");
+        let installed_exe = installed_dir.join("micode-monitor.exe");
+        fs::write(&installed_exe, b"stub").expect("write installed exe");
+
+        let found = find_installed_executable_path_with_env(
+            r"C:\Users\mi\Downloads\micode-monitor.exe",
+            Some(local_app_data.to_string_lossy().as_ref()),
+            None,
+            None,
+        );
+
+        assert_eq!(found, Some(installed_exe));
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn find_installed_executable_finds_local_appdata_install_root() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("duration")
+            .as_nanos();
+        let root = env::temp_dir().join(format!("micode-updater-appdata-{unique}"));
+        let local_app_data = root.join("Local");
+        let installed_dir = local_app_data.join("财多多");
         fs::create_dir_all(&installed_dir).expect("create installed dir");
         let installed_exe = installed_dir.join("micode-monitor.exe");
         fs::write(&installed_exe, b"stub").expect("write installed exe");

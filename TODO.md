@@ -134,6 +134,7 @@
 - [x] Detect Windows standalone/dev EXE launches in updater flow and redirect users to installer guidance so updates no longer loop back to the old binary
 - [x] Tighten compact log error classification so `server/*` events are not misread as errors, while keeping real `stderr` and warning alerts visible
 - [x] Remove obsolete xterm `copyOnSelect` option so `npm run build` / release typecheck passes with the current xterm typings
+- [x] Treat Windows installs under `%LOCALAPPDATA%\\<product>` with uninstall markers as managed installs, so updater no longer misclassifies installed Chinese-name builds as portable EXEs
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
