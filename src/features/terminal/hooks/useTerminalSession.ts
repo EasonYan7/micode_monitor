@@ -121,6 +121,7 @@ export function useTerminalSession({
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const inputDisposableRef = useRef<{ dispose: () => void } | null>(null);
+  const contextMenuHandlerRef = useRef<((e: MouseEvent) => void) | null>(null);
   const openedSessionsRef = useRef<Set<string>>(new Set());
   const outputBuffersRef = useRef<Map<string, string>>(new Map());
   const activeKeyRef = useRef<string | null>(null);
@@ -234,6 +235,10 @@ export function useTerminalSession({
     if (!isVisible) {
       inputDisposableRef.current?.dispose();
       inputDisposableRef.current = null;
+      if (contextMenuHandlerRef.current && containerRef.current) {
+        containerRef.current.removeEventListener('contextmenu', contextMenuHandlerRef.current);
+        contextMenuHandlerRef.current = null;
+      }
       if (terminalRef.current) {
         terminalRef.current.dispose();
         terminalRef.current = null;
@@ -252,6 +257,7 @@ export function useTerminalSession({
         allowTransparency: true,
         theme: appearance.theme,
         scrollback: 5000,
+        copyOnSelect: true,
       });
       const fitAddon = new FitAddon();
       terminal.loadAddon(fitAddon);
@@ -259,6 +265,33 @@ export function useTerminalSession({
       fitAddon.fit();
       terminalRef.current = terminal;
       fitAddonRef.current = fitAddon;
+
+      terminal.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+        if (event.type === 'keydown' && event.ctrlKey && event.shiftKey && event.key === 'V') {
+          void navigator.clipboard.readText().then((text) => terminal.paste(text)).catch(() => {});
+          return false;
+        }
+        if (event.type === 'keydown' && event.ctrlKey && !event.shiftKey && event.key === 'c') {
+          const sel = terminal.getSelection();
+          if (sel) {
+            void navigator.clipboard.writeText(sel);
+            return false;
+          }
+        }
+        return true;
+      });
+
+      const handleContextMenu = (e: MouseEvent) => {
+        e.preventDefault();
+        const sel = terminal.getSelection();
+        if (sel) {
+          void navigator.clipboard.writeText(sel);
+        } else {
+          void navigator.clipboard.readText().then((text) => terminal.paste(text)).catch(() => {});
+        }
+      };
+      containerRef.current.addEventListener('contextmenu', handleContextMenu);
+      contextMenuHandlerRef.current = handleContextMenu;
 
       inputDisposableRef.current = terminal.onData((data: string) => {
         const workspace = activeWorkspaceRef.current;
@@ -285,6 +318,10 @@ export function useTerminalSession({
     return () => {
       inputDisposableRef.current?.dispose();
       inputDisposableRef.current = null;
+      if (contextMenuHandlerRef.current && containerRef.current) {
+        containerRef.current.removeEventListener('contextmenu', contextMenuHandlerRef.current);
+        contextMenuHandlerRef.current = null;
+      }
       if (terminalRef.current) {
         terminalRef.current.dispose();
         terminalRef.current = null;
