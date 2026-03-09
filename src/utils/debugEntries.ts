@@ -203,6 +203,31 @@ function extractEventParam(payload: unknown, key: string): unknown {
   return params?.[key];
 }
 
+function extractEventMethod(payload: unknown): string {
+  const record = asRecord(payload);
+  const message = asRecord(record?.message);
+  return asString(message?.method ?? record?.method);
+}
+
+function isErrorLikeLabel(label: string): boolean {
+  return /(^|[\s/:_-])error($|[\s/:_-])/i.test(label.trim());
+}
+
+function isStderrEntry(entry: DebugEntry): boolean {
+  return (
+    entry.source === "stderr" ||
+    entry.label === "micode/stderr" ||
+    extractEventMethod(entry.payload) === "micode/stderr"
+  );
+}
+
+function extractErrorMessage(entry: DebugEntry): string {
+  if (isStderrEntry(entry)) {
+    return extractStderrMessage(entry.payload);
+  }
+  return asString(entry.payload);
+}
+
 function buildToolCompactEntry(
   entry: DebugEntry,
   item: Record<string, unknown>,
@@ -357,11 +382,10 @@ function buildCompactEntry(
 
   if (
     entry.source === "error" ||
-    entry.source === "stderr" ||
-    entry.label.endsWith(" error") ||
-    entry.label.includes("stderr")
+    isStderrEntry(entry) ||
+    isErrorLikeLabel(entry.label)
   ) {
-    const payload = extractStderrMessage(entry.payload);
+    const payload = extractErrorMessage(entry);
     return {
       id: `${entry.id}:error`,
       timestamp: entry.timestamp,

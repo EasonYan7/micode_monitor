@@ -452,6 +452,12 @@ export type LocalUsageSnapshot = {
   topModels: LocalUsageModel[];
 };
 
+export type UpdaterContext = {
+  executablePath: string;
+  isManagedInstall: boolean;
+  launchMode: "installed" | "portable" | "development" | "unknown";
+};
+
 export type TurnPlanStepStatus = "pending" | "inProgress" | "completed";
 
 export type TurnPlanStep = {

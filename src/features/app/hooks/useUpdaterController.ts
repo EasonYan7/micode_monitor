@@ -28,8 +28,13 @@ export function useUpdaterController({
   successSoundUrl,
   errorSoundUrl,
 }: Params) {
-  const { state: updaterState, startUpdate, dismiss: dismissUpdate, checkForUpdates } =
-    useUpdater({ onDebug });
+  const {
+    state: updaterState,
+    startUpdate,
+    dismiss: dismissUpdate,
+    checkForUpdates,
+    openLatestReleasePage,
+  } = useUpdater({ onDebug });
   const isWindowFocused = useWindowFocusState();
   const nextTestSoundIsError = useRef(false);
 
@@ -81,6 +86,7 @@ export function useUpdaterController({
     updaterState,
     startUpdate,
     dismissUpdate,
+    openLatestReleasePage,
     handleTestNotificationSound,
     handleTestSystemNotification,
   };

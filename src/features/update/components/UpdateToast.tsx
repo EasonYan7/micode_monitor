@@ -4,6 +4,7 @@ type UpdateToastProps = {
   state: UpdateState;
   onUpdate: () => void;
   onDismiss: () => void;
+  onOpenManualInstall: () => void;
 };
 
 function formatBytes(value: number) {
@@ -20,7 +21,12 @@ function formatBytes(value: number) {
   return `${size.toFixed(size >= 10 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
-export function UpdateToast({ state, onUpdate, onDismiss }: UpdateToastProps) {
+export function UpdateToast({
+  state,
+  onUpdate,
+  onDismiss,
+  onOpenManualInstall,
+}: UpdateToastProps) {
   if (state.stage === "idle") {
     return null;
   }
@@ -31,6 +37,9 @@ export function UpdateToast({ state, onUpdate, onDismiss }: UpdateToastProps) {
     totalBytes && totalBytes > 0
       ? Math.min(100, (downloadedBytes / totalBytes) * 100)
       : null;
+  const manualInstallRequired = Boolean(
+    state.updaterContext && !state.updaterContext.isManagedInstall,
+  );
 
   return (
     <div className="update-toasts" role="region" aria-live="polite">
@@ -46,13 +55,23 @@ export function UpdateToast({ state, onUpdate, onDismiss }: UpdateToastProps) {
         )}
         {state.stage === "available" && (
           <>
-            <div className="update-toast-body">A new version is available.</div>
+            <div className="update-toast-body">
+              {manualInstallRequired
+                ? "This copy was not started from the installed app, so auto-update would keep reopening the old EXE."
+                : "A new version is available."}
+            </div>
+            {manualInstallRequired && state.updaterContext?.executablePath ? (
+              <div className="update-toast-error">{state.updaterContext.executablePath}</div>
+            ) : null}
             <div className="update-toast-actions">
               <button className="secondary" onClick={onDismiss}>
-                Later
+                {manualInstallRequired ? "Dismiss" : "Later"}
               </button>
-              <button className="primary" onClick={onUpdate}>
-                Update
+              <button
+                className="primary"
+                onClick={manualInstallRequired ? onOpenManualInstall : onUpdate}
+              >
+                {manualInstallRequired ? "Open Downloads" : "Update"}
               </button>
             </div>
           </>
@@ -101,8 +120,11 @@ export function UpdateToast({ state, onUpdate, onDismiss }: UpdateToastProps) {
               <button className="secondary" onClick={onDismiss}>
                 Dismiss
               </button>
-              <button className="primary" onClick={onUpdate}>
-                Retry
+              <button
+                className="primary"
+                onClick={manualInstallRequired ? onOpenManualInstall : onUpdate}
+              >
+                {manualInstallRequired ? "Open Downloads" : "Retry"}
               </button>
             </div>
           </>

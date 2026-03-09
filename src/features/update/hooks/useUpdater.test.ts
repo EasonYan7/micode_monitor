@@ -2,7 +2,9 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { check } from "@tauri-apps/plugin-updater";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { getUpdaterContext } from "../../../services/tauri";
 import type { DebugEntry } from "../../../types";
 import { useUpdater } from "./useUpdater";
 
@@ -14,16 +16,31 @@ vi.mock("@tauri-apps/plugin-updater", () => ({
   check: vi.fn(),
 }));
 
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  openUrl: vi.fn(),
+}));
+
 vi.mock("@tauri-apps/plugin-process", () => ({
   relaunch: vi.fn(),
 }));
 
+vi.mock("../../../services/tauri", () => ({
+  getUpdaterContext: vi.fn(),
+}));
+
 const checkMock = vi.mocked(check);
+const openUrlMock = vi.mocked(openUrl);
 const relaunchMock = vi.mocked(relaunch);
+const getUpdaterContextMock = vi.mocked(getUpdaterContext);
 
 describe("useUpdater", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getUpdaterContextMock.mockResolvedValue({
+      executablePath: "C:\\Users\\mi\\AppData\\Local\\Programs\\Rich\\rich.exe",
+      isManagedInstall: true,
+      launchMode: "installed",
+    });
   });
 
   afterEach(() => {
@@ -114,6 +131,7 @@ describe("useUpdater", () => {
 
     expect(result.current.state.stage).toBe("available");
     expect(result.current.state.version).toBe("1.2.3");
+    expect(result.current.state.updaterContext?.isManagedInstall).toBe(true);
 
     await act(async () => {
       await result.current.startUpdate();
@@ -181,6 +199,49 @@ describe("useUpdater", () => {
         source: "error",
         payload: "download failed",
       } satisfies Partial<DebugEntry>),
+    );
+  });
+
+  it("blocks update install when current app is not an installed copy", async () => {
+    const close = vi.fn();
+    const downloadAndInstall = vi.fn();
+    getUpdaterContextMock.mockResolvedValue({
+      executablePath: "C:\\Users\\mi\\Downloads\\micode-monitor.exe",
+      isManagedInstall: false,
+      launchMode: "portable",
+    });
+    checkMock.mockResolvedValue({
+      version: "2.0.0",
+      downloadAndInstall,
+      close,
+    } as any);
+
+    const { result } = renderHook(() => useUpdater({}));
+
+    await act(async () => {
+      await result.current.startUpdate();
+    });
+
+    await act(async () => {
+      await result.current.startUpdate();
+    });
+
+    await waitFor(() => expect(result.current.state.stage).toBe("error"));
+    expect(result.current.state.error).toContain("Auto-update only replaces the installed app.");
+    expect(result.current.state.error).toContain("C:\\Users\\mi\\Downloads\\micode-monitor.exe");
+    expect(downloadAndInstall).not.toHaveBeenCalled();
+    expect(relaunchMock).not.toHaveBeenCalled();
+  });
+
+  it("opens the latest release page for manual install guidance", async () => {
+    const { result } = renderHook(() => useUpdater({}));
+
+    await act(async () => {
+      await result.current.openLatestReleasePage();
+    });
+
+    expect(openUrlMock).toHaveBeenCalledWith(
+      "https://github.com/EasonYan7/micode_monitor/releases/latest",
     );
   });
 });

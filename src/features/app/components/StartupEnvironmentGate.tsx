@@ -522,6 +522,9 @@ export function StartupEnvironmentGate({
                 {t(`Progress ${progressPercent}%`, `总进度 ${progressPercent}%`)}
               </div>
               {statusNote ? <div className="startup-gate-live-note">{statusNote}</div> : null}
+              {actionError ? (
+                <div className="startup-gate-inline-error">{actionError}</div>
+              ) : null}
               <div className="startup-gate-stage-steps">
                 {stageSteps.map((step) => (
                   <div
@@ -633,8 +636,6 @@ export function StartupEnvironmentGate({
                 );
               })}
             </div>
-
-            {actionError ? <div className="startup-gate-error">{actionError}</div> : null}
 
             <div className="startup-gate-actions">
               <button

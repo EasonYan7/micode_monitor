@@ -182,6 +182,7 @@ type LayoutNodesOptions = {
   workspaceOpeningToastNode?: ReactNode;
   onUpdate: () => void;
   onDismissUpdate: () => void;
+  onOpenManualInstall: () => void;
   errorToasts: ErrorToast[];
   onDismissErrorToast: (id: string) => void;
   latestAgentRuns: Array<{
@@ -660,6 +661,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
         state={options.updaterState}
         onUpdate={options.onUpdate}
         onDismiss={options.onDismissUpdate}
+        onOpenManualInstall={options.onOpenManualInstall}
       />
     </>
   );

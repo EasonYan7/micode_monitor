@@ -22,7 +22,7 @@ mod state;
 mod storage;
 mod terminal;
 mod types;
-mod utils;
+pub mod utils;
 mod window;
 mod workspaces;
 
@@ -161,7 +161,8 @@ pub fn run() {
             local_usage::local_usage_snapshot,
             debug_logs::append_debug_logs,
             notifications::is_macos_debug_build,
-            notifications::send_notification_fallback
+            notifications::send_notification_fallback,
+            utils::get_updater_context
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
