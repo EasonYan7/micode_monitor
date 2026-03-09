@@ -13,6 +13,13 @@ fn hide_console_on_windows(_command: &mut std::process::Command) {
     }
 }
 
+#[allow(dead_code)]
+pub(crate) fn std_command(program: impl AsRef<OsStr>) -> std::process::Command {
+    let mut command = std::process::Command::new(program);
+    hide_console_on_windows(&mut command);
+    command
+}
+
 pub(crate) fn tokio_command(program: impl AsRef<OsStr>) -> Command {
     let mut command = Command::new(program);
     hide_console_on_windows(command.as_std_mut());

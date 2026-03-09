@@ -8,6 +8,7 @@ use tauri::{AppHandle, Manager, State};
 use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
+use crate::shared::process_core::std_command;
 use super::files::{list_workspace_files_inner, read_workspace_file_inner, WorkspaceFileResponse};
 use super::git::{
     git_branch_exists, git_find_remote_for_branch, git_get_origin_url, git_remote_branch_exists,
@@ -131,7 +132,7 @@ fn spawn_with_app(
 #[cfg(target_os = "windows")]
 fn windows_resolve_command_on_path(candidates: &[&str]) -> Option<String> {
     for candidate in candidates {
-        let output = std::process::Command::new("where")
+        let output = std_command("where")
             .arg(candidate)
             .stdout(Stdio::piped())
             .stderr(Stdio::null())

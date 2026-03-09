@@ -578,6 +578,8 @@ pub(crate) struct AppSettings {
     pub(crate) open_app_targets: Vec<OpenAppTarget>,
     #[serde(default = "default_selected_open_app_id", rename = "selectedOpenAppId")]
     pub(crate) selected_open_app_id: String,
+    #[serde(default, rename = "startupEnvironmentGateCompleted")]
+    pub(crate) startup_environment_gate_completed: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -890,6 +892,7 @@ impl Default for AppSettings {
             workspace_groups: default_workspace_groups(),
             open_app_targets: default_open_app_targets(),
             selected_open_app_id: default_selected_open_app_id(),
+            startup_environment_gate_completed: false,
         }
     }
 }
@@ -991,6 +994,7 @@ mod tests {
         assert!(!settings.composer_code_block_copy_use_modifier);
         assert!(settings.workspace_groups.is_empty());
         assert_eq!(settings.selected_open_app_id, "system");
+        assert!(!settings.startup_environment_gate_completed);
         assert_eq!(settings.open_app_targets.len(), 3);
         assert_eq!(settings.open_app_targets[0].id, "system");
     }

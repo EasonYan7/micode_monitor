@@ -106,6 +106,7 @@ describe("tauri invoke wrappers", () => {
       agentArgs: "--profile team",
       micodeBin: "C:/legacy.cmd",
       micodeArgs: "--profile legacy",
+      startupEnvironmentGateCompleted: true,
     } as AppSettings);
 
     expect(invokeMock).toHaveBeenCalledWith("update_app_settings", {
@@ -113,6 +114,7 @@ describe("tauri invoke wrappers", () => {
         agentProvider: "micode-acp",
         agentBin: "C:/agent.cmd",
         agentArgs: "--profile team",
+        startupEnvironmentGateCompleted: true,
       }),
     });
     const payload = invokeMock.mock.calls[0]?.[1] as {

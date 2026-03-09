@@ -205,6 +205,7 @@ export type AppSettings = {
   workspaceGroups: WorkspaceGroup[];
   openAppTargets: OpenAppTarget[];
   selectedOpenAppId: string;
+  startupEnvironmentGateCompleted: boolean;
 };
 
 export type MiCodeDoctorResult = {
