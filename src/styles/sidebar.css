@@ -116,18 +116,14 @@
   max-width: 100%;
 }
 
-.sidebar-brand-mark {
+.sidebar-brand-logo {
   width: 32px;
   height: 32px;
   border-radius: 10px;
   flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #e4c567, #cfa13a);
-  color: #1d2613;
-  font-size: 18px;
-  font-weight: 700;
+  display: block;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .sidebar-brand-name {
