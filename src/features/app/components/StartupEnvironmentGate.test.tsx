@@ -103,6 +103,7 @@ describe("StartupEnvironmentGate", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     window.localStorage.clear();
     document.body.innerHTML = "";
   });
@@ -151,6 +152,38 @@ describe("StartupEnvironmentGate", () => {
     });
     expect(environmentCheckStartupMock).not.toHaveBeenCalled();
   });
+
+  it("does not auto-start checks while slow settings loading later confirms the gate was completed", async () => {
+    getAppSettingsMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => {
+            resolve({
+              language: "zh",
+              agentBin: null,
+              micodeBin: null,
+              agentArgs: null,
+              micodeArgs: null,
+              startupEnvironmentGateCompleted: true,
+            } as AppSettings);
+          }, 500);
+        }),
+    );
+
+    render(
+      <StartupEnvironmentGate>
+        <div>app ready</div>
+      </StartupEnvironmentGate>,
+    );
+
+    await new Promise((resolve) => window.setTimeout(resolve, 250));
+    expect(environmentCheckStartupMock).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(screen.getByText("app ready")).toBeTruthy();
+    }, { timeout: 2000 });
+    expect(environmentCheckStartupMock).not.toHaveBeenCalled();
+  }, 4000);
 
   it("auto-installs a missing dependency before rendering children", async () => {
     environmentCheckStartupMock.mockResolvedValue(

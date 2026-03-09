@@ -329,13 +329,7 @@ export function StartupEnvironmentGate({
     }
     loadingStartedRef.current = true;
     let canceled = false;
-
-    const autoStartTimer = window.setTimeout(() => {
-      if (canceled || autoCheckStartedRef.current) {
-        return;
-      }
-      void runStartupCheck("auto");
-    }, AUTO_START_DELAY_MS);
+    let autoStartTimer: number | null = null;
 
     void (async () => {
       const [appSettings, cachedStatus] = await Promise.all([
@@ -376,13 +370,20 @@ export function StartupEnvironmentGate({
       }
 
       if (!autoCheckStartedRef.current) {
-        void runStartupCheck("auto");
+        autoStartTimer = window.setTimeout(() => {
+          if (canceled || autoCheckStartedRef.current || hasCompletedStartupGate()) {
+            return;
+          }
+          void runStartupCheck("auto");
+        }, AUTO_START_DELAY_MS);
       }
     })();
 
     return () => {
       canceled = true;
-      window.clearTimeout(autoStartTimer);
+      if (autoStartTimer !== null) {
+        window.clearTimeout(autoStartTimer);
+      }
       activeRunRef.current += 1;
     };
   }, [hasCompletedStartupGate, persistStartupGateCompleted, runStartupCheck]);

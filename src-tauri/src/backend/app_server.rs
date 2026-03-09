@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use crate::backend::events::{AppServerEvent, EventSink};
 use crate::micode::args::apply_micode_args;
-use crate::shared::process_core::tokio_command;
+use crate::shared::process_core::{std_command, tokio_command};
 use crate::types::WorkspaceEntry;
 
 const ACP_PROTOCOL_VERSION: u32 = 1;
@@ -26,7 +26,7 @@ const ACP_INITIALIZE_TIMEOUT: Duration = Duration::from_secs(120);
 #[cfg(target_os = "windows")]
 fn read_windows_registry_path_segments() -> Vec<PathBuf> {
     let script = "[Environment]::GetEnvironmentVariable('Path','Machine'); Write-Output '---PATH-SPLIT---'; [Environment]::GetEnvironmentVariable('Path','User')";
-    let output = std::process::Command::new("powershell")
+    let output = std_command("powershell")
         .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())

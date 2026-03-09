@@ -3,7 +3,6 @@ import type { DebugEntry, UiLanguage } from "../../../types";
 import { appendDebugLogs, type PersistedDebugEntry } from "../../../services/tauri";
 import { formatDebugEntriesForCopy, type DebugViewMode } from "../../../utils/debugEntries";
 
-const MAX_DEBUG_ENTRIES = 200;
 const MAX_PENDING_PERSIST_ENTRIES = 5000;
 const PERSIST_INTERVAL_MS = 1000;
 const WARNING_PATTERN = /(^|[\s/:_-])warn(ing)?($|[\s/:_-])/i;
@@ -84,16 +83,6 @@ export function useDebugLog(language?: UiLanguage) {
     return false;
   }, []);
 
-  const shouldStoreEntry = useCallback(
-    (entry: DebugEntry) => {
-      if (debugOpen) {
-        return true;
-      }
-      return isAlertEntry(entry);
-    },
-    [debugOpen, isAlertEntry],
-  );
-
   const addDebugEntry = useCallback(
     (entry: DebugEntry) => {
       pendingPersistRef.current.push({
@@ -107,24 +96,21 @@ export function useDebugLog(language?: UiLanguage) {
       if (pendingPersistRef.current.length > MAX_PENDING_PERSIST_ENTRIES) {
         pendingPersistRef.current = pendingPersistRef.current.slice(-MAX_PENDING_PERSIST_ENTRIES);
       }
-      if (!shouldStoreEntry(entry)) {
-        return;
-      }
       if (isAlertEntry(entry)) {
         setHasDebugAlerts(true);
       }
       setDebugEntries((prev) => {
         const existingIndex = prev.findIndex((candidate) => candidate.id === entry.id);
         if (existingIndex === -1) {
-          return [...prev, entry].slice(-MAX_DEBUG_ENTRIES);
+          return [...prev, entry];
         }
         const next = [...prev];
         next.splice(existingIndex, 1);
         next.push(entry);
-        return next.slice(-MAX_DEBUG_ENTRIES);
+        return next;
       });
     },
-    [isAlertEntry, shouldStoreEntry],
+    [isAlertEntry],
   );
 
   const handleCopyDebug = useCallback(async () => {

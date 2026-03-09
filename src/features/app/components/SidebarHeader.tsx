@@ -30,7 +30,7 @@ export function SidebarHeader({
           title={isZh ? "财多多" : "Rich"}
           type="button"
         >
-          <span className="sidebar-brand-mark">{isZh ? "财" : "R"}</span>
+          <img className="sidebar-brand-logo" src="/app-icon.png" alt="" aria-hidden />
           <span className="sidebar-brand-name">{isZh ? "财多多" : "Rich"}</span>
         </button>
       </div>

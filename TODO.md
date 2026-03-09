@@ -71,6 +71,7 @@
 - [x] Only show Python/Node auto-install actions when Windows actually has `winget` or `choco`, and switch missing-package-manager cases to explicit manual install guidance
 - [x] Hide optional developer-only checks like `MSVC linker` from the user-facing startup environment gate
 - [x] Stop spawning visible console windows during Windows startup checks by hiding `where`-based dependency probes and removing `MSVC linker` from startup-time diagnostics
+- [x] Delay startup gate auto-check until completion state is loaded, so reopened apps skip the gate instead of racing into a fresh check
 - [x] Enforce slash command-only send path: slash-prefixed input is never forwarded to AI text prompt; `/mcp *` always runs local MCP handler
 - [x] Keep Token terminology untranslated in Chinese UI (replace 鈥滀唬甯佲€?labels with 鈥淭oken鈥?
 - [x] Hide composer "Default" controls: remove collaboration selector when only default mode exists and hide thinking selector when no reasoning options
@@ -139,6 +140,7 @@
 - [x] Tighten compact log error classification so `server/*` events are not misread as errors, while keeping real `stderr` and warning alerts visible
 - [x] Remove obsolete xterm `copyOnSelect` option so `npm run build` / release typecheck passes with the current xterm typings
 - [x] Treat Windows installs under `%LOCALAPPDATA%\\<product>` with uninstall markers as managed installs, so updater no longer misclassifies installed Chinese-name builds as portable EXEs
+- [x] Unify self-brand logo usage: replace default web favicon (`vite.svg`) with app icon and render real app logo in sidebar header instead of letter placeholder
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
@@ -233,4 +235,5 @@
   - `cargo test --manifest-path src-tauri/Cargo.toml translate_tool_call_event_includes_server_and_tool`
   - `cargo test --manifest-path src-tauri/Cargo.toml translate_tool_call_update_uses_cached_tool_identity`
 - [x] Localize the main workspace page for Chinese mode and raise help/about contrast so visible English remnants and low-contrast text no longer confuse users.
+- [x] Keep Debug/Log timeline collecting while panel is closed so opening Log always shows the full current-session history.
 
