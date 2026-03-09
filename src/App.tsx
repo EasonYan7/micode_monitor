@@ -508,6 +508,7 @@ function MainApp() {
     updaterState,
     startUpdate,
     dismissUpdate,
+    openLatestReleasePage,
     handleTestNotificationSound,
     handleTestSystemNotification,
   } = useUpdaterController({
@@ -2000,9 +2001,10 @@ function MainApp() {
         />
       ),
       onUpdate: startUpdate,
-    onDismissUpdate: dismissUpdate,
-    errorToasts,
-    onDismissErrorToast: dismissErrorToast,
+      onDismissUpdate: dismissUpdate,
+      onOpenManualInstall: openLatestReleasePage,
+      errorToasts,
+      onDismissErrorToast: dismissErrorToast,
     latestAgentRuns,
     isLoadingLatestAgents,
     localUsageSnapshot: localUsageSnapshotForHome,

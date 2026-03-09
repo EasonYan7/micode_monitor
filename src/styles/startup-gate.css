@@ -34,7 +34,7 @@
 .startup-gate-panel {
   position: relative;
   width: min(920px, 100%);
-  max-height: min(90vh, 920px);
+  max-height: min(92vh, 920px);
   overflow: auto;
   padding: 28px;
   border-radius: 24px;
@@ -92,6 +92,16 @@
   background: rgba(255, 255, 255, 0.05);
   color: rgba(234, 240, 255, 0.86);
   font-size: 13px;
+}
+
+.startup-gate-inline-error {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 92, 92, 0.12);
+  color: #ffcccc;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .startup-gate-progress-stage {
@@ -344,6 +354,68 @@
   cursor: default;
 }
 
+@media (max-height: 900px) {
+  .startup-gate-shell {
+    padding: 16px;
+    align-items: stretch;
+  }
+
+  .startup-gate-panel {
+    width: min(880px, 100%);
+    max-height: none;
+    height: calc(100vh - 32px);
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  .startup-gate-title {
+    margin: 8px 0 6px;
+    font-size: clamp(24px, 3.2vw, 34px);
+  }
+
+  .startup-gate-copy {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .startup-gate-progress-block,
+  .startup-gate-status,
+  .startup-gate-checks,
+  .startup-gate-actions {
+    margin-top: 14px;
+  }
+
+  .startup-gate-progress-block {
+    padding: 16px;
+  }
+
+  .startup-gate-progress-stage {
+    font-size: 16px;
+  }
+
+  .startup-gate-progress-metric {
+    font-size: 18px;
+  }
+
+  .startup-gate-stage-step {
+    padding: 8px 10px;
+  }
+
+  .startup-gate-check {
+    padding: 14px;
+  }
+
+  .startup-gate-checks {
+    max-height: 36vh;
+    overflow: auto;
+    padding-right: 4px;
+  }
+
+  .startup-gate-details pre {
+    max-height: 132px;
+  }
+}
+
 @media (max-width: 720px) {
   .startup-gate-shell {
     padding: 14px;
@@ -364,5 +436,29 @@
 
   .startup-gate-progress-metric {
     font-size: 18px;
+  }
+}
+
+@media (max-height: 760px) {
+  .startup-gate-panel {
+    height: calc(100vh - 20px);
+    padding: 16px;
+  }
+
+  .startup-gate-title {
+    font-size: clamp(22px, 3vw, 30px);
+  }
+
+  .startup-gate-copy {
+    font-size: 13px;
+  }
+
+  .startup-gate-stage-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .startup-gate-checks {
+    max-height: 32vh;
+    gap: 10px;
   }
 }

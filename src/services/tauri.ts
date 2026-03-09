@@ -11,6 +11,7 @@ import type {
   DictationModelStatus,
   DictationSessionState,
   LocalUsageSnapshot,
+  UpdaterContext,
   WorkspaceInfo,
   WorkspaceSettings,
 } from "../types";
@@ -528,6 +529,10 @@ export async function localUsageSnapshot(
     payload.workspacePath = workspacePath;
   }
   return invoke("local_usage_snapshot", payload);
+}
+
+export async function getUpdaterContext(): Promise<UpdaterContext> {
+  return invoke<UpdaterContext>("get_updater_context");
 }
 
 export async function getModelList(workspaceId: string) {

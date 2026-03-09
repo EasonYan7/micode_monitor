@@ -6,6 +6,7 @@ import { formatDebugEntriesForCopy, type DebugViewMode } from "../../../utils/de
 const MAX_DEBUG_ENTRIES = 200;
 const MAX_PENDING_PERSIST_ENTRIES = 5000;
 const PERSIST_INTERVAL_MS = 1000;
+const WARNING_PATTERN = /(^|[\s/:_-])warn(ing)?($|[\s/:_-])/i;
 
 function tryExtractWorkspaceId(payload: unknown): string | null {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
@@ -74,12 +75,11 @@ export function useDebugLog(language?: UiLanguage) {
       return true;
     }
     const label = entry.label.toLowerCase();
-    if (label.includes("warn") || label.includes("warning")) {
+    if (WARNING_PATTERN.test(label)) {
       return true;
     }
     if (typeof entry.payload === "string") {
-      const payload = entry.payload.toLowerCase();
-      return payload.includes("warn") || payload.includes("warning");
+      return WARNING_PATTERN.test(entry.payload);
     }
     return false;
   }, []);

@@ -65,6 +65,7 @@
 - [x] Add blocking startup environment gate with structured checks/install-retry flow for Node/MiCode ACP/Python (exclude VS Code from startup gating)
 - [x] Increase ACP initialize timeout for slow Windows environments and surface timeout duration in the error message
 - [x] Make Windows Python startup re-check resilient after in-app install by probing common Python install directories and improving failure detail selection
+- [x] Compact startup environment gate for height-constrained screens and surface install-action errors near the progress summary
 - [x] Enforce slash command-only send path: slash-prefixed input is never forwarded to AI text prompt; `/mcp *` always runs local MCP handler
 - [x] Keep Token terminology untranslated in Chinese UI (replace 鈥滀唬甯佲€?labels with 鈥淭oken鈥?
 - [x] Hide composer "Default" controls: remove collaboration selector when only default mode exists and hide thinking selector when no reasoning options
@@ -128,6 +129,8 @@
 - [x] Avoid WiX MSI release fragility by switching Windows release bundles to NSIS-only while keeping updater artifacts
 - [x] Fix Windows updater 404 by generating `latest.json` with the real uploaded asset filename, not the GitHub release label
 - [x] Make Windows release upload names ASCII-stable (`MiCodeMonitor_...`) so GitHub asset URLs and updater `latest.json` stay consistent despite localized product names
+- [x] Detect Windows standalone/dev EXE launches in updater flow and redirect users to installer guidance so updates no longer loop back to the old binary
+- [x] Tighten compact log error classification so `server/*` events are not misread as errors, while keeping real `stderr` and warning alerts visible
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
