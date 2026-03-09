@@ -257,7 +257,6 @@ export function useTerminalSession({
         allowTransparency: true,
         theme: appearance.theme,
         scrollback: 5000,
-        copyOnSelect: true,
       });
       const fitAddon = new FitAddon();
       terminal.loadAddon(fitAddon);
