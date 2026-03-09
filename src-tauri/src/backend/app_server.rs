@@ -23,6 +23,36 @@ const ACP_PROTOCOL_VERSION: u32 = 1;
 const TURN_START_TIMEOUT: Duration = Duration::from_secs(6 * 60 * 60);
 const ACP_INITIALIZE_TIMEOUT: Duration = Duration::from_secs(120);
 
+#[cfg(target_os = "windows")]
+fn read_windows_registry_path_segments() -> Vec<PathBuf> {
+    let script = "[Environment]::GetEnvironmentVariable('Path','Machine'); Write-Output '---PATH-SPLIT---'; [Environment]::GetEnvironmentVariable('Path','User')";
+    let output = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output();
+
+    let Ok(output) = output else {
+        return Vec::new();
+    };
+    if !output.status.success() {
+        return Vec::new();
+    }
+
+    let raw = String::from_utf8_lossy(&output.stdout);
+    raw.split("---PATH-SPLIT---")
+        .flat_map(|segment| segment.split(';'))
+        .map(str::trim)
+        .filter(|segment| !segment.is_empty())
+        .map(PathBuf::from)
+        .collect()
+}
+
+#[cfg(not(target_os = "windows"))]
+fn read_windows_registry_path_segments() -> Vec<PathBuf> {
+    Vec::new()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct LocalThreadRecord {
     #[serde(rename = "threadId")]
@@ -2586,6 +2616,7 @@ pub(crate) fn build_micode_path_env(agent_bin: Option<&str>) -> Option<String> {
     let mut extras: Vec<PathBuf> = Vec::new();
 
     if cfg!(windows) {
+        extras.extend(read_windows_registry_path_segments());
         if let Ok(user_profile) = env::var("USERPROFILE") {
             extras.push(PathBuf::from(&user_profile).join(".cargo").join("bin"));
             extras.push(PathBuf::from(&user_profile).join(".local").join("bin"));

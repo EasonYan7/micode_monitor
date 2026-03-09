@@ -329,10 +329,13 @@ export function StartupEnvironmentGate({
         setStatus(cachedStatus);
       }
 
-      if (hasCompletedStartupGate() || cachedStatus?.canProceed) {
-        if (cachedStatus?.canProceed) {
-          markStartupGateCompleted();
-        }
+      if (hasCompletedStartupGate()) {
+        setPhase("ready");
+        return;
+      }
+
+      if (cachedStatus?.canProceed) {
+        markStartupGateCompleted();
         setPhase("ready");
         return;
       }

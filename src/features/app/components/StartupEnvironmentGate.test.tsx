@@ -98,6 +98,7 @@ describe("StartupEnvironmentGate", () => {
   });
 
   afterEach(() => {
+    window.localStorage.clear();
     document.body.innerHTML = "";
   });
 
@@ -190,5 +191,21 @@ describe("StartupEnvironmentGate", () => {
       },
       { timeout: 3000 },
     );
+  });
+
+  it("skips the gate after one successful completion was already recorded", async () => {
+    window.localStorage.setItem("caiduoduo.startupGateCompleted.v1", "1");
+
+    render(
+      <StartupEnvironmentGate>
+        <div>app ready</div>
+      </StartupEnvironmentGate>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("app ready")).toBeTruthy();
+    });
+    expect(environmentCheckStartupMock).not.toHaveBeenCalled();
+    expect(environmentRetryCheckMock).not.toHaveBeenCalled();
   });
 });

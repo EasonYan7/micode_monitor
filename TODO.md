@@ -66,6 +66,8 @@
 - [x] Increase ACP initialize timeout for slow Windows environments and surface timeout duration in the error message
 - [x] Make Windows Python startup re-check resilient after in-app install by probing common Python install directories and improving failure detail selection
 - [x] Compact startup environment gate for height-constrained screens and surface install-action errors near the progress summary
+- [x] Change startup gate behavior to first-pass blocking only, then default to direct app entry on later launches while keeping install-time recheck logic
+- [x] Refresh Windows dependency rechecks from the latest user/machine PATH so newly installed Python/Node can be detected without restarting the app
 - [x] Enforce slash command-only send path: slash-prefixed input is never forwarded to AI text prompt; `/mcp *` always runs local MCP handler
 - [x] Keep Token terminology untranslated in Chinese UI (replace 鈥滀唬甯佲€?labels with 鈥淭oken鈥?
 - [x] Hide composer "Default" controls: remove collaboration selector when only default mode exists and hide thinking selector when no reasoning options
