@@ -122,4 +122,59 @@ describe("useModels", () => {
       expect(result.current.selectedEffort).toBe("high");
     });
   });
+
+  it("only exposes the first three models in the picker", async () => {
+    vi.mocked(getModelList).mockResolvedValueOnce({
+      result: {
+        data: [
+          {
+            id: "m1",
+            model: "m1",
+            displayName: "Model 1",
+            supportedReasoningEfforts: [],
+            defaultReasoningEffort: null,
+            isDefault: true,
+          },
+          {
+            id: "m2",
+            model: "m2",
+            displayName: "Model 2",
+            supportedReasoningEfforts: [],
+            defaultReasoningEffort: null,
+            isDefault: false,
+          },
+          {
+            id: "m3",
+            model: "m3",
+            displayName: "Model 3",
+            supportedReasoningEfforts: [],
+            defaultReasoningEffort: null,
+            isDefault: false,
+          },
+          {
+            id: "m4",
+            model: "m4",
+            displayName: "Model 4",
+            supportedReasoningEfforts: [],
+            defaultReasoningEffort: null,
+            isDefault: false,
+          },
+        ],
+      },
+    });
+    vi.mocked(getConfigModel).mockResolvedValueOnce(null);
+
+    const { result } = renderHook(() =>
+      useModels({ activeWorkspace: workspace }),
+    );
+
+    await waitFor(() => expect(result.current.models).toHaveLength(3));
+
+    expect(result.current.models.map((model) => model.id)).toEqual([
+      "m1",
+      "m2",
+      "m3",
+    ]);
+    expect(result.current.selectedModelId).toBe("m1");
+  });
 });
