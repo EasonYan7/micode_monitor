@@ -2635,6 +2635,7 @@ pub(crate) fn build_micode_path_env(agent_bin: Option<&str>) -> Option<String> {
                     .join("WinGet")
                     .join("Links"),
             );
+            extras.push(PathBuf::from(&local_app_data).join("Programs").join("nodejs"));
             extras.push(
                 PathBuf::from(&local_app_data)
                     .join("Programs")
@@ -2645,6 +2646,21 @@ pub(crate) fn build_micode_path_env(agent_bin: Option<&str>) -> Option<String> {
                 PathBuf::from(&local_app_data)
                     .join("Programs")
                     .join("micode")
+                    .join("bin"),
+            );
+        }
+        if let Ok(program_files) = env::var("ProgramFiles") {
+            extras.push(PathBuf::from(&program_files).join("nodejs"));
+        }
+        if let Ok(program_files_x86) = env::var("ProgramFiles(x86)") {
+            extras.push(PathBuf::from(&program_files_x86).join("nodejs"));
+        }
+        if let Ok(choco_install) = env::var("ChocolateyInstall") {
+            extras.push(PathBuf::from(&choco_install).join("bin"));
+        } else if let Ok(all_users_profile) = env::var("ALLUSERSPROFILE") {
+            extras.push(
+                PathBuf::from(&all_users_profile)
+                    .join("chocolatey")
                     .join("bin"),
             );
         }

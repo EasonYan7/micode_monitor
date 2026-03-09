@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::mpsc;
-use tokio::time::{timeout, Instant};
+use tokio::time::{sleep, timeout, Instant};
 
 pub(crate) mod args;
 pub(crate) mod config;
@@ -526,6 +526,9 @@ fn install_error(message: &str) -> String {
     format!("{message} Please complete the install manually, then click retry.")
 }
 
+const AUTO_INSTALL_TIMEOUT_SECS: u64 = 300;
+const POST_INSTALL_PROBE_TIMEOUT_SECS: u64 = 45;
+
 fn command_exists(program: &str) -> bool {
     let checker = if cfg!(windows) { "where" } else { "which" };
     std_command(checker)
@@ -544,7 +547,7 @@ async fn run_install_command(program: &str, args: &[&str], timeout_secs: u64) ->
     command.stderr(Stdio::piped());
     let output = timeout(Duration::from_secs(timeout_secs), command.output())
         .await
-        .map_err(|_| format!("{program} install timed out."))?
+        .map_err(|_| format!("{program} install timed out after {timeout_secs} seconds."))?
         .map_err(|error| format!("Failed to run {program}: {error}"))?;
     if output.status.success() {
         return Ok(());
@@ -559,6 +562,43 @@ async fn run_install_command(program: &str, args: &[&str], timeout_secs: u64) ->
     })
 }
 
+async fn wait_for_version_probe(
+    program: &str,
+    args: &[&str],
+    timeout_secs: u64,
+) -> Result<(), String> {
+    let started = Instant::now();
+    let timeout_duration = Duration::from_secs(timeout_secs);
+    let mut last_error = format!("{program} not found on PATH.");
+    loop {
+        let path_env = build_micode_path_env(None);
+        match run_version_probe(program, args, path_env.as_deref()).await {
+            Ok(_) => return Ok(()),
+            Err(error) => {
+                last_error = error;
+            }
+        }
+        if started.elapsed() >= timeout_duration {
+            break;
+        }
+        sleep(Duration::from_millis(1500)).await;
+    }
+    Err(last_error)
+}
+
+fn winget_install_args<'a>(package_id: &'a str) -> Vec<&'a str> {
+    vec![
+        "install",
+        "--id",
+        package_id,
+        "-e",
+        "--accept-package-agreements",
+        "--accept-source-agreements",
+        "--disable-interactivity",
+        "--silent",
+    ]
+}
+
 async fn install_node_dependency() -> Result<(), String> {
     #[cfg(not(target_os = "windows"))]
     {
@@ -568,14 +608,53 @@ async fn install_node_dependency() -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         if command_exists("winget") {
-            run_install_command("winget", &["install", "--id", "OpenJS.NodeJS", "-e"], 900).await
+            let primary_args = winget_install_args("OpenJS.NodeJS.LTS");
+            if let Err(primary_error) =
+                run_install_command("winget", &primary_args, AUTO_INSTALL_TIMEOUT_SECS).await
+            {
+                let fallback_args = winget_install_args("OpenJS.NodeJS");
+                run_install_command("winget", &fallback_args, AUTO_INSTALL_TIMEOUT_SECS)
+                    .await
+                    .map_err(|fallback_error| {
+                        install_error(&format!(
+                            "Automatic Node.js install failed via winget. LTS attempt: {primary_error}. Fallback attempt: {fallback_error}"
+                        ))
+                    })?;
+            }
         } else if command_exists("choco") {
-            run_install_command("choco", &["install", "-y", "nodejs"], 900).await
+            if let Err(primary_error) = run_install_command(
+                "choco",
+                &["install", "-y", "nodejs-lts", "--no-progress", "--limit-output"],
+                AUTO_INSTALL_TIMEOUT_SECS,
+            )
+            .await
+            {
+                run_install_command(
+                    "choco",
+                    &["install", "-y", "nodejs", "--no-progress", "--limit-output"],
+                    AUTO_INSTALL_TIMEOUT_SECS,
+                )
+                .await
+                .map_err(|fallback_error| {
+                    install_error(&format!(
+                        "Automatic Node.js install failed via choco. LTS attempt: {primary_error}. Fallback attempt: {fallback_error}"
+                    ))
+                })?;
+            }
         } else {
-            Err(install_error(
+            return Err(install_error(
                 "Automatic Node.js installation needs winget or choco, but neither command is available.",
-            ))
+            ));
         }
+
+        wait_for_version_probe("node", &["--version"], POST_INSTALL_PROBE_TIMEOUT_SECS)
+            .await
+            .map_err(|detail| {
+                install_error(&format!(
+                    "Node.js installer finished, but `node --version` is still unavailable. Last probe error: {detail}"
+                ))
+            })?;
+        Ok(())
     }
 }
 
@@ -588,10 +667,27 @@ async fn install_python_dependency() -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         if command_exists("winget") {
-            run_install_command("winget", &["install", "--id", "Python.Python.3.12", "-e"], 900)
-                .await
+            let primary_args = winget_install_args("Python.Python.3.12");
+            if let Err(primary_error) =
+                run_install_command("winget", &primary_args, AUTO_INSTALL_TIMEOUT_SECS).await
+            {
+                let fallback_args = winget_install_args("Python.Python.3.11");
+                run_install_command("winget", &fallback_args, AUTO_INSTALL_TIMEOUT_SECS)
+                    .await
+                    .map_err(|fallback_error| {
+                        install_error(&format!(
+                            "Automatic Python install failed via winget. Python 3.12 attempt: {primary_error}. Python 3.11 fallback: {fallback_error}"
+                        ))
+                    })?;
+            }
+            Ok(())
         } else if command_exists("choco") {
-            run_install_command("choco", &["install", "-y", "python"], 900).await
+            run_install_command(
+                "choco",
+                &["install", "-y", "python", "--no-progress", "--limit-output"],
+                AUTO_INSTALL_TIMEOUT_SECS,
+            )
+            .await
         } else {
             Err(install_error(
                 "Automatic Python installation needs winget or choco, but neither command is available.",

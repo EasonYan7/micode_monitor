@@ -10,6 +10,7 @@ type UseModelsOptions = {
 };
 
 const CONFIG_MODEL_DESCRIPTION = "Configured in CODEX_HOME/config.toml";
+const MAX_VISIBLE_MODELS = 3;
 
 const normalizeEffort = (value: unknown): string | null => {
   if (typeof value !== "string") {
@@ -235,7 +236,7 @@ export function useModels({
           isDefault: false,
         };
         return [configOption, ...dataFromServer];
-      })();
+      })().slice(0, MAX_VISIBLE_MODELS);
       setModels(data);
       lastFetchedWorkspaceId.current = workspaceId;
       const defaultModel = pickDefaultModel(data, configModelFromConfig);

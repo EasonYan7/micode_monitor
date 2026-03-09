@@ -83,6 +83,7 @@
 - [x] Add sidebar workspace action: clear project conversation history with confirm dialog, and wipe local history cache (`.micodemonitor` + global `~/.micode|~/.codex/tmp`)
 - [x] Split README into standalone EN/CN versions (`README.md` + `README.zh-CN.md`) with language switch links and MiCode install guide
 - [x] Persist startup environment gate completion in `settings.json` so packaged app restarts do not reopen the detection gate after it already passed
+- [x] Harden Windows startup auto-install for Node/Python: switch to non-interactive installer flags, shorten install timeout, and verify Node availability after install with expanded PATH probing
 - [x] Update README install section with official MiCode one-click install commands (macOS/Linux and Windows)
 - [x] Sync EN/CN README sections describing feature removals and behavior changes from original CodexMonitor
 - [x] Update About panel branding/links (remove Twitter, point GitHub to EasonYan7/micode_monitor, update footer credit)
@@ -141,6 +142,7 @@
 - [x] Remove obsolete xterm `copyOnSelect` option so `npm run build` / release typecheck passes with the current xterm typings
 - [x] Treat Windows installs under `%LOCALAPPDATA%\\<product>` with uninstall markers as managed installs, so updater no longer misclassifies installed Chinese-name builds as portable EXEs
 - [x] Unify self-brand logo usage: replace default web favicon (`vite.svg`) with app icon and render real app logo in sidebar header instead of letter placeholder
+- [x] Limit model picker exposure to top 3 entries from `model/list` (with unified client-side cap and coverage test)
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
@@ -236,4 +238,5 @@
   - `cargo test --manifest-path src-tauri/Cargo.toml translate_tool_call_update_uses_cached_tool_identity`
 - [x] Localize the main workspace page for Chinese mode and raise help/about contrast so visible English remnants and low-contrast text no longer confuse users.
 - [x] Keep Debug/Log timeline collecting while panel is closed so opening Log always shows the full current-session history.
+- [x] Remove compact error-card duplicate rendering (same stderr line shown twice via summary/detail).
 

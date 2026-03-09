@@ -386,6 +386,8 @@ function buildCompactEntry(
     isErrorLikeLabel(entry.label)
   ) {
     const payload = extractErrorMessage(entry);
+    // Compact mode renders summary and detail separately; keep errors in summary
+    // to avoid duplicate repeated lines for single-line stderr events.
     return {
       id: `${entry.id}:error`,
       timestamp: entry.timestamp,
@@ -394,7 +396,7 @@ function buildCompactEntry(
       category: "error",
       title: i18n.error,
       summary: payload || entry.label,
-      detail: payload || undefined,
+      detail: undefined,
     };
   }
 
