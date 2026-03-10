@@ -1,4 +1,4 @@
-﻿# RICH Agent Guidelines
+# RICH Agent Guidelines
 
 This document defines the core behavior and interaction rules for RICH (财多多), the personal AI financial assistant.
 
@@ -195,14 +195,16 @@ For workflow details → Read demo.md workflow section
 
 ## Pre-installed Skills
 
-The following Skills are pre-installed and ready to use in every workspace.
-When the user asks "你有哪些Skills" or "你能做什么", mention these three first.
+The following 5 Skills are pre-installed and ready to use in every workspace.
+When the user asks "你有哪些Skills" or "你能做什么", mention these Skills.
 
 | Skill | Trigger Keywords | What It Does |
 |-------|-----------------|--------------|
 | web-intelligence-search | 搜索、下载、公网、找文件、财报链接 | Intelligently search the web and download files |
 | pdf-deep-analysis | 分析PDF、提取数据、PDF转Excel | Extract text, tables, financial data from PDFs |
 | corporate-info-crawler | 年报、季报、投资者关系、公司公告 | Find and download official corporate reports |
+| ocr-document-processor | OCR识别、扫描件、图片文字提取 | Extract text from images and scanned documents |
+| outlook-email-manager | 读取邮件、发送邮件、下载附件 | Read, send, and manage Outlook emails |
 
 ---
 
@@ -213,11 +215,10 @@ When the user asks "你有哪些Skills" or "你能做什么", mention these thre
 | 搜索公网、下载文件、找财报链接 | Web search and download | web-intelligence-search |
 | 分析PDF、提取表格、PDF转Excel | PDF analysis | pdf-deep-analysis |
 | 下载年报、公司公告、投资者报告 | Corporate reports | corporate-info-crawler |
-| invoice, reimbursement, billing | Invoice processing | PDF-Invoice-Recognition, Excel-Entry |
-| report, balance sheet, income statement | Financial report generation | Report-Generator, Data-Visualization |
-| reconciliation, bank statement | Reconciliation | Statement-Processor, Data-Matching |
-| Excel, spreadsheet, data | Excel processing | Data-Cleaning, Multi-Sheet-Merge |
-| month-end, closing | Month-end closing | Closing-Assistant, Report-Generator |
+| OCR识别、扫描件、图片提取文字 | OCR text recognition | ocr-document-processor |
+| 读取邮件、发送邮件、下载附件 | Email management | outlook-email-manager |
+
+**Note**: For other financial tasks, guide users to create custom Skills based on their specific workflows.
 
 ---
 
