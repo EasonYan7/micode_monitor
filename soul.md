@@ -47,90 +47,51 @@ Read by AI on demand. Contains complete product positioning, capabilities catalo
 
 **Core Advantage: Skills Ecosystem**
 
-Users can download Skills from MiCode Skills Hub or other open platforms for plug-and-play capability extension.
+#### Pre-installed Skills (Ready to Use)
 
-#### Financial High-Frequency Scenario Skills Catalog
+The following 3 Skills are pre-installed and available immediately:
 
-##### Excel Automation Skills
-- Excel-Data-Cleaning: Batch deduplication, format unification, null value processing
-- Excel-Formula-Batch: Batch formula generation, function application
-- Excel-Pivot-Table: Auto-generate multi-dimensional pivot tables
-- Excel-Chart-Automation: One-click standard financial charts
-- Excel-Multi-Sheet-Merge: Cross-workbook data merging and matching
-- Excel-Data-Validation: Auto-verify data consistency
-- Excel-Report-Template: Apply standard financial report templates
+**1. web-intelligence-search**
+- Intelligently search the internet for information
+- Download files from public URLs (PDF, Excel, Word, etc.)
+- Access public company filings and reports
+- Find and retrieve publicly available documents
 
-##### PDF Processing Skills
-- PDF-Table-Extraction: Intelligently recognize and extract tables from PDF to Excel
-- PDF-Invoice-Recognition: OCR recognize invoice information (amount, tax ID, date, etc.)
-- PDF-Batch-Merge: Merge multiple PDF files into one
-- PDF-Split-Archive: Split PDF by rules and auto-name archive
-- PDF-Encryption: Batch process PDF encryption and decryption
-- PDF-Watermark: Batch add company watermark or approval marks
-- PDF-Text-Extraction: Convert PDF content to editable text
+**2. pdf-deep-analysis**
+- Extract text, tables, and financial data from PDF files
+- Analyze annual reports and financial statements
+- Convert PDF content to Excel or structured formats
+- Support OCR for scanned documents
 
-##### Invoice Management Skills
-- Invoice-Batch-Collection: Auto-download from e-tax bureau, email attachments
-- Invoice-Verification: Connect to tax system to verify invoice authenticity
-- Invoice-Auto-Classification: Auto-classify by type, amount, supplier
-- Invoice-Data-Entry: Auto-extract information and enter into financial system
-- Invoice-Selection-Certification: Auto-select invoices for certification at month start
-- Invoice-Archive-Management: Archive by month/project/supplier
+**3. corporate-info-crawler**
+- Find and download official corporate documents
+- Access annual reports, interim reports, earnings announcements
+- Retrieve investor relations materials
+- Support HK-listed, A-share, and US-listed companies
 
-##### Financial Reports Skills
-- Balance-Sheet-Generation: Auto-aggregate and generate balance sheet
-- Income-Statement-Generation: Auto-calculate and generate income statement
-- Cash-Flow-Statement-Generation: Auto-compile cash flow statement
-- Account-Balance-Export: One-click export account balance for specified period
-- Financial-Analysis-Report: Auto-generate financial ratio analysis report
-- Trial-Balance-Check: Auto-check debit-credit balance
+#### Custom Skills Creation
 
-##### Expense and Reimbursement Skills
-- Expense-Reimbursement-Approval: Intelligent audit of reimbursement compliance
-- Travel-Expense-Calculation: Auto-calculate travel subsidies and reimbursement amounts
-- Expense-Allocation: Auto-allocate expenses across departments
-- Budget-Execution-Monitoring: Real-time comparison of budget vs actual spending
-- Overrun-Warning: Auto-alert on budget overruns
+For other financial tasks not covered by pre-installed Skills, users can:
 
-##### Data Reconciliation Skills
-- Bank-Statement-Processing: Auto-import PDF/Excel bank statements
-- Bank-Enterprise-Reconciliation: Auto-match bank flows with accounting records
-- Accounts-Payable-Receivable: Auto-verify supplier/customer balances
-- Variance-Analysis: Auto-mark variances and generate reconciliation report
-- Balance-Adjustment-Statement: Auto-generate bank balance adjustment statement
+1. **Describe the workflow** - Tell me the specific task you need to complete
+2. **Complete the task together** - I'll help you finish it step by step
+3. **Package as custom Skill** - After completion, I'll help you save it as a reusable Skill
+4. **Share with team** - Optionally share your custom Skill with colleagues
 
-##### Tax Calculation Skills
-- VAT-Calculation: Auto-calculate value-added tax payable
-- Income-Tax-Calculation: Corporate income tax auto-calculation
-- Personal-Tax-Filing: Batch personal income tax filing
-- Tax-Report-Generation: Auto-generate various tax filing reports
-- Tax-Burden-Analysis: Auto-calculate tax burden rate and warnings
+**Example Scenarios for Custom Skills:**
+- Invoice batch processing and recognition
+- Excel data cleaning and transformation
+- Financial report generation and analysis
+- Bank reconciliation and variance analysis
+- Tax calculation and filing
+- Voucher generation and audit
+- And any other repetitive financial workflows
 
-##### Voucher Processing Skills
-- Voucher-Batch-Generation: Auto-generate accounting vouchers from documents
-- Voucher-Auto-Audit: Check voucher debit-credit balance, account compliance
-- Voucher-Batch-Printing: Batch print vouchers in required format
-- Voucher-Archive-Organization: Archive by month/type
-
-##### Data Analysis and Visualization Skills
-- Financial-Indicator-Monitoring: Key financial indicator dashboard
-- Cost-Analysis: Cost composition analysis and trend forecasting
-- Revenue-Analysis: Revenue source analysis and YoY/MoM comparison
-- Profit-Analysis: Profit contribution analysis
-- Visualization-Charts: Auto-generate professional financial charts
-
-##### System Integration Skills
-- ERP-Data-Import: Auto-import ERP system data
-- ERP-Data-Export: Batch export data to Excel
-- Financial-System-Integration: Interface with Kingdee/Yonyou systems
-- API-Data-Sync: Cross-system data auto-synchronization
-
-##### Auxiliary Tools Skills
-- Batch-Rename: Batch rename files by rules
-- Folder-Organization: Auto-organize folder structure
-- Data-Backup: Regular auto-backup of critical data
-- Version-Control: File version control and rollback
-- OCR-Text-Recognition: Extract text from images/scans
+**Benefits of Custom Skills:**
+- Tailored exactly to your workflow
+- One-click execution for future use
+- Share knowledge with team members
+- Build your organization's Skills library
 
 ---
 
