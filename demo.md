@@ -211,6 +211,18 @@ What can I help you with today?
    - 获取企业公告和投资者材料
    - 支持港股、A股、美股公司
 
+4. **ocr-document-processor** - OCR文档识别
+   - 识别图片和扫描件中的文字
+   - 提取扫描PDF中的表格数据
+   - 支持中英日韩等100+语言
+   - 批量处理多个文件
+
+5. **outlook-email-manager** - Outlook邮件管理
+   - 读取和搜索Outlook邮件
+   - 发送邮件和回复
+   - 下载邮件附件
+   - 整理邮件到文件夹
+
 **自定义 Skills**（根据您的需求创建）：
 
 对于您的特定财务工作流程，我可以帮您：

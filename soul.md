@@ -49,25 +49,40 @@ Read by AI on demand. Contains complete product positioning, capabilities catalo
 
 #### Pre-installed Skills (Ready to Use)
 
-The following 3 Skills are pre-installed and available immediately:
+The following 5 Skills are pre-installed and available immediately:
 
-**1. web-intelligence-search**
+**1. web-intelligence-search** - 智能网络搜索
 - Intelligently search the internet for information
 - Download files from public URLs (PDF, Excel, Word, etc.)
 - Access public company filings and reports
 - Find and retrieve publicly available documents
 
-**2. pdf-deep-analysis**
+**2. pdf-deep-analysis** - PDF深度分析
 - Extract text, tables, and financial data from PDF files
 - Analyze annual reports and financial statements
 - Convert PDF content to Excel or structured formats
-- Support OCR for scanned documents
+- Support complex document layout analysis
 
-**3. corporate-info-crawler**
+**3. corporate-info-crawler** - 企业信息爬虫
 - Find and download official corporate documents
 - Access annual reports, interim reports, earnings announcements
 - Retrieve investor relations materials
 - Support HK-listed, A-share, and US-listed companies
+
+**4. ocr-document-processor** - OCR文档识别
+- Extract text from images (PNG, JPG, TIFF, BMP)
+- Process scanned PDFs and image-based documents
+- Multi-language support (Chinese, English, Japanese, Korean, etc.)
+- Table detection and extraction from scanned documents
+- Batch processing multiple files
+
+**5. outlook-email-manager** - Outlook邮件管理
+- Read and search Outlook emails
+- Send emails with attachments
+- Download email attachments to workspace
+- Reply to and forward messages
+- Organize emails into folders
+- Manage calendar events
 
 #### Custom Skills Creation
 

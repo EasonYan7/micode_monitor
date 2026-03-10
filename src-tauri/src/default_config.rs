@@ -11,6 +11,10 @@ const SKILL_PDF_DEEP_ANALYSIS: &str =
     include_str!("../../skills/pdf-deep-analysis/SKILL.md");
 const SKILL_CORPORATE_INFO_CRAWLER: &str =
     include_str!("../../skills/corporate-info-crawler/SKILL.md");
+const SKILL_OCR_DOCUMENT_PROCESSOR: &str =
+    include_str!("../../skills/ocr-document-processor/SKILL.md");
+const SKILL_OUTLOOK_EMAIL_MANAGER: &str =
+    include_str!("../../skills/outlook-email-manager/SKILL.md");
 
 struct SkillEntry {
     dir_name: &'static str,
@@ -29,6 +33,14 @@ const DEFAULT_SKILLS: &[SkillEntry] = &[
     SkillEntry {
         dir_name: "corporate-info-crawler",
         content: SKILL_CORPORATE_INFO_CRAWLER,
+    },
+    SkillEntry {
+        dir_name: "ocr-document-processor",
+        content: SKILL_OCR_DOCUMENT_PROCESSOR,
+    },
+    SkillEntry {
+        dir_name: "outlook-email-manager",
+        content: SKILL_OUTLOOK_EMAIL_MANAGER,
     },
 ];
 
@@ -136,9 +148,13 @@ mod tests {
         assert!(micode_home.join("skills/web-intelligence-search/SKILL.md").exists());
         assert!(micode_home.join("skills/pdf-deep-analysis/SKILL.md").exists());
         assert!(micode_home.join("skills/corporate-info-crawler/SKILL.md").exists());
+        assert!(micode_home.join("skills/ocr-document-processor/SKILL.md").exists());
+        assert!(micode_home.join("skills/outlook-email-manager/SKILL.md").exists());
         assert!(codex_home.join("skills/web-intelligence-search/SKILL.md").exists());
         assert!(codex_home.join("skills/pdf-deep-analysis/SKILL.md").exists());
         assert!(codex_home.join("skills/corporate-info-crawler/SKILL.md").exists());
+        assert!(codex_home.join("skills/ocr-document-processor/SKILL.md").exists());
+        assert!(codex_home.join("skills/outlook-email-manager/SKILL.md").exists());
 
         let _ = fs::remove_dir_all(temp_dir);
     }
