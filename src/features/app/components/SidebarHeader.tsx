@@ -31,7 +31,6 @@ export function SidebarHeader({
           type="button"
         >
           <img className="sidebar-brand-logo" src="/app-icon.png" alt="" aria-hidden />
-          <span className="sidebar-brand-name">{isZh ? "财多多" : "Rich"}</span>
         </button>
       </div>
       <div className="sidebar-header-actions">
