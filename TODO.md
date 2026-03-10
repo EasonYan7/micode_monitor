@@ -143,6 +143,7 @@
 - [x] Treat Windows installs under `%LOCALAPPDATA%\\<product>` with uninstall markers as managed installs, so updater no longer misclassifies installed Chinese-name builds as portable EXEs
 - [x] Unify self-brand logo usage: replace default web favicon (`vite.svg`) with app icon and render real app logo in sidebar header instead of letter placeholder
 - [x] Limit model picker exposure to top 3 entries from `model/list` (with unified client-side cap and coverage test)
+- [x] Switch brand presentation to logo-only (remove separate 财多多 text) and enlarge all in-page logo sizes for readability
 - [ ] Final integration validation and documentation
 - [ ] Enable true ACP session resume (`session/load`) once MiCode exposes `agentCapabilities.loadSession=true`; then replace current local-history + new-session fallback.
 
@@ -239,4 +240,6 @@
 - [x] Localize the main workspace page for Chinese mode and raise help/about contrast so visible English remnants and low-contrast text no longer confuse users.
 - [x] Keep Debug/Log timeline collecting while panel is closed so opening Log always shows the full current-session history.
 - [x] Remove compact error-card duplicate rendering (same stderr line shown twice via summary/detail).
+- [x] Merge adjacent `micode/stderr` fragments in compact log so ENOENT-style multi-line errors show as one readable block.
+- [x] Add Debug scope switch with default `thread` view and optional `workspace` full view to reduce cross-thread log noise.
 

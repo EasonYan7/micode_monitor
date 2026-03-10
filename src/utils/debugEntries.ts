@@ -55,6 +55,7 @@ export function buildErrorDebugEntry(label: string, error: unknown): DebugEntry 
 }
 
 const MAX_COMPACT_SUMMARY_LENGTH = 200;
+const STDERR_MERGE_WINDOW_MS = 1500;
 
 function resolveLocale(language?: UiLanguage | null): DebugLocale {
   return language === "zh" ? "zh" : "en";
@@ -226,6 +227,48 @@ function extractErrorMessage(entry: DebugEntry): string {
     return extractStderrMessage(entry.payload);
   }
   return asString(entry.payload);
+}
+
+function isCompactStderrEntry(entry: CompactDebugEntry): boolean {
+  return (
+    entry.category === "error" &&
+    (entry.source === "stderr" || entry.label === "micode/stderr")
+  );
+}
+
+function appendDistinctSummaryLine(summary: string, nextLine: string): string {
+  const normalized = nextLine.trim();
+  if (!normalized) {
+    return summary;
+  }
+  const lines = summary
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.includes(normalized)) {
+    return summary;
+  }
+  return summary ? `${summary}\n${nextLine}` : nextLine;
+}
+
+function mergeCompactStderrEntries(entries: CompactDebugEntry[]): CompactDebugEntry[] {
+  const merged: CompactDebugEntry[] = [];
+  entries.forEach((entry) => {
+    const previous = merged[merged.length - 1];
+    if (
+      previous &&
+      isCompactStderrEntry(previous) &&
+      isCompactStderrEntry(entry) &&
+      previous.label === entry.label &&
+      entry.timestamp - previous.timestamp <= STDERR_MERGE_WINDOW_MS
+    ) {
+      previous.summary = appendDistinctSummaryLine(previous.summary, entry.summary);
+      previous.timestamp = Math.max(previous.timestamp, entry.timestamp);
+      return;
+    }
+    merged.push({ ...entry });
+  });
+  return merged;
 }
 
 function buildToolCompactEntry(
@@ -464,7 +507,7 @@ export function buildCompactDebugEntries(
     filtered.push(entry);
   }
 
-  return filtered;
+  return mergeCompactStderrEntries(filtered);
 }
 
 function formatDetailCopy(entries: DebugEntry[]) {

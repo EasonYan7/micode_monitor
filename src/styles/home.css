@@ -41,7 +41,6 @@
 }
 
 .home-hero > .home-brand-row,
-.home-hero > .home-title,
 .home-hero > .home-subtitle,
 .home-hero > .home-hero-copy,
 .home-hero > .home-actions,
@@ -56,32 +55,30 @@
   flex-wrap: wrap;
 }
 
-.home-brand-pill,
+.home-brand-logo,
 .home-brand-persona {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
 }
 
-.home-brand-pill {
-  color: #173329;
-  background: linear-gradient(135deg, #e6c86e, #dcae46);
-  font-weight: 700;
+.home-brand-logo {
+  width: clamp(132px, 16vw, 220px);
+  height: auto;
+  display: block;
+  border-radius: 14px;
+  border: 1px solid rgba(220, 193, 105, 0.24);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 8px 10px;
+  box-sizing: border-box;
 }
 
 .home-brand-persona {
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12px;
   color: rgba(248, 241, 214, 0.9);
   border: 1px solid rgba(220, 193, 105, 0.24);
   background: rgba(255, 255, 255, 0.04);
-}
-
-.home-title {
-  font-size: 56px;
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  color: #fff5d4;
 }
 
 .home-subtitle {

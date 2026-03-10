@@ -36,11 +36,7 @@ export function AboutView() {
     <div className="about">
       <div className="about-card">
         <div className="about-header">
-          <img className="about-icon" src="/app-icon.png" alt="财多多图标" />
-          <div>
-            <div className="about-title">财多多</div>
-            <div className="about-name-en">Rich</div>
-          </div>
+          <img className="about-icon" src="/app-icon.png" alt="财多多 logo" />
         </div>
         <div className="about-version">{version ? `版本 ${version}` : "版本 -"}</div>
         <div className="about-tagline">面向本地项目的智能协作与任务工作台。</div>

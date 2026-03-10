@@ -30,6 +30,7 @@ export function useDebugLog(language?: UiLanguage) {
   const [hasDebugAlerts, setHasDebugAlerts] = useState(false);
   const [debugPinned, setDebugPinned] = useState(false);
   const [debugViewMode, setDebugViewMode] = useState<DebugViewMode>("compact");
+  const [debugScopeMode, setDebugScopeMode] = useState<"thread" | "workspace">("thread");
   const pendingPersistRef = useRef<PersistedDebugEntry[]>([]);
   const persistingRef = useRef(false);
 
@@ -146,6 +147,8 @@ export function useDebugLog(language?: UiLanguage) {
     debugEntries,
     debugViewMode,
     setDebugViewMode,
+    debugScopeMode,
+    setDebugScopeMode,
     hasDebugAlerts,
     showDebugButton,
     addDebugEntry,

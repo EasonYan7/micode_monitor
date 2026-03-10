@@ -323,12 +323,15 @@ export function Home({
       <div className="home">
         <section className="home-hero">
           <div className="home-brand-row">
-            <span className="home-brand-pill">财多多</span>
+            <img
+              className="home-brand-logo"
+              src="/app-icon.png"
+              alt={isZh ? "财多多 logo" : "Rich logo"}
+            />
             <span className="home-brand-persona">
               {isZh ? "你的项目协作台" : "Your project companion"}
             </span>
           </div>
-          <div className="home-title">Rich</div>
           <div className="home-subtitle">
             {isZh
               ? "面向本地项目的智能协作与任务工作台。"

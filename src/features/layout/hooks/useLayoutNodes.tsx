@@ -436,6 +436,7 @@ type LayoutNodesOptions = {
   plan: TurnPlan | null;
   debugEntries: DebugEntry[];
   debugViewMode: DebugViewMode;
+  debugScopeMode: "thread" | "workspace";
   debugOpen: boolean;
   terminalOpen: boolean;
   terminalTabs: TerminalTab[];
@@ -447,6 +448,7 @@ type LayoutNodesOptions = {
   onClearDebug: () => void;
   onCopyDebug: () => void;
   onDebugViewModeChange: (mode: DebugViewMode) => void;
+  onDebugScopeModeChange: (mode: "thread" | "workspace") => void;
   onResizeDebug: (event: MouseEvent<Element>) => void;
   onResizeTerminal: (event: MouseEvent<Element>) => void;
   onBackFromDiff: () => void;
@@ -832,6 +834,10 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       onCopy={options.onCopyDebug}
       viewMode={options.debugViewMode}
       onViewModeChange={options.onDebugViewModeChange}
+      scopeMode={options.debugScopeMode}
+      onScopeModeChange={options.onDebugScopeModeChange}
+      activeWorkspaceId={options.activeWorkspaceId}
+      activeThreadId={options.activeThreadId}
       language={options.language}
       onResizeStart={options.onResizeDebug}
     />
@@ -845,6 +851,10 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       onCopy={options.onCopyDebug}
       viewMode={options.debugViewMode}
       onViewModeChange={options.onDebugViewModeChange}
+      scopeMode={options.debugScopeMode}
+      onScopeModeChange={options.onDebugScopeModeChange}
+      activeWorkspaceId={options.activeWorkspaceId}
+      activeThreadId={options.activeThreadId}
       language={options.language}
       variant="full"
     />

@@ -106,7 +106,7 @@
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 0;
   padding: 0;
   border: none;
   background: transparent;
@@ -117,23 +117,16 @@
 }
 
 .sidebar-brand-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
   flex: 0 0 auto;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  padding: 5px;
+  box-sizing: border-box;
   border: 1px solid rgba(255, 255, 255, 0.18);
-}
-
-.sidebar-brand-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.1;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .sidebar-title-group {

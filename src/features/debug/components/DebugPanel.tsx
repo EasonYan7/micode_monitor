@@ -15,6 +15,10 @@ type DebugPanelProps = {
   onCopy: () => void;
   viewMode: DebugViewMode;
   onViewModeChange: (mode: DebugViewMode) => void;
+  scopeMode: "thread" | "workspace";
+  onScopeModeChange: (mode: "thread" | "workspace") => void;
+  activeWorkspaceId: string | null;
+  activeThreadId: string | null;
   language?: UiLanguage;
   onResizeStart?: (event: ReactMouseEvent) => void;
   variant?: "dock" | "full";
@@ -34,6 +38,53 @@ function formatPayload(payload: unknown) {
   }
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function pickString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function extractWorkspaceId(entry: DebugEntry): string | null {
+  const payload = asRecord(entry.payload);
+  const message = asRecord(payload?.message);
+  const params = asRecord(message?.params);
+  return (
+    pickString(payload?.workspaceId) ??
+    pickString(payload?.workspace_id) ??
+    pickString(params?.workspaceId) ??
+    pickString(params?.workspace_id) ??
+    null
+  );
+}
+
+function extractThreadId(entry: DebugEntry): string | null {
+  const payload = asRecord(entry.payload);
+  const message = asRecord(payload?.message);
+  const params = asRecord(message?.params);
+  const turn = asRecord(params?.turn);
+  const item = asRecord(params?.item);
+  return (
+    pickString(payload?.threadId) ??
+    pickString(payload?.thread_id) ??
+    pickString(params?.threadId) ??
+    pickString(params?.thread_id) ??
+    pickString(turn?.threadId) ??
+    pickString(turn?.thread_id) ??
+    pickString(item?.threadId) ??
+    pickString(item?.thread_id) ??
+    null
+  );
+}
+
 export function DebugPanel({
   entries,
   isOpen,
@@ -41,6 +92,10 @@ export function DebugPanel({
   onCopy,
   viewMode,
   onViewModeChange,
+  scopeMode,
+  onScopeModeChange,
+  activeWorkspaceId,
+  activeThreadId,
   language,
   onResizeStart,
   variant = "dock",
@@ -56,6 +111,19 @@ export function DebugPanel({
   const previousEntriesRef = useRef<DebugEntry[] | null>(null);
   const previousFormattedRef = useRef<FormattedDebugEntry[] | null>(null);
 
+  const filteredEntries = useMemo(() => {
+    if (scopeMode === "workspace") {
+      if (!activeWorkspaceId) {
+        return entries;
+      }
+      return entries.filter((entry) => extractWorkspaceId(entry) === activeWorkspaceId);
+    }
+    if (!activeThreadId) {
+      return [];
+    }
+    return entries.filter((entry) => extractThreadId(entry) === activeThreadId);
+  }, [activeThreadId, activeWorkspaceId, entries, scopeMode]);
+
   const formattedEntries = useMemo(() => {
     if (!isVisible) {
       return previousFormattedRef.current ?? [];
@@ -66,8 +134,8 @@ export function DebugPanel({
     const canReusePrevious =
       previousEntries !== null &&
       previousFormatted !== null &&
-      previousEntries.length === entries.length &&
-      entries.every((entry, index) => {
+      previousEntries.length === filteredEntries.length &&
+      filteredEntries.every((entry, index) => {
         const previous = previousEntries[index];
         return (
           previous !== undefined &&
@@ -83,25 +151,25 @@ export function DebugPanel({
       return previousFormatted;
     }
 
-    const nextFormatted = entries.map((entry) => ({
+    const nextFormatted = filteredEntries.map((entry) => ({
       ...entry,
       timeLabel: new Date(entry.timestamp).toLocaleTimeString(),
       payloadText:
         entry.payload !== undefined ? formatPayload(entry.payload) : undefined,
     }));
 
-    previousEntriesRef.current = entries;
+    previousEntriesRef.current = filteredEntries;
     previousFormattedRef.current = nextFormatted;
 
     return nextFormatted;
-  }, [entries, isVisible]);
+  }, [filteredEntries, isVisible]);
 
   const compactEntries = useMemo<CompactDebugEntry[]>(() => {
     if (!isVisible) {
       return [];
     }
-    return buildCompactDebugEntries(entries, language);
-  }, [entries, isVisible, language]);
+    return buildCompactDebugEntries(filteredEntries, language);
+  }, [filteredEntries, isVisible, language]);
 
   if (!isVisible) {
     return null;
@@ -124,6 +192,22 @@ export function DebugPanel({
         <div className="debug-heading">
           <div className="debug-title">Debug</div>
           <div className="debug-mode-tabs" role="tablist" aria-label="Debug view mode">
+            <button
+              className={`debug-mode-tab ${scopeMode === "thread" ? "active" : ""}`}
+              onClick={() => onScopeModeChange("thread")}
+              role="tab"
+              aria-selected={scopeMode === "thread"}
+            >
+              Thread
+            </button>
+            <button
+              className={`debug-mode-tab ${scopeMode === "workspace" ? "active" : ""}`}
+              onClick={() => onScopeModeChange("workspace")}
+              role="tab"
+              aria-selected={scopeMode === "workspace"}
+            >
+              Workspace
+            </button>
             <button
               className={`debug-mode-tab ${viewMode === "compact" ? "active" : ""}`}
               onClick={() => onViewModeChange("compact")}
